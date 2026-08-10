@@ -1,0 +1,1 @@
+{"schema":1,"type":"queue-item","id":"20260810213656-ky5v4o","objective":"FIX MEDIUM (warden): release.sh step-3 template ships wrong install instructions — documents non-existent init/clean/smudge subcommands + filter.dracon-warden.* (scripts/release.sh)","addedAt":"2026-08-10T21:36:56.853Z"}

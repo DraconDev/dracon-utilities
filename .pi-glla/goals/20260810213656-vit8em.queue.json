@@ -1,0 +1,1 @@
+{"schema":1,"type":"queue-item","id":"20260810213656-vit8em","objective":"FIX MEDIUM (warden): global pre-push/pre-rebase hooks shadow repo-local hooks with no chaining (H-10 fix covered pre-commit only) (main.rs:2506-2661, 2665-2698)","addedAt":"2026-08-10T21:36:56.853Z"}

@@ -1,0 +1,1 @@
+{"schema":1,"type":"queue-item","id":"20260810213656-sdabvq","objective":"FIX LOW (sync): visibility freshness windows diverge — cached_repo_visibility hardcodes 24h vs is_visibility_cache_fresh policy interval_hours (visibility.rs:188-196 vs 105-131)","addedAt":"2026-08-10T21:36:56.853Z"}

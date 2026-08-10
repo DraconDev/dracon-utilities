@@ -1,0 +1,1 @@
+{"schema":1,"type":"queue-item","id":"20260810213656-6wrhdf","objective":"FIX LOW (sync): redact remote URLs (credentials) from stuck-push ledger + handle_ahead_push eprintln (precedent: redact_origin_credentials ownership.rs:468) (daemon.rs:2602-2621, sync.rs:4399-4412)","addedAt":"2026-08-10T21:36:56.853Z"}

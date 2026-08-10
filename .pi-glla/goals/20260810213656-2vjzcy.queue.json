@@ -1,0 +1,1 @@
+{"schema":1,"type":"queue-item","id":"20260810213656-2vjzcy","objective":"FIX LOW (meta): sync release.sh --dry-run skips Cargo.toml bump so cargo publish --dry-run validates OLD version manifest (line ~331)","addedAt":"2026-08-10T21:36:56.854Z"}

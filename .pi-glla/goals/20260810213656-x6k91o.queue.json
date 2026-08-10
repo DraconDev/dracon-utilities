@@ -1,0 +1,1 @@
+{"schema":1,"type":"queue-item","id":"20260810213656-x6k91o","objective":"FIX LOW (system): oom bias inherited by forked children — descendants stranded at adj 250; add sweep for stranded 250s (main.rs:2390-2407)","addedAt":"2026-08-10T21:36:56.854Z"}

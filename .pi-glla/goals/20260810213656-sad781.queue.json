@@ -1,0 +1,1 @@
+{"schema":1,"type":"queue-item","id":"20260810213656-sad781","objective":"FIX MEDIUM (warden): gather_all_recipients trusts any *.pub/*.key without owner_* validation — silent recipient addition to all future encryptions (crypto.rs:104-133)","addedAt":"2026-08-10T21:36:56.853Z"}

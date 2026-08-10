@@ -1,0 +1,1 @@
+{"schema":1,"type":"queue-item","id":"20260810213656-vd5wuo","objective":"FIX LOW (warden): dead code seal_clean/seal_smudge (filter.rs:382,556) + Warden::smudge unused by main.rs — remove or wire","addedAt":"2026-08-10T21:36:56.854Z"}

@@ -1,0 +1,1 @@
+{"schema":1,"type":"queue-item","id":"20260810213656-6x7c59","objective":"FIX MEDIUM (warden): V1 fallback CFB unauthenticated — wrong-key decrypt passing ASCII heuristic returns silent garbage; leaks 20 ciphertext bytes to stderr (crypto.rs:184-201)","addedAt":"2026-08-10T21:36:56.853Z"}

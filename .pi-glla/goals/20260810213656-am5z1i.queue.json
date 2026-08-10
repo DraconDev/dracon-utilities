@@ -1,0 +1,1 @@
+{"schema":1,"type":"queue-item","id":"20260810213656-am5z1i","objective":"FIX MEDIUM (warden scanner): SecretScanner byte-slice panic &matching_str[..60] on multi-byte UTF-8 — same class as sync c06853e fix (scanner.rs:483-493)","addedAt":"2026-08-10T21:36:56.854Z"}

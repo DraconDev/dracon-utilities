@@ -1,0 +1,1 @@
+{"schema":1,"type":"queue-item","id":"20260810213656-wy8lk9","objective":"FIX MEDIUM (sync): exclude.rs matches_untracked_exclude dead `**/A/B` + `a/**/b` patterns silently auto-commit operator-excluded files (exclude.rs:1035-1058); add tests for `**/scratch/notes.md` + `a/**/b` shapes","addedAt":"2026-08-10T21:36:56.853Z"}

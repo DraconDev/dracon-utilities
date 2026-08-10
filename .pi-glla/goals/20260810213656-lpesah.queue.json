@@ -1,0 +1,1 @@
+{"schema":1,"type":"queue-item","id":"20260810213656-lpesah","objective":"FIX MEDIUM (system): memory-renice restore hardcodes nice 0 — capture original pre-pressure nice like the oom path does (main.rs:2379, 2839)","addedAt":"2026-08-10T21:36:56.854Z"}

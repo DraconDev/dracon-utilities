@@ -1,0 +1,1 @@
+{"schema":1,"type":"queue-item","id":"20260810213656-ldwn0s","objective":"FIX HIGH (meta): dracon-system/CHANGELOG.md duplicated ## [0.112.36] headers (lines 16+18) + glued [0.112.35] (line 52); release.sh closer needs close-changelog.py idempotent path","addedAt":"2026-08-10T21:36:56.854Z"}

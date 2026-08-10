@@ -1,0 +1,1 @@
+{"schema":1,"type":"queue-item","id":"20260810213656-sogrn3","objective":"FIX MEDIUM (warden scanner): DSA/EC/OpenSSH/PGP private-key patterns are RSA-regex dupes; PGP PRIVATE KEY BLOCK matches nothing (scanner.rs:318-341)","addedAt":"2026-08-10T21:36:56.854Z"}

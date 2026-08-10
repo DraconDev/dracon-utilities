@@ -1,0 +1,1 @@
+{"schema":1,"type":"queue-item","id":"20260810213656-cvnvqo","objective":"FIX LOW (system): doctor STATUS renders 'present' for failing checks — inverted label; system_root_exists never displayed (doctor.rs:107-171)","addedAt":"2026-08-10T21:36:56.854Z"}

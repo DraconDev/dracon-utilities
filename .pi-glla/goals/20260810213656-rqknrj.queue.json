@@ -1,0 +1,1 @@
+{"schema":1,"type":"queue-item","id":"20260810213656-rqknrj","objective":"FIX MEDIUM (warden): whole-file-tag detection purely syntactic — tag-shaped plaintext committed UNENCRYPTED + breaks checkout; validate with base64-decode/magic (lib.rs:890-930, filter.rs:269-272)","addedAt":"2026-08-10T21:36:56.853Z"}
