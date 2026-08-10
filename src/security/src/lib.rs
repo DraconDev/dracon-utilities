@@ -1936,6 +1936,107 @@ API_KEY=secret"#;
         assert_eq!(smudged, "prefix hunter2 suffix");
     }
 
+    /// FIXED 2026-08-11 (audit MEDIUM): whole-file-tag recognition
+    /// was purely SYNTACTIC (starts `[DRACON_SECRET:` + ends `]`). A
+    /// protected file whose PLAINTEXT was tag-shaped (template,
+    /// redacted placeholder, hand-written "already encrypted" marker)
+    /// tripped the clean-side double-encrypt guard (filter.rs:269/317)
+    /// and was committed UNENCRYPTED, silently. Recognition must now
+    /// validate the payload: valid base64 + age-encryption magic.
+    #[test]
+    fn test_tag_shaped_plaintext_is_not_recognized() {
+        let security = test_security_with_identity();
+
+        // (a) not base64 at all
+        let not_b64 = b"[DRACON_SECRET:not-base64!!!]";
+        // (b) valid base64, decodes to non-age bytes ("hello world")
+        let b64_plain = general_purpose::STANDARD.encode(b"hello world");
+        let wrong_magic = format!("[DRACON_SECRET:{}]", b64_plain).into_bytes();
+        // (c) control: a REAL tag must still be recognized
+        let real = security.encrypt_v2_to_b64_tag(b"secret payload").unwrap();
+
+        assert!(!security.starts_with_any_secret_tag(not_b64));
+        assert!(!security.starts_with_any_secret_tag(&wrong_magic));
+        assert!(security.starts_with_any_secret_tag(&real));
+
+        // Smudge side: tag-shaped plaintext is NOT one of ours — None
+        // (fall through), never `Some(Err)`.
+        assert!(security.decrypt_whole_file_tag(not_b64).is_none());
+        assert!(security.decrypt_whole_file_tag(&wrong_magic).is_none());
+        assert!(security.decrypt_whole_file_tag(&real).is_some());
+    }
+
+    /// FIXED 2026-08-11 (audit MEDIUM): `smudge_with_security`
+    /// propagated `Some(Err)`, hard-failing checkout/merge on any
+    /// tag-shaped file; `seal_smudge` always warned + passed through.
+    /// Now: tag-shaped plaintext falls through gracefully, and a real
+    /// age payload that cannot be unlocked (missing key) also passes
+    /// through with a warning instead of bricking the checkout.
+    #[test]
+    fn test_smudge_passes_through_tag_shaped_plaintext() {
+        let security = test_security_with_identity();
+
+        let not_b64 = b"[DRACON_SECRET:not-base64!!!]";
+        let b64_plain = general_purpose::STANDARD.encode(b"hello world");
+        let wrong_magic = format!("[DRACON_SECRET:{}]", b64_plain).into_bytes();
+
+        // Tag-shaped plaintext must smudge to itself (Ok, no error).
+        let out = smudge_with_security(&security, not_b64).unwrap();
+        assert_eq!(out, not_b64);
+        let out = smudge_with_security(&security, &wrong_magic).unwrap();
+        assert_eq!(out, wrong_magic);
+
+        // A REAL age payload encrypted to a key that exists NOWHERE on
+        // this machine is Some(Err) — smudge must warn + pass the blob
+        // through, not fail. (Encrypt with explicit recipients so the
+        // machine's real identities never appear on the recipient
+        // list; unlock_payload's repo-key/keychain fallbacks cannot
+        // hold a random in-test key, so this is deterministic.)
+        let random_key = x25519::Identity::generate();
+        let foreign_enc = security
+            .encrypt_v2(b"data", vec![Box::new(random_key.to_public())])
+            .unwrap();
+        let foreign = format!(
+            "[DRACON_SECRET:{}]",
+            general_purpose::STANDARD.encode(&foreign_enc)
+        )
+        .into_bytes();
+        assert!(security.decrypt_whole_file_tag(&foreign).is_some(),
+                "age magic must still be recognized as a whole-file tag");
+        let out = smudge_with_security(&security, &foreign).unwrap();
+        assert_eq!(out, foreign, "unlockable-fail tag must pass through raw");
+    }
+
+    /// FIXED 2026-08-11 (audit MEDIUM): the clean-side consequence of
+    /// syntactic recognition — a protected `.env` whose plaintext was
+    /// tag-shaped was returned AS-IS (committed UNENCRYPTED). Now the
+    /// guard only short-circuits on verified age payloads, so
+    /// tag-shaped plaintext gets properly whole-file encrypted.
+    #[test]
+    fn test_clean_encrypts_tag_shaped_plaintext_protected_file() {
+        let security = test_security_with_identity();
+        let tag_shaped = b"[DRACON_SECRET:not-base64!!!]";
+
+        let cleaned = security
+            .smart_clean_with_path(tag_shaped, ".env")
+            .unwrap();
+        assert_ne!(
+            cleaned, tag_shaped,
+            "tag-shaped plaintext must NOT pass through unencrypted"
+        );
+        assert!(
+            security.starts_with_any_secret_tag(&cleaned),
+            "output must be a REAL whole-file tag, got {:?}",
+            String::from_utf8_lossy(&cleaned)
+        );
+
+        // Control: a REAL tag still passes through unchanged (no
+        // double encryption) — the guard must not weaken.
+        let real = security.encrypt_v2_to_b64_tag(b"already encrypted").unwrap();
+        let cleaned = security.smart_clean_with_path(&real, ".env").unwrap();
+        assert_eq!(cleaned, real);
+    }
+
     #[test]
     fn test_encrypt_v2_decrypt_v2_roundtrip() {
         let security = test_security_with_identity();
