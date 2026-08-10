@@ -2045,7 +2045,7 @@ API_KEY=secret"#;
         let mut hasher = Sha256::new();
         hasher.update(repo_key);
         let hash = hasher.finalize();
-        let mut cipher =
+        let cipher =
             cfb_mode::Encryptor::<aes::Aes256>::new_from_slices(&hash[..32], &hash[..16])
                 .unwrap();
         let mut out = plaintext.to_vec();
@@ -2078,7 +2078,7 @@ API_KEY=secret"#;
 
         // 2. Wrong key: a 300-byte payload makes the UTF-8 gate
         // deterministic — random CFB output cannot be valid UTF-8.
-        let long: Vec<u8> = (0..300).map(|i| b'a' + (i % 26)).collect();
+        let long: Vec<u8> = (0u32..300).map(|i| b'a' + (i % 26) as u8).collect();
         let ct = legacy_cfb_encrypt(&key_a, &long);
         assert!(
             security.decrypt_git_seal(&RepoKey(key_b), &ct).is_err(),
