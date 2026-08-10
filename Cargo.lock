@@ -941,7 +941,7 @@ dependencies = [
 
 [[package]]
 name = "dracon-system"
-version = "0.112.35"
+version = "0.112.36"
 dependencies = [
  "anyhow",
  "chrono",
