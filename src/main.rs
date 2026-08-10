@@ -2531,7 +2531,7 @@ SCAN_FILES_NUL=$(mktemp)
 # Accumulator for added-file paths (newline-delimited) — used by the
 # added-blob scan below.
 ADDED_FILES=$(mktemp)
-trap 'rm -f "$SCAN_FILES_NUL" "$ADDED_FILES"' EXIT
+trap 'rm -f "$SCAN_FILES_NUL" "$ADDED_FILES" "$REFS_FILE"' EXIT
 
 # Secret shapes scanned against added diff lines AND added file blobs
 # (see the added-blob scan below). Kept case-sensitive deliberately:
@@ -2548,6 +2548,30 @@ trap 'rm -f "$SCAN_FILES_NUL" "$ADDED_FILES"' EXIT
 # required a quote after `=`, so `password = hunter2` in an added line
 # pushed clean.
 SECRET_RE='(A{1}KIA[A-Z0-9]{16}|-----BEGIN [A-Z]+ PRIVATE KEY|password\s*=\s*["''][^"'']+|secret\s*=\s*["''][^"'']+|api_key\s*=\s*["''][^"'']+|password\s*=\s*[^[:space:]"'']{6,})'
+
+# ── Repo-local hook chaining (FIXED 2026-08-11, audit MEDIUM — H-10
+#    follow-up) ──────────────────────────────────────────────────────
+# Global core.hooksPath shadows .git/hooks for every repo; the H-10
+# fix chained repo-local hooks for pre-commit only, leaving THIS hook
+# silently shadowing any repo-local pre-push. Chain first, like
+# pre-commit: git feeds the push refs on stdin exactly once, so
+# buffer them, hand the buffer to the local hook, and reuse it for
+# warden's own scan below — a local hook that consumes stdin cannot
+# starve the scan. The scan keeps its main-shell form
+# (`done < "$REFS_FILE"`, not a pipe): inside a piped subshell `exit
+# 1` would exit only the subshell and the hook would return 0,
+# silently defeating the guard. The "Dracon Warden" grep skips our
+# own seeded copies (no recursion). DRACON_ALLOW_REWRITE does NOT
+# gate this: that bypass is scoped to the history guard inside the
+# loop; a repo-local hook failure must abort the push regardless.
+REFS_FILE=$(mktemp)
+cat > "$REFS_FILE"
+
+REPO=$(git rev-parse --show-toplevel)
+LOCAL_HOOK="$REPO/.git/hooks/pre-push"
+if [ -x "$LOCAL_HOOK" ] && ! grep -q "Dracon Warden" "$LOCAL_HOOK" 2>/dev/null; then
+    "$LOCAL_HOOK" "$@" < "$REFS_FILE" || exit $?
+fi
 
 # Read push info from stdin (remote URL and branch refs)
 while read local_ref local_sha remote_ref remote_sha; do
@@ -2693,7 +2717,7 @@ while read local_ref local_sha remote_ref remote_sha; do
             exit 1
         fi
     fi
-done
+done < "$REFS_FILE"
 "##;
 
 /// ADDED 2026-07-25 (v0.113.0): refuse rebases that would rewrite
@@ -2708,6 +2732,20 @@ const PRE_REBASE_HOOK: &str = r#"#!/bin/sh
 # Installed by: dracon-warden setup-hooks
 # Bypass deliberately: DRACON_ALLOW_REWRITE=1 git rebase ...
 if [ -n "$DRACON_ALLOW_REWRITE" ]; then exit 0; fi
+
+# FIXED 2026-08-11 (audit MEDIUM — H-10 follow-up): global
+# core.hooksPath shadows .git/hooks for every repo; pre-commit got
+# chaining in H-10 but pre-push and pre-rebase silently shadowed any
+# repo-local hook. Chain the repo-local pre-rebase when one exists
+# (the "Dracon Warden" grep skips our own seeded copies — no
+# recursion). Placed after the bypass so DRACON_ALLOW_REWRITE=1
+# disables hook interference entirely, matching the hook's
+# documented escape hatch.
+REPO=$(git rev-parse --show-toplevel)
+LOCAL_HOOK="$REPO/.git/hooks/pre-rebase"
+if [ -x "$LOCAL_HOOK" ] && ! grep -q "Dracon Warden" "$LOCAL_HOOK" 2>/dev/null; then
+    "$LOCAL_HOOK" "$@" || exit $?
+fi
 
 upstream="$1"
 [ -z "$upstream" ] && exit 0

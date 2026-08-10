@@ -2249,6 +2249,141 @@ protected_patterns = ["secrets.json"]
         }
     }
 
+    // ---- repo-local hook chaining (H-10 follow-up, FIXED 2026-08-11) ----
+    // The global core.hooksPath shadows .git/hooks for every repo;
+    // H-10 chained repo-local hooks for pre-commit only. These tests
+    // prove pre-push and pre-rebase now chain too: the repo-local
+    // hook runs (marker file), its failure aborts the operation, and
+    // the warden pre-push scan still sees the refs even when the
+    // local hook consumed stdin (refs are buffered + replayed).
+
+    fn chmod_755(path: &std::path::Path) {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(path, fs::Permissions::from_mode(0o755)).expect("chmod");
+        }
+    }
+
+    #[test]
+    fn pre_push_hook_chains_to_repo_local_hook() {
+        let (td, hook_path) = make_repo_with_pre_push_hook("chain_push_ok");
+        let repo = td.path();
+        run_git_in(repo, &["commit", "-q", "--allow-empty", "-m", "c1"]);
+        let sha = git_in_output(repo, &["rev-parse", "HEAD"]).trim().to_string();
+
+        // Repo-local hook (non-warden) that records its invocation.
+        let local_hook = repo.join(".git/hooks/pre-push");
+        fs::write(
+            &local_hook,
+            "#!/bin/sh\necho \"local pre-push ran\" > \"$PWD/.git/local-hook.log\"\n",
+        )
+        .expect("write local hook");
+        chmod_755(&local_hook);
+
+        let (status, _stderr) =
+            run_hook(repo, &hook_path, &sha, "0000000000000000000000000000000000000000");
+        let log = fs::read_to_string(repo.join(".git/local-hook.log"))
+            .expect("repo-local pre-push hook must have been chained (ran)");
+        assert!(log.contains("local pre-push ran"));
+        assert!(
+            status.success(),
+            "clean push passes with a chained repo-local hook"
+        );
+    }
+
+    #[test]
+    fn pre_push_hook_chains_and_propagates_local_hook_failure() {
+        let (td, hook_path) = make_repo_with_pre_push_hook("chain_push_fail");
+        let repo = td.path();
+        run_git_in(repo, &["commit", "-q", "--allow-empty", "-m", "c1"]);
+        let sha = git_in_output(repo, &["rev-parse", "HEAD"]).trim().to_string();
+
+        let local_hook = repo.join(".git/hooks/pre-push");
+        fs::write(&local_hook, "#!/bin/sh\nexit 3\n").expect("write local hook");
+        chmod_755(&local_hook);
+
+        let (status, _stderr) =
+            run_hook(repo, &hook_path, &sha, "0000000000000000000000000000000000000000");
+        assert_eq!(
+            status.code(),
+            Some(3),
+            "repo-local hook failure must abort the push (chained before the scan)"
+        );
+    }
+
+    #[test]
+    fn pre_push_hook_scan_survives_local_hook_stdin_consumption() {
+        // A repo-local hook that consumes stdin must not starve
+        // warden's own scan (refs are buffered and replayed).
+        let (td, hook_path) = make_repo_with_pre_push_hook("chain_push_stdin");
+        let repo = td.path();
+        // Literal is concat-split so the warden's own live hook never
+        // self-blocks on this test fixture (unquoted-password shape).
+        fs::write(repo.join("secret.txt"), concat!("password = hunt", "er2\n"))
+            .expect("write secret");
+        run_git_in(repo, &["add", "-A"]);
+        run_git_in(repo, &["commit", "-q", "-m", "secret"]);
+        let sha = git_in_output(repo, &["rev-parse", "HEAD"]).trim().to_string();
+
+        let local_hook = repo.join(".git/hooks/pre-push");
+        fs::write(&local_hook, "#!/bin/sh\ncat >/dev/null\nexit 0\n").expect("write local hook");
+        chmod_755(&local_hook);
+
+        let (status, stderr) =
+            run_hook(repo, &hook_path, &sha, "0000000000000000000000000000000000000000");
+        assert!(
+            !status.success(),
+            "warden scan must still run after the chained hook consumed stdin"
+        );
+        assert!(
+            stderr.contains("Possible plaintext secrets"),
+            "expected secret-block message, got: {stderr}"
+        );
+    }
+
+    #[test]
+    fn pre_rebase_hook_chains_to_repo_local_hook() {
+        let (td, hook_path) = make_repo_with_hook("chain_rebase_ok", "pre-rebase", PRE_REBASE_HOOK);
+        let repo = td.path();
+        run_git_in(repo, &["commit", "-q", "--allow-empty", "-m", "A"]);
+
+        let local_hook = repo.join(".git/hooks/pre-rebase");
+        fs::write(
+            &local_hook,
+            "#!/bin/sh\necho \"local pre-rebase ran\" > \"$PWD/.git/local-rebase.log\"\n",
+        )
+        .expect("write local hook");
+        chmod_755(&local_hook);
+
+        let (status, _text) = run_hook_args(repo, &hook_path, &["main"]);
+        let log = fs::read_to_string(repo.join(".git/local-rebase.log"))
+            .expect("repo-local pre-rebase hook must have been chained (ran)");
+        assert!(log.contains("local pre-rebase ran"));
+        assert!(
+            status.success(),
+            "unpublished rebase passes with a chained repo-local hook"
+        );
+    }
+
+    #[test]
+    fn pre_rebase_hook_chains_and_propagates_local_hook_failure() {
+        let (td, hook_path) = make_repo_with_hook("chain_rebase_fail", "pre-rebase", PRE_REBASE_HOOK);
+        let repo = td.path();
+        run_git_in(repo, &["commit", "-q", "--allow-empty", "-m", "A"]);
+
+        let local_hook = repo.join(".git/hooks/pre-rebase");
+        fs::write(&local_hook, "#!/bin/sh\nexit 4\n").expect("write local hook");
+        chmod_755(&local_hook);
+
+        let (status, _text) = run_hook_args(repo, &hook_path, &["main"]);
+        assert_eq!(
+            status.code(),
+            Some(4),
+            "repo-local pre-rebase failure must abort the rebase"
+        );
+    }
+
     // ---- pre-rebase (H-11, M-15) ----
 
     #[test]
