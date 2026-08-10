@@ -2487,9 +2487,15 @@ if ! grep -q "filter=dracon" "$REPO/.gitattributes" 2>/dev/null; then
     exit 1
 fi
 
-# Check git config has filter.dracon.clean set
-if ! git -C "$REPO" config filter.dracon.clean >/dev/null 2>&1; then
-    echo "❌ Warden filter not configured in git config."
+# Check git config has filter.dracon.clean set — MUST be --local:
+# the operator's GLOBAL ~/.gitconfig also carries filter.dracon.*
+# (this machine included), so a plain `git config` read succeeds in
+# EVERY repo and the check would be dead code — exactly the drift
+# class the MANAGED probe above guards against. `once` writes the
+# keys locally (ensure_repo_filter_config), so validate the same
+# scope. FIXED 2026-08-11 (audit LOW).
+if ! git -C "$REPO" config --local filter.dracon.clean >/dev/null 2>&1; then
+    echo "❌ Warden filter not configured in local git config."
     echo "   Run: dracon-warden once $REPO"
     exit 1
 fi

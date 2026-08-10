@@ -2494,6 +2494,62 @@ protected_patterns = ["secrets.json"]
     }
 
     #[test]
+    fn pre_commit_hook_blocks_managed_repo_with_only_global_filter_config() {
+        // FIXED 2026-08-11 (audit LOW): the second filter check read
+        // `git config` WITHOUT --local, so a machine whose ~/.gitconfig
+        // carries filter.dracon.* (this one does) passed the check in
+        // every repo — masking local-config drift in managed repos.
+        // The managed probe already required --local; the enforcement
+        // check now does too.
+        let (td, hook) =
+            make_repo_with_hook("precommit_global_only", "pre-commit", PRE_COMMIT_HOOK);
+        let repo = td.path();
+        // Managed markers: .dracon dir + .gitattributes block. No LOCAL
+        // filter config (simulating a clone that never ran `once`).
+        fs::create_dir_all(repo.join(".dracon")).expect(".dracon dir");
+        fs::write(repo.join(".gitattributes"), "*.env filter=dracon\n").expect("gitattributes");
+        // Global config carries the filter keys (the masking scope).
+        let global_cfg = repo.join("global.gitconfig");
+        fs::write(
+            &global_cfg,
+            "[filter \"dracon\"]\n\tclean = dracon-warden filter-clean %f\n",
+        )
+        .expect("global gitconfig");
+
+        use std::process::Command;
+        let output = Command::new(&hook)
+            .current_dir(repo)
+            .env("GIT_CONFIG_GLOBAL", &global_cfg)
+            .env("GIT_CONFIG_SYSTEM", "/dev/null")
+            .output()
+            .expect("run hook");
+        let text = String::from_utf8_lossy(&output.stdout).to_string()
+            + &String::from_utf8_lossy(&output.stderr);
+        assert!(
+            !output.status.success(),
+            "managed repo with only GLOBAL filter config must be blocked: {text}"
+        );
+        assert!(
+            text.contains("local git config"),
+            "expected --local enforcement message, got: {text}"
+        );
+
+        // Control: with the LOCAL config present the same repo passes.
+        run_git_in(repo, &["config", "filter.dracon.clean", "dracon-warden filter-clean"]);
+        let output = Command::new(&hook)
+            .current_dir(repo)
+            .env("GIT_CONFIG_GLOBAL", &global_cfg)
+            .env("GIT_CONFIG_SYSTEM", "/dev/null")
+            .output()
+            .expect("run hook");
+        assert!(
+            output.status.success(),
+            "managed repo WITH local filter config must pass: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    #[test]
     fn pre_commit_hook_chains_to_foreign_repo_local_hook() {
         let (td, hook) = make_repo_with_hook("precommit_chain", "pre-commit", PRE_COMMIT_HOOK);
         let repo = td.path();
