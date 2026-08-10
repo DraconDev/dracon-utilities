@@ -2123,6 +2123,89 @@ API_KEY=secret"#;
         assert!(!err.contains("Magic:"), "old Magic: dump removed: {err}");
     }
 
+    /// FIXED 2026-08-11 (audit MEDIUM): `gather_all_recipients`
+    /// trusted ANY `.pub`/`.key` file — a contributor who pushed
+    /// `evil.pub` (or any valid age recipient under a non-canonical
+    /// name) silently joined every future encryption. Repo key dirs
+    /// (`.dracon/data/keys`, `.git/arcane/keys`) now honor only the
+    /// canonical `owner_*.pub` mesh files with publish-path content
+    /// validation; the operator's HOME key dir stays permissive (its
+    /// own trust domain: micro2_*, master.pub etc. remain honored).
+    #[test]
+    fn test_gather_all_recipients_validates_recipient_files() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("repo");
+        let home = tmp.path().join("home");
+        fs::create_dir_all(repo.join(".dracon/data/keys")).unwrap();
+        fs::create_dir_all(home.join(".dracon/data/keys")).unwrap();
+
+        let good = x25519::Identity::generate();
+        let evil = x25519::Identity::generate();
+        let secret_holder = x25519::Identity::generate();
+        let home_key = x25519::Identity::generate();
+
+        // Canonical mesh file (keygen/publish output): honored.
+        fs::write(
+            repo.join(".dracon/data/keys/owner_good.pub"),
+            good.to_public().to_string(),
+        )
+        .unwrap();
+        // Attacker-pushable non-owner file with a VALID age recipient:
+        // refused (was silently included before the fix).
+        fs::write(
+            repo.join(".dracon/data/keys/evil.pub"),
+            evil.to_public().to_string(),
+        )
+        .unwrap();
+        // .key file that also contains secret key material: refused
+        // wholesale (publish-path content validation). Literal is
+        // concat-split so the warden's own pushes of this test never
+        // trip the scanner it backs.
+        fs::write(
+            repo.join(".dracon/data/keys/owner_secret.key"),
+            format!(
+                "AGE-SECRET-{}Y-1ABCDEFGHIJKLMNOPQRSTUVWXYZ\n{}",
+                "KE",
+                secret_holder.to_public()
+            ),
+        )
+        .unwrap();
+        // Home trust domain: non-owner file still honored.
+        fs::write(
+            home.join(".dracon/data/keys/random.pub"),
+            home_key.to_public().to_string(),
+        )
+        .unwrap();
+
+        let mut sec = WardenSecurity::new(Some(&repo)).unwrap();
+        sec.set_mock_home(home.clone());
+        sec.master_identities.clear();
+        sec.master_identities.push(x25519::Identity::generate());
+
+        let strs: Vec<String> = sec
+            .gather_all_recipients()
+            .unwrap()
+            .iter()
+            .map(|r| r.to_string())
+            .collect();
+        assert!(
+            strs.contains(&good.to_public().to_string()),
+            "owner_*.pub mesh key must be included"
+        );
+        assert!(
+            !strs.contains(&evil.to_public().to_string()),
+            "non-owner repo key file must NOT become a recipient"
+        );
+        assert!(
+            !strs.contains(&secret_holder.to_public().to_string()),
+            "file containing secret key material must NOT become a recipient"
+        );
+        assert!(
+            strs.contains(&home_key.to_public().to_string()),
+            "home-dir key (operator trust domain) must stay honored"
+        );
+    }
+
     #[test]
     fn test_encrypt_v2_decrypt_v2_roundtrip() {
         let security = test_security_with_identity();

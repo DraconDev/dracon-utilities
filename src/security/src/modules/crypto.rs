@@ -131,9 +131,8 @@ impl WardenSecurity {
                 warn_once(
                     &WARNED_NON_OWNER_REPO_FILE,
                     &format!(
-                        "ignoring recipient file {} (not owner_*.pub); "
-                            .to_string()
-                            + "only canonical mesh keys are honored in repo key dirs",
+                        "ignoring recipient file {} (not owner_*.pub); \
+only canonical mesh keys are honored in repo key dirs",
                         path.display()
                     ),
                 );
