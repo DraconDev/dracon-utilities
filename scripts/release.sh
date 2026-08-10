@@ -244,11 +244,22 @@ cargo install dracon-warden --version ${VERSION}
 
 ## Usage as a git filter (smudge/clean)
 
+The filter is installed by warden's hardening pass — no manual
+\`git config filter.*\` lines needed (the old template documented
+non-existent \`init\`/\`clean\`/\`smudge\` subcommands and a wrong
+\`filter.dracon-warden.*\` name; the real filter is \`filter.dracon.*\`,
+written by \`once\` via ensure_repo_filter_config):
+
 \`\`\`bash
-# In each repo you want to encrypt:
-dracon-warden init
-git config filter.dracon-warden.clean \"dracon-warden clean %f\"
-git config filter.dracon-warden.smudge \"dracon-warden smudge %f\"
+# One-time, per machine: install the global hooks (pre-commit /
+# pre-push / pre-rebase) and generate this machine's keypair.
+dracon-warden setup-hooks
+dracon-warden keygen
+
+# Per repo you want to encrypt: harden it — writes the managed
+# .gitattributes filter=dracon block + .gitignore block, configures
+# filter.dracon.clean/smudge, and scrubs plaintext markers.
+dracon-warden once <repo>
 \`\`\`
 
 **Full Changelog**: https://github.com/DraconDev/dracon-warden-secret-encrypt-age-git-filter/compare/$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo "0.0.0")...v${VERSION}
