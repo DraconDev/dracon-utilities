@@ -283,6 +283,69 @@ mod tests {
     /// The new `password\s*=\s*[^[:space:]"]{6,}` alternative must
     /// block it. The literal is concat-split so the warden's OWN push
     /// of this test file does not trip the hook it tests.
+    /// FIXED 2026-08-11 (audit LOW): only the AKIA branch (+ the
+    /// space-filename regression) had shell-level coverage. The
+    /// WARDEN-M2 `'\''` single-quote idiom, the BEGIN PRIVATE KEY
+    /// branch, and the password=/secret=/api_key= branches were
+    /// untested. Each fixture literal is concat-split in the SOURCE so
+    /// the warden's own live pre-push hook never self-blocks on the
+    /// test file itself.
+    fn assert_pre_push_blocks_content(name: &str, filename: &str, content: &str) {
+        let (td, hook_path) = make_repo_with_pre_push_hook(name);
+        let repo = td.path();
+        fs::write(repo.join(filename), content).expect("write fixture");
+        run_git_in(repo, &["add", "-A"]);
+        run_git_in(repo, &["commit", "-q", "-m", "add fixture"]);
+        let head = git_in_output(repo, &["rev-parse", "HEAD"]).trim().to_string();
+        let (status, stderr) = run_hook(repo, &hook_path, &head, ZERO_SHA);
+        assert_eq!(
+            status.code(),
+            Some(1),
+            "hook must block the {} shape; stderr was: {}",
+            name,
+            stderr
+        );
+    }
+
+    #[test]
+    fn pre_push_hook_blocks_begin_private_key_branch() {
+        assert_pre_push_blocks_content(
+            "BEGIN PRIVATE KEY",
+            "id_rsa",
+            concat!("-----BEGIN RSA PR", "IVATE KEY-----\nMIIEowIBAAKCAQEA...\n"),
+        );
+    }
+
+    #[test]
+    fn pre_push_hook_blocks_single_quoted_secret_warden_m2_idiom() {
+        // The hook embeds a literal single quote via the shell `'\''`
+        // idiom (WARDEN-M2); the scanner must still match it.
+        assert_pre_push_blocks_content(
+            "single-quoted secret",
+            "config.env",
+            concat!("secret = 'hunt", "er2'\n"),
+        );
+    }
+
+    #[test]
+    fn pre_push_hook_blocks_password_secret_api_key_double_quoted_branches() {
+        assert_pre_push_blocks_content(
+            "password=\"\"",
+            "p.env",
+            concat!("password = \"hunt", "er2\"\n"),
+        );
+        assert_pre_push_blocks_content(
+            "secret=\"\"",
+            "s.env",
+            concat!("secret = \"hunt", "er2\"\n"),
+        );
+        assert_pre_push_blocks_content(
+            "api_key=\"\"",
+            "a.env",
+            concat!("api_key = \"hunt", "er2\"\n"),
+        );
+    }
+
     #[test]
     fn pre_push_hook_blocks_unquoted_padded_password() {
         let (td, hook_path) = make_repo_with_pre_push_hook("hook_unquoted_password");
