@@ -194,9 +194,13 @@ impl WardenSecurity {
             return Ok(plaintext);
         }
 
+        // FIXED 2026-08-11 (audit MEDIUM): the old message dumped the
+        // first 20 CIPHERTEXT bytes to stderr — a plaintext leak on any
+        // machine where stderr is captured by CI/log pipelines. Report
+        // only a safe classification (age magic? length).
         Err(anyhow::anyhow!(
-            "Decryption failed after trying all keys (V2 + V1 + Keychain). Magic: {:?}, Len: {}",
-            encrypted_data.get(0..20).unwrap_or(&[]),
+            "Decryption failed after trying all keys (V2 + V1 + Keychain). Payload: age-format={}, len={}",
+            encrypted_data.starts_with(HEADER_V2_MAGIC),
             encrypted_data.len()
         ))
     }
@@ -299,12 +303,23 @@ impl WardenSecurity {
         let mut plaintext = ciphertext.to_vec();
         cipher.decrypt(&mut plaintext);
 
-        // Simple heuristic: check if result is likely plaintext
-        // If it's garbage, it was probably not encrypted this way
-        let is_likely_plaintext = plaintext
-            .iter()
-            .take(20)
-            .all(|&b| b.is_ascii() && (b.is_ascii_graphic() || b.is_ascii_whitespace() || b == 0));
+        // FIXED 2026-08-11 (audit MEDIUM): the old heuristic checked
+        // ONLY the first 20 bytes for ASCII — a wrong-key decrypt whose
+        // CFB output merely STARTED printable was returned as silent
+        // garbage plaintext (whole-file secret corruption). CFB has no
+        // authentication, so the discriminator is plausibility over the
+        // WHOLE buffer: legacy git-seal ciphertexts are TEXT secrets, so
+        // the entire plaintext must be valid UTF-8 (ASCII-first-20 +
+        // garbage-tail now fails; a wrong-key 300-byte output passes
+        // UTF-8 with probability ~1e-60). The first-20 ASCII gate is
+        // kept for control-character rejection (low bytes are valid
+        // UTF-8 but not text). Binary legacy payloads are rejected with
+        // a clear error instead of being silently corrupted.
+        let is_likely_plaintext = std::str::from_utf8(&plaintext).is_ok()
+            && plaintext
+                .iter()
+                .take(20)
+                .all(|&b| b.is_ascii() && (b.is_ascii_graphic() || b.is_ascii_whitespace() || b == 0));
 
         if !is_likely_plaintext {
             return Err(anyhow::anyhow!(
