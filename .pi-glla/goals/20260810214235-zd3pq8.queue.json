@@ -1,1 +1,8 @@
-{"schema":1,"type":"queue-item","id":"20260810214235-zd3pq8","objective":"Fix audit finding: MEDIUM: whole-file-tag detection is purely syntactic — a protected file whose plaintext begins `[DRACON_SECRET:` and ends `]` trips the clean-side double-encrypt guard (`starts_with_any_secret_tag`, lib.rs:890-930) → committed UNENCRYPTED silently, and `smudge_with_security` propagates the `Some(Err)` on checkout (lib.rs:1213-1221, unlike seal_smudge) → checkout/merge hard-fails; no base64-decode/magic validation distinguishes tag-shaped plaintext (filter.rs:269-272) —","verificationContract":"the fix is committed on the current branch with the repo's configured identity, and this finding's box in .pi-glla/audit-loop/findings.md is checked (\"- [x] … — fixed in <commit>\").","addedAt":"2026-08-10T21:42:35.617Z"}
+{
+  "addedAt": "2026-08-10T21:42:35.617Z",
+  "id": "20260810214235-zd3pq8",
+  "objective": null,
+  "schema": 1,
+  "type": "queue-item",
+  "verificationContract": "the fix is committed on the current branch with the repo's configured identity, and this finding's box in .pi-glla/audit-loop/findings.md is checked (\"- [x] … — fixed in <commit>\")."
+}
