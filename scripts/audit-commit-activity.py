@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import fnmatch
 import os
 import subprocess
 import sys
@@ -34,6 +35,14 @@ def load_policy(path: Path) -> dict:
         raise SystemExit(f"cannot read policy {path}: {exc}")
 
 
+def excluded_name(name: str, excluded: set[str]) -> bool:
+    # audit LOW 2026-08-10: the live config contains the glob ".tmp-*",
+    # which never matches under exact set membership — .tmp-* dirs were
+    # scanned anyway. Match each exclude_dir_names entry as a glob
+    # (fnmatch); entries without metacharacters still match exactly.
+    return name in excluded or any(fnmatch.fnmatch(name, pat) for pat in excluded)
+
+
 def discover_repos(policy: dict) -> list[Path]:
     excluded = set(policy.get("exclude_dir_names", []))
     excluded.update({".git", "target", "node_modules"})
@@ -45,7 +54,7 @@ def discover_repos(policy: dict) -> list[Path]:
         if (root / ".git").exists():
             found.add(root.resolve())
         for current, dirs, _files in os.walk(root):
-            dirs[:] = [d for d in dirs if d not in excluded]
+            dirs[:] = [d for d in dirs if not excluded_name(d, excluded)]
             current_path = Path(current)
             if (current_path / ".git").exists():
                 found.add(current_path.resolve())

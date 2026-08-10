@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **audit scripts now honour glob patterns in `exclude_dir_names`** (audit
+  LOW, 2026-08-10): `scripts/audit-commit-activity.py` and
+  `scripts/verify-ownership-mirrors.py` filtered `os.walk` directories by
+  exact set membership, but the live config contains the glob `.tmp-*` —
+  it never matched, so `.tmp-*` dirs were scanned by both scripts. The
+  directory filter now matches each `exclude_dir_names` entry with
+  `fnmatch` (glob); entries without metacharacters still match exactly.
+  Verified with a fixture tree: `.tmp-scratch`/`.tmp-a`/`node_modules`
+  pruned, plain repos still discovered.
+
 ## [0.113.50] - 2026-08-09
 
 ### Fixed
