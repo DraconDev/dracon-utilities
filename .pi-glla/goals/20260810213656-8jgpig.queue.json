@@ -1,1 +1,0 @@
-{"schema":1,"type":"queue-item","id":"20260810213656-8jgpig","objective":"FIX LOW (sync): SIGHUP reload + freeze marker latency — polled only at loop top, up to one pulse_interval_secs (120s+) delay (daemon.rs:3524-3576)","addedAt":"2026-08-10T21:36:56.853Z"}
