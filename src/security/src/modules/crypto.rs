@@ -12,12 +12,34 @@ use std::collections::HashSet;
 use std::fs;
 use std::io::{Read, Write};
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::is_v1_fallback_allowed;
 use crate::RepoKey;
 use crate::WardenSecurity;
 
 const HEADER_V2_MAGIC: &[u8] = b"age-encryption.org/v1";
+
+/// Mirrors `is_owner_pubkey_filename` in the warden binary (main.rs):
+/// the canonical mesh files written by keygen/publish are `owner_*.pub`.
+/// This crate is published separately, so the predicate is duplicated.
+fn is_owner_pubkey_filename(path: &Path) -> bool {
+    let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+        return false;
+    };
+    name.starts_with("owner_") && name.ends_with(".pub")
+}
+
+/// Warn-once-per-process eprintln (a gather runs on every protected-file
+/// clean; repeating per file would spam the journal).
+fn warn_once(flag: &AtomicBool, msg: &str) {
+    if !flag.swap(true, Ordering::Relaxed) {
+        eprintln!("⚠️ warden: {}", msg);
+    }
+}
+
+static WARNED_NON_OWNER_REPO_FILE: AtomicBool = AtomicBool::new(false);
+static WARNED_SUSPICIOUS_FILE: AtomicBool = AtomicBool::new(false);
 
 impl WardenSecurity {
     pub fn encrypt_v2(
@@ -74,6 +96,7 @@ impl WardenSecurity {
         keys_dir: &Path,
         seen_keys: &mut HashSet<String>,
         recipients: &mut Vec<x25519::Recipient>,
+        require_owner_naming: bool,
     ) {
         if !keys_dir.exists() {
             return;
@@ -85,14 +108,66 @@ impl WardenSecurity {
 
         for entry in entries.flatten() {
             let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
             let ext = path.extension().and_then(|s| s.to_str()).unwrap_or("");
             if ext != "pub" && ext != "key" {
+                continue;
+            }
+
+            // FIXED 2026-08-11 (audit MEDIUM): any `.pub`/`.key` file
+            // was trusted as a recipient source. In REPO key dirs
+            // (`.dracon/data/keys`, `.git/arcane/keys` — the
+            // contributor-pushable surface) only the canonical
+            // `owner_*.pub` mesh files written by keygen/publish
+            // (main.rs publish_repo_pubkey) are honored; anything else
+            // is refused with a warning instead of silently joining
+            // every future encryption. The operator's HOME key dir is
+            // its own trust domain: files there stay honored (parsed
+            // per line, see below) but a warning flags non-canonical
+            // names.
+            if require_owner_naming && !is_owner_pubkey_filename(&path) {
+                warn_once(
+                    &WARNED_NON_OWNER_REPO_FILE,
+                    &format!(
+                        "ignoring recipient file {} (not owner_*.pub); "
+                            .to_string()
+                            + "only canonical mesh keys are honored in repo key dirs",
+                        path.display()
+                    ),
+                );
                 continue;
             }
 
             let Ok(pub_str) = fs::read_to_string(&path) else {
                 continue;
             };
+            // FIXED 2026-08-11 (audit MEDIUM): publish-path content
+            // validation — secret key material or oversized files are
+            // not recipient sources (mirrors validate_owner_age_pubkey_bytes:
+            // no AGE-SECRET-KEY- material, <= 256 bytes).
+            if pub_str.contains(concat!("AGE", "-", "SECRET", "-", "KEY", "-")) {
+                warn_once(
+                    &WARNED_SUSPICIOUS_FILE,
+                    &format!(
+                        "ignoring suspicious recipient file {} (contains secret key material)",
+                        path.display()
+                    ),
+                );
+                continue;
+            }
+            if pub_str.len() > 256 {
+                warn_once(
+                    &WARNED_SUSPICIOUS_FILE,
+                    &format!(
+                        "ignoring suspicious recipient file {} ({} bytes > 256)",
+                        path.display(),
+                        pub_str.len()
+                    ),
+                );
+                continue;
+            }
 
             for line in pub_str.lines() {
                 let line = line.trim();
@@ -123,11 +198,16 @@ impl WardenSecurity {
         // 2. Canonical mesh recipients from ~/.dracon/data/keys/*.pub. This keeps
         // encryption aligned with the documented mesh even when the owner/master
         // private key is stored off-box and only the public recipient is present.
-        if let Some(home) = dirs::home_dir() {
+        // FIXED 2026-08-11 (audit MEDIUM): the home dir is the operator's own
+        // trust domain — non-owner_* files remain honored (micro2_*, master.pub
+        // are legitimate mesh additions) but load_public_recipients_from_dir
+        // flags them once. Repo key dirs below are strict (owner_*.pub only).
+        if let Ok(home) = self.get_home() {
             self.load_public_recipients_from_dir(
                 &home.join(".dracon").join("data").join("keys"),
                 &mut seen_keys,
                 &mut recipients,
+                false,
             );
         }
 
@@ -143,13 +223,22 @@ impl WardenSecurity {
         // 4. Authorized Machine & Team Keys from the current repo
         if let Ok(repo_root) = self.get_repo_root() {
             // Check BOTH new committed path (V2 Standard) and legacy path
+            // FIXED 2026-08-11 (audit MEDIUM): repo key dirs are the
+            // contributor-pushable surface — require the canonical
+            // `owner_*.pub` naming there so a pushed `evil.pub` can no
+            // longer add its holder to every future encryption.
             let search_paths = vec![
                 repo_root.join(".dracon").join("data").join("keys"), // V2 Standard
                 repo_root.join(".git").join("arcane").join("keys"),  // Legacy
             ];
 
             for keys_dir in search_paths {
-                self.load_public_recipients_from_dir(&keys_dir, &mut seen_keys, &mut recipients);
+                self.load_public_recipients_from_dir(
+                    &keys_dir,
+                    &mut seen_keys,
+                    &mut recipients,
+                    true,
+                );
             }
         }
 
