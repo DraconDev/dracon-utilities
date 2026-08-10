@@ -86,3 +86,49 @@ fn test_scanner_detects_aws_access_key() {
         result
     );
 }
+
+#[test]
+fn test_scanner_detects_unquoted_padded_password() {
+    // FIXED 2026-08-11 (audit MEDIUM): whitespace-padded UNQUOTED
+    // passwords (`password = hunter2`) were missed — the unquoted
+    // password pattern required `=` immediately after the name and an
+    // 8+ char value. The literal is concat-split so the warden's own
+    // pushes of this fixture do not trip the pre-push hook it backs.
+    let scanner = SecretScanner::new().unwrap();
+    let content = concat!("password = hunt", "er2\n");
+    let result = scanner.scan_and_replace(content, |name, _| name.to_string());
+    assert!(
+        result.contains("Password Variable"),
+        "whitespace-padded unquoted password should be detected, got: {}",
+        result
+    );
+}
+
+#[test]
+fn test_scanner_detects_unquoted_padded_generic_secret() {
+    // FIXED 2026-08-11 (audit MEDIUM): "Generic Secret (Unquoted)" was
+    // commented out, so `secret = <16+ chars>` with padding pushed
+    // clean. Re-enabled with word boundaries + `\s*` around `=`.
+    let scanner = SecretScanner::new().unwrap();
+    let content = concat!("secret = abcdefghijklm", "nopqrstuvwxyz\n");
+    let result = scanner.scan_and_replace(content, |name, _| name.to_string());
+    assert!(
+        result.contains("Generic Secret"),
+        "whitespace-padded unquoted generic secret should be detected, got: {}",
+        result
+    );
+}
+
+#[test]
+fn test_scanner_ignores_too_short_unquoted_password() {
+    // The unquoted password pattern requires a 6+ char value so that
+    // prose like `password = abcd` (or `password = true`) does not
+    // encrypt protected files on sight.
+    let scanner = SecretScanner::new().unwrap();
+    let content = "password = abcd\n";
+    let result = scanner.scan_and_replace(content, |name, _| name.to_string());
+    assert_eq!(
+        result, content,
+        "4-char unquoted value must NOT match the password pattern"
+    );
+}
