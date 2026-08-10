@@ -545,13 +545,22 @@ mod tests {
         );
     }
 
-    /// ADDED 2026-07-27 (v0.113.2): the BAD_AUTHORS scan must use
-    /// `--first-parent`. Earlier the scan walked every reachable commit
-    /// in the range, so a test-identity commit on a non-first-parent
-    /// side-merge blocked pushes even though the published branch is
-    /// clean. Build a `--no-ff`-merged feature branch where the
-    /// feature commits are authored by `test@test`; main's
-    /// first-parent history is clean and the hook should PASS.
+    /// ADDED 2026-07-27 (v0.113.2): the BAD_AUTHORS scan range must
+    /// exclude ALREADY-PUBLISHED commits — it deliberately does NOT
+    /// use `--first-parent` (FIXED 2026-08-11 comment, audit LOW).
+    /// Earlier the scan covered every reachable commit (for tag
+    /// pushes, `git log empty..tag-sha` = the ENTIRE history
+    /// reachable from the tag object), so a test-identity commit on a
+    /// non-first-parent side-merge blocked a later tag push even
+    /// though that commit was already accepted by the F0.1 scan when
+    /// its branch was pushed. The hook now uses
+    /// `git rev-list "$LOCAL_SHA" --not --remotes` for new-ref
+    /// pushes (and `--not "$REMOTE_SHA"` for branch updates) — a
+    /// --no-ff merge of UNPUBLISHED test-identity commits must still
+    /// block (the counter-test below proves exactly that). This test
+    /// models the production scenario: feature commits authored by
+    /// `test@test` merged with --no-ff, then already published via a
+    /// fake remote-tracking branch; the tag push must PASS.
     #[test]
     fn pre_push_hook_test_identity_on_non_first_parent_merge_passes() {
         let (td, hook_path) = make_repo_with_pre_push_hook("hook_test_non_first_parent");
