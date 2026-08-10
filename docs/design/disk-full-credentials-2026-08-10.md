@@ -160,3 +160,31 @@ matches under repo trees are not.
 compromise of the home dir leaks all git credentials. Consider migrating to
 `credential.helper = libsecret` or `gh auth` before the next full-disk
 recovery forces broader cleanup decisions.
+
+## 8. Follow-up (same day): why the incidents went unmonitored + the fix
+
+Post-incident inspection found the root gap: **`dracon-system-guard.service`
+was disabled and inactive** — its journal has no entries since 2026-08-07 and
+`systemctl --user is-enabled` reported `disabled`. The 2026-08-09 swap-thrash
+and the 2026-08-10 ENOSPC crash both happened with NO guard daemon watching.
+
+Remediation (dracon-system **v0.112.35**, 2026-08-10):
+
+- **Memory/swap pressure guard** (`monitor_memory`): `/proc/meminfo` + PSI
+  (`/proc/pressure/memory`) every pass; alerts on low free memory, high swap
+  usage, or swap thrashing (PSI `full avg10`), with the top-5 RSS offenders
+  in the notification. Never kills anything.
+- **Rapid disk-fill alert** (`disk_rapid_fill_gbph`, default 20 GiB/h):
+  byte-precise df history catches "disk filling fast" before the percent
+  thresholds.
+- **Stuck-candidate escalation** (`process_stuck_after_secs`, default 600):
+  sustained-heavy processes are flagged "POSSIBLY STUCK".
+- **Zombie detail**: per-pid zombie reports with parent/age (diagnostic).
+- **Trash credential guard** (`trash_credential_guard`): the section 5 scan
+  now runs inside `empty_trash` before any deletion; matches abort it.
+- **Service re-enabled**: `systemctl --user enable --now
+  dracon-system-guard.service` (0.112.35 binary installed to
+  `~/.local/bin/dracon-system`).
+
+See `dracon-system/CHANGELOG.md` and
+`dracon-system/release-notes-v0.112.35.md` for details.
