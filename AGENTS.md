@@ -386,6 +386,29 @@ multi-minute downtime (release installs, hardware work) must touch
 the hold marker first and remove it afterwards. See
 `docs/design/daemon-quiesce-policy-2026-08-07.md`.
 
+## Disk cleanup & credential discipline (2026-08-10)
+
+Full writeup: `docs/design/disk-full-credentials-2026-08-10.md` (incident,
+verification protocol, path/pattern lists). Short version:
+
+- **Never delete without operator approval**: `~/.config/google-chrome/**`
+  (and caches while Chrome runs), `~/.dracon/**`, `~/.ssh/**`, `~/.git-credentials`,
+  `~/.netrc`, `~/.npmrc`, `~/.config/gh/hosts.yml`, KWallet/keyring dirs,
+  `*.env`/`*.pem`/`*.key`/`*.age` anywhere in `~/Dev`. Trash too — the
+  2026-08-10 scan found 665 credential-pattern matches in a 56 GB Trash.
+- **Scan before bulk delete / Trash empty**: pattern list in the design doc
+  (chrome/credential/password/secret/token/login data/.env/.pem/.key/.age/
+  .git-credentials/.npmrc/hosts.yml). Review names only; never empty Trash
+  without the scan.
+- **Guard live builds before `rm -rf target/`**: check for `cargo`/`rustc`/
+  `npm install`/`vite build` processes (dev servers are safe to ignore).
+- **Chrome DBs are WAL-locked while Chrome runs**: copy main+`-wal`+`-shm` to
+  /tmp and run `PRAGMA integrity_check` on the copy; `database is locked` on a
+  live file is contention, not corruption. Chrome 148+ has no
+  `os_crypt.encrypted_key` in `Local State` — the key is in KWallet; missing
+  `portal`/keyring with a fresh `Local State` is the real loss signal.
+- **Verify credentials after any cleanup**, read-only (protocol in the doc).
+
 ## Forbidden actions
 
 > **REMOVED in draft 2026-06-30 (audit goal `mr0q2qx2-mvfs0c`)**:
