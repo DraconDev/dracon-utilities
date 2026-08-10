@@ -1,1 +1,0 @@
-{"schema":1,"type":"queue-item","id":"20260810213656-ldb888","objective":"FIX MEDIUM (warden): pre-push hook + inline scanner miss whitespace-padded unquoted secrets (`password = hunter2`) and binary additions are never scanned (main.rs:2645, scanner.rs:342-367)","addedAt":"2026-08-10T21:36:56.853Z"}
