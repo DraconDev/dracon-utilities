@@ -188,3 +188,19 @@ Remediation (dracon-system **v0.112.35**, 2026-08-10):
 
 See `dracon-system/CHANGELOG.md` and
 `dracon-system/release-notes-v0.112.35.md` for details.
+
+Same-day follow-up (v0.112.36, 2026-08-10): the guard now LIMITS
+instead of only detecting. `auto_renice_on_memory` reniced top RSS
+offenders during pressure (fixes the unresponsive-desktop symptom
+without killing); `bias_oom_on_pressure` raises `oom_score_adj` to
+250 on offenders during critical pressure so the kernel's last-resort
+OOM kill picks them, not an innocent process (writing oom_score_adj
+never triggers a kill); optional `cap_offenders_cpu_percent`
+(default 0=off) hard-throttles offenders via a transient CPUQuota
+unit. Memory is deliberately NOT capped (caps free nothing; MemoryMax
+kills, MemoryHigh freezes). A guard WATCHDOG
+(`dracon-system-guard-watchdog.timer`) now restarts the guard if it
+is ever stopped or disabled — the gap that left the system unmonitored
+on Aug 9–10. See
+`dracon-system/release-notes-v0.112.36.md` and the AGENTS.md section
+"Guard service resilience & memory limiting (2026-08-10)".

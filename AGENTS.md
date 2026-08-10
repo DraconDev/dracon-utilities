@@ -386,6 +386,39 @@ multi-minute downtime (release installs, hardware work) must touch
 the hold marker first and remove it afterwards. See
 `docs/design/daemon-quiesce-policy-2026-08-07.md`.
 
+## Guard service resilience & memory limiting (2026-08-10, v0.112.36)
+
+The Aug 9–10 incidents (swap thrash, ENOSPC Chrome crash) ran with
+`dracon-system-guard.service` **disabled + inactive** — no guard was
+watching. Three things changed:
+
+1. **Guard watchdog**: `dracon-system-guard-watchdog.timer` (every
+   2 min) restarts the guard if it is ever inactive. `Restart=always`
+   only covers crashes, not manual stops or a disabled unit. Escape
+   hatch: `touch ~/.dracon/dracon-system.maintenance-hold` (remove
+   afterwards — nothing does it automatically).
+2. **Memory-pressure limiter** (`auto_renice_on_memory`, default
+   true): during warn/critical memory pressure the top-5 RSS offenders
+   get graduated nice (4 GiB → 5, 8 GiB → 10), restored on recovery.
+   Fixes the "system unresponsive" symptom (CPU starvation) without
+   killing. Whitelist via `process_exempt_names`.
+3. **OOM-killer bias** (`bias_oom_on_pressure`, default true): during
+   critical pressure offenders get `oom_score_adj` 250 so the kernel's
+   last-resort kill picks them, not an innocent process. Never
+   triggers a kill; never touches adj ≤ −500 (protected) processes.
+
+Optional (default OFF): `cap_offenders_cpu_percent = N` hard-
+throttles offenders to N% CPU via a transient user systemd unit
+(CPUQuota) during critical pressure. CPU throttling never kills —
+verified live 100% → ~51%. Memory caps are deliberately NOT offered:
+a memory cap frees nothing and only kills (MemoryMax) or freezes
+(MemoryHigh) the process — renice fixes the responsiveness symptom,
+OOM bias steers the kill, CPUQuota tames a stuck busy-loop.
+
+This is the operator-approved design from the 2026-08-10 discussion:
+"deprioritize heavy consumers during pressure, whitelist what must
+stay fast, never cap memory, steer the last-resort kill at offenders."
+
 ## Disk cleanup & credential discipline (2026-08-10)
 
 Full writeup: `docs/design/disk-full-credentials-2026-08-10.md` (incident,
