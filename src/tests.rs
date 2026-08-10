@@ -276,6 +276,93 @@ mod tests {
         );
     }
 
+    /// ADDED 2026-08-11 (audit MEDIUM): the pre-fix hook regex
+    /// required a quote after `=` (`password\s*=\s*["'][^"]+`), so a
+    /// whitespace-padded UNQUOTED password (`password = hunter2` in a
+    /// protected text file) committed plaintext AND pushed clean.
+    /// The new `password\s*=\s*[^[:space:]"]{6,}` alternative must
+    /// block it. The literal is concat-split so the warden's OWN push
+    /// of this test file does not trip the hook it tests.
+    #[test]
+    fn pre_push_hook_blocks_unquoted_padded_password() {
+        let (td, hook_path) = make_repo_with_pre_push_hook("hook_unquoted_password");
+        let repo = td.path();
+
+        fs::create_dir_all(repo.join("secrets")).unwrap();
+        fs::write(
+            repo.join("secrets/app.yaml"),
+            concat!("password = hunt", "er2\n"),
+        )
+        .unwrap();
+        run_git_in(repo, &["add", "secrets/app.yaml"]);
+        run_git_in(repo, &["commit", "-q", "-m", "add padded unquoted password"]);
+        let head = git_in_output(repo, &["rev-parse", "HEAD"])
+            .trim()
+            .to_string();
+
+        let (status, stderr) = run_hook(repo, &hook_path, &head, ZERO_SHA);
+        assert_eq!(
+            status.code(),
+            Some(1),
+            "hook must block a whitespace-padded unquoted password; stderr was: {}",
+            stderr
+        );
+    }
+
+    /// ADDED 2026-08-11 (audit MEDIUM): `git diff --unified=0` emits no
+    /// `+` lines for binary files, so binary additions were never
+    /// scanned. The added-blob scan (`git cat-file blob | grep -a`)
+    /// must block a binary containing key material. The AKIA literal is
+    /// concat-split so the warden's own push of this test file does not
+    /// trip the hook it tests.
+    #[test]
+    fn pre_push_hook_blocks_secret_in_added_binary() {
+        let (td, hook_path) = make_repo_with_pre_push_hook("hook_binary_secret");
+        let repo = td.path();
+
+        // Zip-like header (NUL bytes force git's binary detection).
+        let mut data = b"PK\x03\x04\x00\x00archive\x00".to_vec();
+        data.extend_from_slice(concat!("AK", "IAIOSFODNN7EXAMPLE").as_bytes());
+        data.extend_from_slice(b"\x00tail\x00");
+        fs::write(repo.join("archive.bin"), &data).unwrap();
+        run_git_in(repo, &["add", "archive.bin"]);
+        run_git_in(repo, &["commit", "-q", "-m", "add binary with key material"]);
+        let head = git_in_output(repo, &["rev-parse", "HEAD"])
+            .trim()
+            .to_string();
+
+        let (status, stderr) = run_hook(repo, &hook_path, &head, ZERO_SHA);
+        assert_eq!(
+            status.code(),
+            Some(1),
+            "hook must block a binary addition containing key material; stderr was: {}",
+            stderr
+        );
+    }
+
+    /// ADDED 2026-08-11 (audit MEDIUM): the counterpart to
+    /// `pre_push_hook_blocks_secret_in_added_binary` — a clean binary
+    /// (no key-shaped bytes) must NOT trip the new added-blob scan.
+    #[test]
+    fn pre_push_hook_passes_on_clean_binary() {
+        let (td, hook_path) = make_repo_with_pre_push_hook("hook_clean_binary");
+        let repo = td.path();
+
+        fs::write(repo.join("clean.bin"), b"PK\x03\x04\x00\x00hello world\x00end").unwrap();
+        run_git_in(repo, &["add", "clean.bin"]);
+        run_git_in(repo, &["commit", "-q", "-m", "add clean binary"]);
+        let head = git_in_output(repo, &["rev-parse", "HEAD"])
+            .trim()
+            .to_string();
+
+        let (status, stderr) = run_hook(repo, &hook_path, &head, ZERO_SHA);
+        assert!(
+            status.success(),
+            "hook should pass on a clean binary addition; stderr was: {}",
+            stderr
+        );
+    }
+
     /// ADDED 2026-07-21 (v0.112.32, audit M30/F4.4):
     /// `setup-hooks --local` must actually set `core.hooksPath` —
     /// the pre-fix code ran `git config local core.hooksPath <dir>`

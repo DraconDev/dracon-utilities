@@ -349,25 +349,35 @@ impl SecretScanner {
             // ============================================================
             // Unquoted Assignments (Env Vars / Configs)
             // ============================================================
-            // (
-            //     "Generic Secret (Unquoted)",
-            //     r#"(?i)(?:secret|token|password|passwd|pwd|credential).{0,10}=[^\s"\[]{16,}"#,
-            // ),
+            // FIXED 2026-08-11 (audit MEDIUM): "Generic Secret (Unquoted)"
+            // was commented out upstream, so whitespace-padded unquoted
+            // secrets (`password = hunter2` in a protected file such as
+            // secrets/app.yaml) committed plaintext AND passed the
+            // pre-push defense-in-depth hook. Re-enabled with two
+            // hardening tweaks: `\b` word boundaries (the old pattern
+            // matched `password` inside `notpassword`) and `\s*` around
+            // `=` (whitespace-padded assignments). Blast radius is
+            // protected paths only (see filter.rs: the scanner runs on
+            // secret_patterns matches, never on arbitrary source).
+            (
+                "Generic Secret (Unquoted)",
+                r#"(?i)\b(?:secret|token|password|passwd|pwd|credential)\b.{0,10}\s*=\s*[^\s"\[]{16,}"#,
+            ),
             (
                 "Generic API Key (Unquoted)",
-                r#"(?i)(?:api[_-]?key|apikey).{0,10}=[A-Za-z0-9_-]{20,}"#,
+                r#"(?i)(?:api[_-]?key|apikey).{0,10}\s*=\s*[A-Za-z0-9_-]{20,}"#,
             ),
             (
                 "Private Key Variable (Unquoted)",
-                r#"(?i)[A-Z0-9_]*PRIVATE_KEY[A-Z0-9_]*=[A-Za-z0-9_-]{20,}"#,
+                r#"(?i)[A-Z0-9_]*PRIVATE_KEY[A-Z0-9_]*\s*=\s*[A-Za-z0-9_-]{20,}"#,
             ),
             (
                 "Password Variable (Unquoted)",
-                r#"(?i)[A-Z0-9_]*PASSWORD[A-Z0-9_]*=[a-zA-Z0-9!$%&*+\-.=?@^_~]{8,}"#,
+                r#"(?i)[A-Z0-9_]*PASSWORD[A-Z0-9_]*\s*=\s*[a-zA-Z0-9!$%&*+\-.=?@^_~]{6,}"#,
             ),
             (
                 "Generic Assignment (Unquoted)",
-                r#"(?i)[A-Z][A-Z0-9_]*(?:KEY|SECRET|TOKEN|PASSWORD|PASSWD|CREDENTIAL|AUTH|ACCESS)[A-Z0-9_]*=[^\s"'`]{20,}"#,
+                r#"(?i)[A-Z][A-Z0-9_]*(?:KEY|SECRET|TOKEN|PASSWORD|PASSWD|CREDENTIAL|AUTH|ACCESS)[A-Z0-9_]*\s*=\s*[^\s"'`]{20,}"#,
             ),
         ]
     }
