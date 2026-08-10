@@ -2272,6 +2272,14 @@ protected_patterns = ["secrets.json"]
 
         let hooks_dir = repo.join("test-hooks");
         fs::create_dir_all(&hooks_dir).expect("hooks dir");
+        // Same anti-vacuity fix as make_repo_with_pre_push_hook
+        // (2026-08-12, audit LOW follow-up): never commit the hook
+        // script into the fixture repo.
+        fs::write(
+            repo.join(".git/info/exclude"),
+            "# dracon-warden tests: never commit the hook under test\ntest-hooks/\n",
+        )
+        .expect("write info/exclude");
         run_git_in(
             repo,
             &[
