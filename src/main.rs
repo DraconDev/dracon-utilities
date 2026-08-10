@@ -2528,7 +2528,26 @@ const PRE_PUSH_HOOK: &str = r##"#!/bin/sh
 
 # Accumulator for the per-ref accepted file list (NUL-delimited).
 SCAN_FILES_NUL=$(mktemp)
-trap 'rm -f "$SCAN_FILES_NUL"' EXIT
+# Accumulator for added-file paths (newline-delimited) — used by the
+# added-blob scan below.
+ADDED_FILES=$(mktemp)
+trap 'rm -f "$SCAN_FILES_NUL" "$ADDED_FILES"' EXIT
+
+# Secret shapes scanned against added diff lines AND added file blobs
+# (see the added-blob scan below). Kept case-sensitive deliberately:
+# the warden's own test fixtures contain uppercase `PASSWORD=` forms,
+# and the case-insensitive primary gate (SecretScanner) covers
+# protected paths. Unquoted `secret=`/`api_key=` values are NOT in the
+# hook regex: the warden's own fixture corpus uses exactly those
+# shapes (`secret=hunter2` in plaintext_sibling_test,
+# `ibm_cloud_api_key = ...` in comprehensive_test), which would
+# self-block every future warden push.
+#
+# FIXED 2026-08-11 (audit MEDIUM): added the unquoted-password
+# alternative `password\s*=\s*[^[:space:]"]{6,}`. The pre-fix regex
+# required a quote after `=`, so `password = hunter2` in an added line
+# pushed clean.
+SECRET_RE='(A{1}KIA[A-Z0-9]{16}|-----BEGIN [A-Z]+ PRIVATE KEY|password\s*=\s*["''][^"'']+|secret\s*=\s*["''][^"'']+|api_key\s*=\s*["''][^"'']+|password\s*=\s*[^[:space:]"'']{6,})'
 
 # Read push info from stdin (remote URL and branch refs)
 while read local_ref local_sha remote_ref remote_sha; do
@@ -2597,12 +2616,34 @@ while read local_ref local_sha remote_ref remote_sha; do
     # x" — the class became ["x27], matching literal x/2/7 instead of
     # a single quote), so single-quoted secrets escaped the scan. Use
     # the shell `'`\\`''` idiom to embed a literal single quote.
-    if echo "$DIFF" | grep -qE '(A{1}KIA[A-Z0-9]{16}|-----BEGIN [A-Z]+ PRIVATE KEY|password\s*=\s*["'\''][^"'\'']+|secret\s*=\s*["'\''][^"'\'']+|api_key\s*=\s*["'\''][^"'\'']+)'; then
+    if echo "$DIFF" | grep -qE "$SECRET_RE"; then
         echo "⚠️  Possible plaintext secrets detected in push." >&2
         echo "   The warden filter may have been bypassed." >&2
         echo "   Run: dracon-warden once $(git rev-parse --show-toplevel)" >&2
         exit 1
     fi
+
+    # ADDED 2026-08-11 (audit MEDIUM): `git diff --unified=0` emits NO
+    # `+` lines for binary files (only "Binary files ... differ"), so
+    # binary additions were never scanned. Scan the FULL blob of every
+    # ADDED file with `grep -a` (treats binary data as text). For a new
+    # file the added content IS the whole file, so this is equivalent
+    # to the diff-line scan for text additions and covers binaries for
+    # the first time. MODIFIED files keep the added-lines diff scan
+    # only: scanning whole modified blobs would re-trip on key-shaped
+    # bytes that predate the push.
+    git diff --name-only --diff-filter=A -z "$RANGE" 2>/dev/null | tr '\0' '\n' > "$ADDED_FILES"
+    while IFS= read -r af; do
+        # Skip files hatched via a `.plaintext` sibling, matching the
+        # text scan above.
+        [ -f "$af.plaintext" ] && continue
+        if git cat-file blob "$local_sha:$af" 2>/dev/null | grep -aqE "$SECRET_RE"; then
+            echo "⚠️  Possible plaintext secrets detected in added file $af (binary-safe scan)." >&2
+            echo "   The warden filter may have been bypassed." >&2
+            echo "   Run: dracon-warden once $(git rev-parse --show-toplevel)" >&2
+            exit 1
+        fi
+    done < "$ADDED_FILES"
 
     # ADDED 2026-07-21 (v0.112.33, audit H2/F0.1 follow-up): reject
     # pushes containing commits authored by known TEST identities.
