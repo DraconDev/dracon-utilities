@@ -1,1 +1,0 @@
-{"schema":1,"type":"queue-item","id":"20260810213656-egbk11","objective":"FIX LOW-MED (sync): stage_commit_and_push truncates regular+gitlink lists independently → 2×max_batch staged in one commit when both present (sync.rs:3262-3273)","addedAt":"2026-08-10T21:36:56.853Z"}
