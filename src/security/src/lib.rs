@@ -27,6 +27,13 @@ pub use modules::scanner::SecretScanner;
 
 const DEFAULT_SECRET_MARKER: &str = "DRACON_SECRET";
 
+/// Age encryption header magic. Mirrors the module-private duplicates in
+/// `modules/filter.rs` and `modules/crypto.rs` (kept private per module;
+/// this crate's established pattern). Used to distinguish REAL whole-file
+/// tags (`[DRACON_SECRET:<b64 of age payload>]`) from tag-shaped
+/// plaintext.
+const HEADER_V2_MAGIC: &[u8] = b"age-encryption.org/v1";
+
 static DEFAULT_SECURITY_CACHE: OnceCell<WardenSecurity> = OnceCell::new();
 
 /// Managed-pattern override for the filter process. The
@@ -319,9 +326,27 @@ impl WardenSecurity {
 
     fn starts_with_any_secret_tag(&self, content: &[u8]) -> bool {
         let trimmed = Self::trim_trailing_line_endings(content);
-        self.secret_tag_prefixes()
-            .iter()
-            .any(|prefix| trimmed.starts_with(prefix.as_bytes()) && trimmed.ends_with(b"]"))
+        self.secret_tag_prefixes().iter().any(|prefix| {
+            let p = prefix.as_bytes();
+            if !(trimmed.starts_with(p) && trimmed.ends_with(b"]")) {
+                return false;
+            }
+            // FIXED 2026-08-11 (audit MEDIUM): recognition was purely
+            // SYNTACTIC — any protected file whose plaintext merely
+            // STARTED `[DRACON_SECRET:` and ENDED `]` (tag-shaped
+            // plaintext: a template, a redacted placeholder, or a
+            // hand-written "already encrypted" marker) tripped the
+            // clean-side double-encrypt guard (filter.rs:269/317) and
+            // was committed UNENCRYPTED, silently. Validate the payload
+            // for real: it must be valid base64 AND decode to an age
+            // payload (age-encryption.org/v1 magic).
+            let b64 = &trimmed[p.len()..trimmed.len() - 1];
+            let b64_str = std::str::from_utf8(b64).unwrap_or("");
+            let Ok(encrypted) = general_purpose::STANDARD.decode(b64_str.trim()) else {
+                return false;
+            };
+            encrypted.starts_with(HEADER_V2_MAGIC)
+        })
     }
 
     pub fn get_identity_path() -> Result<PathBuf> {
@@ -900,6 +925,14 @@ impl WardenSecurity {
     /// `.kdbx`) on checkout. Worse, the corrupted working-tree file
     /// was later re-cleaned, so the corruption was re-encrypted into
     /// git history and the original bytes were lost.
+    ///
+    /// FIXED 2026-08-11 (audit MEDIUM): tag-shaped PLAINTEXT is no
+    /// longer surfaced as `Some(Err(...))`. A payload that is not
+    /// valid base64, or decodes to bytes that are not age data
+    /// (magic mismatch), is not one of ours — `None` lets the caller
+    /// fall through to the (graceful) inline/raw paths instead of
+    /// hard-failing checkout. `Some(Err)` is reserved for genuine
+    /// age payloads that fail to unlock (missing key, corrupt).
     fn decrypt_whole_file_tag(&self, content: &[u8]) -> Option<Result<Vec<u8>>> {
         // FIXED 2026-08-09 (audit MEDIUM): trim ALL trailing `\r`/`\n`
         // (CRLF checkouts, editors appending newlines) — a single
@@ -910,19 +943,19 @@ impl WardenSecurity {
             let p = prefix.as_bytes();
             if trimmed.starts_with(p) && trimmed.ends_with(b"]") {
                 let b64 = &trimmed[p.len()..trimmed.len() - 1];
-                // Base64 payloads are ASCII by construction; the
-                // `unwrap_or("")` makes a malformed payload decode-fail
-                // below rather than panic.
+                // FIXED 2026-08-11 (audit MEDIUM): a tag-shaped file
+                // whose payload is not valid base64, or decodes to
+                // non-age bytes, is tag-shaped PLAINTEXT — return None
+                // (fall through) instead of `Some(Err)` so checkout
+                // does not hard-fail. `unlock_payload`'s magic check
+                // is the ground truth for "really encrypted".
                 let b64_str = std::str::from_utf8(b64).unwrap_or("");
-                let encrypted = match general_purpose::STANDARD.decode(b64_str.trim()) {
-                    Ok(e) => e,
-                    Err(e) => {
-                        return Some(Err(anyhow::anyhow!(
-                            "whole-file tag base64 decode failed: {}",
-                            e
-                        )))
-                    }
+                let Ok(encrypted) = general_purpose::STANDARD.decode(b64_str.trim()) else {
+                    return None;
                 };
+                if !encrypted.starts_with(HEADER_V2_MAGIC) {
+                    return None;
+                }
                 return Some(self.unlock_payload(&encrypted));
             }
         }
@@ -1216,7 +1249,20 @@ impl Warden {
 /// is the path `main.rs:run_filter` actually reaches.
 fn smudge_with_security(security: &WardenSecurity, bytes: &[u8]) -> Result<Vec<u8>> {
     if let Some(result) = security.decrypt_whole_file_tag(bytes) {
-        return result;
+        return match result {
+            Ok(plaintext) => Ok(plaintext),
+            // FIXED 2026-08-11 (audit MEDIUM): `Some(Err)` was
+            // propagated, so a genuine age payload that could not be
+            // unlocked (missing/corrupt key) hard-failed EVERY checkout
+            // and merge touching that file — while `seal_smudge` has
+            // always warned + passed through. Match `seal_smudge`:
+            // warn once, pass the blob through raw. Tag-shaped
+            // plaintext never reaches this arm (it is `None` now).
+            Err(e) => {
+                eprintln!("⚠️ whole-file tag decryption failed: {}", e);
+                Ok(bytes.to_vec())
+            }
+        };
     }
     if is_binary_content(bytes) {
         return Ok(bytes.to_vec());
