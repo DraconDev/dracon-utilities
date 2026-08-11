@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Private-key scanner patterns now match their actual formats**: DSA, EC,
+  OpenSSH, and PGP private-key detectors no longer reuse the RSA armored-key
+  expression. The PGP detector now matches `PGP PRIVATE KEY BLOCK` armor, and
+  regression coverage verifies each format is reported under its specific
+  finding name.
+
 - **`.env` header versioning no longer parses body text**: `get_env_version`
   scanned the whole file for the first `"Version: "` substring and the
   header-strip gate used `contains("Dracon Warden")` — an unrelated
