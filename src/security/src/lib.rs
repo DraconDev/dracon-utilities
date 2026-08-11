@@ -112,13 +112,25 @@ fn get_env_version(content: &str) -> u32 {
     let mut lines = content.lines();
     for (idx, line) in lines.by_ref().enumerate() {
         if line.trim() == ENV_HEADER_MARKER_LINE {
-            // In the template the version line immediately follows the
-            // marker.
-            if let Some(vline) = lines.next() {
+            // FIXED 2026-08-12 (audit 2026-08-11 disapproval): the
+            // version line does NOT immediately follow the marker in
+            // the real template — line 3 is the
+            // "# This file is encrypted ..." banner, the version lives
+            // on line 4. The old strict adjacency read the banner,
+            // failed the prefix check and returned 0, so every
+            // re-encryption RESET the version to 1 (blob rewritten
+            // each cycle). Scan a bounded window (the rest of the
+            // 6-line header block) for the version prefix instead.
+            for (k, vline) in lines.by_ref().enumerate() {
                 if let Some(rest) = vline.trim().strip_prefix(ENV_HEADER_VERSION_PREFIX) {
                     if let Ok(v) = rest.trim().parse::<u32>() {
                         return v;
                     }
+                }
+                // k=0..3 = template lines 3-6 (banner, version, DO NOT
+                // EDIT, closing banner); stop before the body.
+                if k >= 3 {
+                    break;
                 }
             }
             return 0;
@@ -1573,9 +1585,13 @@ mod tests {
         // body byte-exact — the old `stripped.trim()` dropped the
         // trailing newline on every re-encryption, so an unchanged
         // .env produced a modified blob each cycle (audit LOW
-        // 2026-08-12).
+        // 2026-08-12). The fixture uses the REAL 6-line
+        // ENV_VERSION_HEADER_TEMPLATE layout (version on line 4) —
+        // the older 4-line adjacent fixture never exercised the
+        // production parser and hid the version-reset bug (audit
+        // 2026-08-11 disapproval).
         let warden = DraconWarden::new().unwrap();
-        let v1 = "# =============================================================================\n# Dracon Warden Encrypted Environment File\n# Version: 1\n# =============================================================================\nAPI_KEY=secret\nTRAIL=value\n\n";
+        let v1 = "# =============================================================================\n# Dracon Warden Encrypted Environment File\n# This file is encrypted by dracon-warden for secure team collaboration.\n# Version: 1\n# DO NOT EDIT THE ENCRYPTED CONTENT MANUALLY - Use `dracon-warden smudge` to decrypt.\n# =============================================================================\nAPI_KEY=secret\nTRAIL=value\n\n";
         let encrypted = warden.clean(v1.as_bytes(), Some(".env")).unwrap();
         let decrypted = warden.smudge(&encrypted, Some(".env")).unwrap();
         let decrypted_str = String::from_utf8_lossy(&decrypted);
@@ -1596,16 +1612,25 @@ mod tests {
 
     #[test]
     fn test_get_env_version_extracts_version() {
+        // Fixtures use the REAL 6-line ENV_VERSION_HEADER_TEMPLATE
+        // layout (version on line 4, after the "# This file is
+        // encrypted ..." banner) — the older adjacent-layout fixtures
+        // matched the buggy strict-adjacency parser and never
+        // exercised production files (audit 2026-08-11 disapproval).
         let v1_content = r#"# =============================================================================
 # Dracon Warden Encrypted Environment File
+# This file is encrypted by dracon-warden for secure team collaboration.
 # Version: 1
+# DO NOT EDIT THE ENCRYPTED CONTENT MANUALLY - Use `dracon-warden smudge` to decrypt.
 # =============================================================================
 API_KEY=secret"#;
         assert_eq!(get_env_version(v1_content), 1);
 
         let v5_content = r#"# =============================================================================
 # Dracon Warden Encrypted Environment File
+# This file is encrypted by dracon-warden for secure team collaboration.
 # Version: 5
+# DO NOT EDIT THE ENCRYPTED CONTENT MANUALLY - Use `dracon-warden smudge` to decrypt.
 # =============================================================================
 API_KEY=secret"#;
         assert_eq!(get_env_version(v5_content), 5);
@@ -1616,10 +1641,13 @@ API_KEY=secret"#;
 
     #[test]
     fn test_make_env_version_header_increments_version() {
-        // Managed header at the top → increments off the HEADER version.
+        // Managed header at the top (REAL 6-line template layout) →
+        // increments off the HEADER version.
         let managed_content = r#"# =============================================================================
 # Dracon Warden Encrypted Environment File
+# This file is encrypted by dracon-warden for secure team collaboration.
 # Version: 1
+# DO NOT EDIT THE ENCRYPTED CONTENT MANUALLY - Use `dracon-warden smudge` to decrypt.
 # =============================================================================
 API_KEY=secret"#;
         let header = make_env_version_header(managed_content);
