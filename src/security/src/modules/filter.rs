@@ -277,12 +277,19 @@ impl WardenSecurity {
                         // that false-positive yielded wrong/duplicated header
                         // versions, audit LOW 2026-08-10).
                         if is_env_version_managed(text_content) {
-                            // Remove old header and add new one with incremented version
+                            // Remove old header and add new one with incremented version.
+                            // FIXED 2026-08-12 (audit LOW): do NOT `.trim()` the
+                            // stripped body — strip_env_version_header already skips
+                            // the newlines right after the closing marker, and the
+                            // body's own trailing blank lines / leading indentation
+                            // must survive re-encryption byte-exact (trim made every
+                            // re-encrypt of a .env ending in a newline rewrite the
+                            // file).
                             let stripped = strip_env_version_header(text_content);
                             format!(
                                 "{}\n{}",
                                 make_env_version_header(text_content),
-                                stripped.trim()
+                                stripped
                             )
                         } else {
                             // First time encryption - add v1 header

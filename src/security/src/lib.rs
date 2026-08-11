@@ -156,16 +156,39 @@ fn make_env_version_header(content: &str) -> String {
 }
 
 fn strip_env_version_header(content: &str) -> &str {
-    let header_marker = "Dracon Warden Encrypted Environment File";
-    if let Some(start_pos) = content.find(header_marker) {
-        let after_header = &content[start_pos..];
-        let closing_marker =
-            "# =============================================================================";
-        if let Some(closing_pos) = after_header.find(closing_marker) {
-            let after_closing = &after_header[closing_pos + closing_marker.len()..];
-            return after_closing
-                .trim_start_matches('\n')
-                .trim_start_matches('\r');
+    // FIXED 2026-08-12 (audit LOW): the old whole-file `find` stripped
+    // everything from the FIRST occurrence of the marker ANYWHERE in
+    // the file — a body value/comment merely mentioning the marker
+    // text mangled the file on re-encryption. Only a marker within the
+    // top lines is the managed header block (same top-6 rule as
+    // `get_env_version` / `is_env_version_managed`); past that the
+    // marker string is body content.
+    let header_marker = ENV_HEADER_MARKER_LINE;
+    for (idx, line) in content.lines().enumerate() {
+        if line.trim() == header_marker {
+            // Byte offset of this line's start (lines() yields slices
+            // into `content`, so the pointer delta is exact for both
+            // \n and \r\n files).
+            let marker_offset = line.as_ptr() as usize - content.as_ptr() as usize;
+            let after_header = &content[marker_offset..];
+            let closing_marker =
+                "# =============================================================================";
+            if let Some(closing_pos) = after_header.find(closing_marker) {
+                let after_closing = &after_header[closing_pos + closing_marker.len()..];
+                // Skip only the newline(s) directly after the closing
+                // marker — the BODY's own leading indentation and
+                // trailing whitespace must be preserved byte-exact
+                // (the filter no longer calls .trim() on this).
+                return after_closing
+                    .trim_start_matches('\n')
+                    .trim_start_matches('\r');
+            }
+            return content;
+        }
+        // The header occupies only the top few lines; past that the
+        // marker string is body content, not a header.
+        if idx >= 6 {
+            break;
         }
     }
     content
@@ -1567,6 +1590,59 @@ mod tests {
         assert!(migrated.contains("[DRACON_SECRET:abc]"));
         assert!(migrated.contains("[DRACON_SECRET:def]"));
         assert!(!migrated.contains("[OLD_SECRET:"));
+    }
+
+    #[test]
+    fn test_strip_env_version_header_only_strips_top_marker() {
+        // A marker in the BODY (past the top lines) is content, not a
+        // header — the old whole-file `find` stripped everything from
+        // the first occurrence anywhere (audit LOW 2026-08-12).
+        let header = r#"# =============================================================================
+# Dracon Warden Encrypted Environment File
+# Version: 1
+# =============================================================================
+"#;
+        let body = "API_KEY=secret\n# Dracon Warden Encrypted Environment File mentioned later\nTAIL=value\n";
+        let managed = format!("{}{}", header, body);
+        let stripped = strip_env_version_header(&managed);
+        assert_eq!(stripped, body, "body (incl. its own marker mention) must be preserved");
+
+        // A file with the marker only in the MIDDLE (never managed) is
+        // returned unchanged.
+        let unmanaged = "FIRST=1\n# Dracon Warden Encrypted Environment File\nLAST=2\n";
+        assert_eq!(strip_env_version_header(unmanaged), unmanaged);
+    }
+
+    #[test]
+    fn test_strip_env_version_header_preserves_body_whitespace() {
+        // Leading indentation of the first body line and trailing blank
+        // lines must survive stripping byte-exact (the filter's
+        // re-encryption path must not .trim() them).
+        let managed = "# =============================================================================\n# Dracon Warden Encrypted Environment File\n# Version: 1\n# =============================================================================\n    INDENTED=1\nTRAIL=2\n\n\n";
+        let expected_body = "    INDENTED=1\nTRAIL=2\n\n\n";
+        assert_eq!(strip_env_version_header(managed), expected_body);
+    }
+
+    #[test]
+    fn test_env_reencryption_preserves_body_whitespace() {
+        // End-to-end: clean() of a managed .env must round-trip the
+        // body byte-exact — the old `stripped.trim()` dropped the
+        // trailing newline on every re-encryption, so an unchanged
+        // .env produced a modified blob each cycle (audit LOW
+        // 2026-08-12).
+        let warden = Warden::new().unwrap();
+        let v1 = "# =============================================================================\n# Dracon Warden Encrypted Environment File\n# Version: 1\n# =============================================================================\nAPI_KEY=secret\nTRAIL=value\n\n";
+        let encrypted = warden.clean(v1.as_bytes(), Some(".env")).unwrap();
+        let decrypted = warden.smudge(&encrypted, Some(".env")).unwrap();
+        let decrypted_str = String::from_utf8_lossy(&decrypted);
+        assert!(
+            decrypted_str.contains("# Version: 2"),
+            "header version must increment: {}",
+            decrypted_str
+        );
+        // Body identical to the original (incl. the trailing blank line).
+        let expected = v1.replace("# Version: 1", "# Version: 2");
+        assert_eq!(decrypted_str, expected, "body must round-trip byte-exact");
     }
 
     #[test]
