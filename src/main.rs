@@ -2551,9 +2551,18 @@ trap 'rm -f "$SCAN_FILES_NUL" "$ADDED_FILES" "$REFS_FILE"' EXIT
 #
 # FIXED 2026-08-11 (audit MEDIUM): added the unquoted-password
 # alternative `password\s*=\s*[^[:space:]"]{6,}`. The pre-fix regex
-# required a quote after `=`, so `password = hunter2` in an added line
-# pushed clean.
-SECRET_RE='(A{1}KIA[A-Z0-9]{16}|-----BEGIN [A-Z]+ PRIVATE KEY|password\s*=\s*["''][^"'']+|secret\s*=\s*["''][^"'']+|api_key\s*=\s*["''][^"'']+|password\s*=\s*[^[:space:]"'']{6,})'
+# required a quote after `=`, so a bare `password = abc` in an added
+# line pushed clean.
+# FIXED 2026-08-12 (audit LOW follow-up, auditor-verified): the quoted
+# branches were written `["''][^"'']` inside a shell single-quoted
+# string — POSIX shell collapses each `''` pair to the empty string,
+# so the EFFECTIVE regex was `["][^"]+`: single-quoted values
+# (`secret = 'hunter2'`) pushed clean. Use the `'\''` idiom so a real
+# `'` survives shell parsing (effective: `["'][^"']+`, verified with
+# sh -x). NOTE: this comment must never contain `password = <6+ chars>`
+# — the unquoted branch would self-match the hook's own text if the
+# script is ever committed (the 2026-08-12 test-harness vacuity).
+SECRET_RE='(A{1}KIA[A-Z0-9]{16}|-----BEGIN [A-Z]+ PRIVATE KEY|password\s*=\s*["'\''][^"'\'']+|secret\s*=\s*["'\''][^"'\'']+|api_key\s*=\s*["'\''][^"'\'']+|password\s*=\s*[^[:space:]"'']{6,})'
 
 # ── Repo-local hook chaining (FIXED 2026-08-11, audit MEDIUM — H-10
 #    follow-up) ──────────────────────────────────────────────────────

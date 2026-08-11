@@ -107,6 +107,20 @@ mod tests {
         // pre-push hook there.
         let hooks_dir = repo.join("test-hooks");
         fs::create_dir_all(&hooks_dir).expect("hooks dir");
+        // FIXED 2026-08-12 (audit LOW follow-up, auditor-verified
+        // vacuity): the hook script must NEVER be committed into the
+        // fixture repo — the hook's own documentation comment
+        // (`password = hunter2`) self-matches the unquoted-password
+        // branch, so every "block" assertion passed via the committed
+        // hook script, not via the fixture. Exclude the hooks dir via
+        // .git/info/exclude (git add -A honors it); the dir stays
+        // inside the temp repo so TestDir Drop cleans it up.
+        fs::create_dir_all(repo.join(".git/info")).expect(".git/info");
+        fs::write(
+            repo.join(".git/info/exclude"),
+            "# dracon-warden tests: never commit the hook under test\ntest-hooks/\n",
+        )
+        .expect("write info/exclude");
         run_git_in(
             repo,
             &[
@@ -294,7 +308,12 @@ mod tests {
         let (td, hook_path) = make_repo_with_pre_push_hook(name);
         let repo = td.path();
         fs::write(repo.join(filename), content).expect("write fixture");
-        run_git_in(repo, &["add", "-A"]);
+        // FIXED 2026-08-12 (audit LOW follow-up): stage ONLY the
+        // fixture (never `git add -A` — the hook script at
+        // test-hooks/ would otherwise be committed and its own
+        // documentation comment would self-match, making the
+        // assertion vacuous).
+        run_git_in(repo, &["add", "--", filename]);
         run_git_in(repo, &["commit", "-q", "-m", "add fixture"]);
         let head = git_in_output(repo, &["rev-parse", "HEAD"]).trim().to_string();
         let (status, stderr) = run_hook(repo, &hook_path, &head, ZERO_SHA);
@@ -2275,6 +2294,7 @@ protected_patterns = ["secrets.json"]
         // Same anti-vacuity fix as make_repo_with_pre_push_hook
         // (2026-08-12, audit LOW follow-up): never commit the hook
         // script into the fixture repo.
+        fs::create_dir_all(repo.join(".git/info")).expect(".git/info");
         fs::write(
             repo.join(".git/info/exclude"),
             "# dracon-warden tests: never commit the hook under test\ntest-hooks/\n",
@@ -2402,7 +2422,9 @@ protected_patterns = ["secrets.json"]
         // self-blocks on this test fixture (unquoted-password shape).
         fs::write(repo.join("secret.txt"), concat!("password = hunt", "er2\n"))
             .expect("write secret");
-        run_git_in(repo, &["add", "-A"]);
+        // FIXED 2026-08-12 (audit LOW follow-up): stage only the
+        // fixture (anti-vacuity — never commit the hook script).
+        run_git_in(repo, &["add", "--", "secret.txt"]);
         run_git_in(repo, &["commit", "-q", "-m", "secret"]);
         let sha = git_in_output(repo, &["rev-parse", "HEAD"]).trim().to_string();
 
