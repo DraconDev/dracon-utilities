@@ -1266,7 +1266,7 @@ fn is_binary_content(bytes: &[u8]) -> bool {
 /// (DER keys, SQLite, .kdbx); the corrupted worktree file was then
 /// re-encrypted into git history by the next clean. The v0.112.32
 /// `decrypt_whole_file_tag` helper was only wired into
-/// `seal_smudge`/`decrypt_file`, which the binary never calls — this
+/// `decrypt_file`, which the binary never calls — this
 /// is the path `main.rs:run_filter` actually reaches.
 fn smudge_with_security(security: &WardenSecurity, bytes: &[u8]) -> Result<Vec<u8>> {
     if let Some(result) = security.decrypt_whole_file_tag(bytes) {
@@ -1275,8 +1275,9 @@ fn smudge_with_security(security: &WardenSecurity, bytes: &[u8]) -> Result<Vec<u
             // FIXED 2026-08-11 (audit MEDIUM): `Some(Err)` was
             // propagated, so a genuine age payload that could not be
             // unlocked (missing/corrupt key) hard-failed EVERY checkout
-            // and merge touching that file — while `seal_smudge` has
-            // always warned + passed through. Match `seal_smudge`:
+            // and merge touching that file — while the legacy smudge
+            // path has
+            // always warned + passed through. Match it:
             // warn once, pass the blob through raw. Tag-shaped
             // plaintext never reaches this arm (it is `None` now).
             Err(e) => {
@@ -2053,8 +2054,9 @@ API_KEY=secret"#;
 
     /// FIXED 2026-08-11 (audit MEDIUM): `smudge_with_security`
     /// propagated `Some(Err)`, hard-failing checkout/merge on any
-    /// tag-shaped file; `seal_smudge` always warned + passed through.
-    /// Now: tag-shaped plaintext falls through gracefully, and a real
+    /// tag-shaped file; the legacy smudge path always warned + passed
+    /// through. Now: tag-shaped plaintext falls through gracefully,
+    /// and a real
     /// age payload that cannot be unlocked (missing key) also passes
     /// through with a warning instead of bricking the checkout.
     #[test]
