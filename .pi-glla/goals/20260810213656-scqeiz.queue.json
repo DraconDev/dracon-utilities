@@ -1,1 +1,0 @@
-{"schema":1,"type":"queue-item","id":"20260810213656-scqeiz","objective":"FIX MEDIUM (system): empty_trash credential guard only in apply mode — dry-run reports bytes apply refuses; align dry-run warning (main.rs:1615-1662)","addedAt":"2026-08-10T21:36:56.854Z"}
