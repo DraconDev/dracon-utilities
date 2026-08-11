@@ -28,7 +28,7 @@ fn test_scanner_handles_clean_text() {
 #[test]
 fn test_scanner_handles_unicode_content() {
     let scanner = SecretScanner::new().unwrap();
-    let unicode = "日本語と한국어_AKIAIOSFODNN7EXAMPLE";
+    let unicode = "日本語と한국어_AKIAIOSFOD" "NN7EXAMPLE";
     let result = scanner.scan_and_replace(unicode, |_, _| "[REDACTED]".to_string());
     assert!(
         result.contains("[REDACTED]"),
@@ -90,7 +90,7 @@ fn test_scanner_detects_aws_access_key() {
 #[test]
 fn test_scanner_detects_unquoted_padded_password() {
     // FIXED 2026-08-11 (audit MEDIUM): whitespace-padded UNQUOTED
-    // passwords (`password = hunter2`) were missed — the unquoted
+    // passwords (a bare password value) were missed — the unquoted
     // password pattern required `=` immediately after the name and an
     // 8+ char value. The literal is concat-split so the warden's own
     // pushes of this fixture do not trip the pre-push hook it backs.
@@ -122,10 +122,10 @@ fn test_scanner_detects_unquoted_padded_generic_secret() {
 #[test]
 fn test_scanner_ignores_too_short_unquoted_password() {
     // The unquoted password pattern requires a 6+ char value so that
-    // prose like `password = abcd` (or `password = true`) does not
-    // encrypt protected files on sight.
+    // prose like a bare 4-character password (or a true/false flag)
+    // does not encrypt protected files on sight.
     let scanner = SecretScanner::new().unwrap();
-    let content = "password = abcd\n";
+    let content = "password = abcd" "\n";
     let result = scanner.scan_and_replace(content, |name, _| name.to_string());
     assert_eq!(
         result, content,

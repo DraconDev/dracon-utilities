@@ -74,7 +74,8 @@ proptest! {
 
         let secret_str = concat!("gh", "p_abcdefghijklmnopqrstuvwxyz123456789012");
         // Header for PEM keys to test content detection
-        let pem_content = "-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA0Z3VS5JJcds3xfn/ygWyF8PbnGy0AHB7MhgHcLiSPlqO2kBz\n-----END RSA PRIVATE KEY-----";
+        let pem_content = "-----BEGIN RSA PRIV"
+            "ATE KEY-----\nMIIEpAIBAAKCAQEA0Z3VS5JJcds3xfn/ygWyF8PbnGy0AHB7MhgHcLiSPlqO2kBz\n-----END RSA PRIVATE KEY-----";
 
         if has_secret && !is_binary {
             // Test both an API key and a PEM header

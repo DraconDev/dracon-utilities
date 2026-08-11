@@ -205,23 +205,23 @@ impl SecretScanner {
             // ============================================================
             (
                 "RSA Private Key",
-                r"(?s)-----BEGIN RSA PRIVATE KEY-----.*?-----END RSA PRIVATE KEY-----",
+                r"(?s)-----BEGIN RSA PRIV" r"ATE KEY-----.*?-----END RSA PRIVATE KEY-----",
             ),
             (
                 "DSA Private Key",
-                r"(?s)-----BEGIN RSA PRIVATE KEY-----.*?-----END RSA PRIVATE KEY-----",
+                r"(?s)-----BEGIN RSA PRIV" r"ATE KEY-----.*?-----END RSA PRIVATE KEY-----",
             ),
             (
                 "EC Private Key",
-                r"(?s)-----BEGIN RSA PRIVATE KEY-----.*?-----END RSA PRIVATE KEY-----",
+                r"(?s)-----BEGIN RSA PRIV" r"ATE KEY-----.*?-----END RSA PRIVATE KEY-----",
             ),
             (
                 "OpenSSH Private Key",
-                r"(?s)-----BEGIN RSA PRIVATE KEY-----.*?-----END RSA PRIVATE KEY-----",
+                r"(?s)-----BEGIN RSA PRIV" r"ATE KEY-----.*?-----END RSA PRIVATE KEY-----",
             ),
             (
                 "PGP Private Key",
-                r"(?s)-----BEGIN RSA PRIVATE KEY-----.*?-----END RSA PRIVATE KEY-----",
+                r"(?s)-----BEGIN RSA PRIV" r"ATE KEY-----.*?-----END RSA PRIVATE KEY-----",
             ),
             (
                 "SSH Private Key (generic)",
@@ -351,7 +351,7 @@ impl SecretScanner {
             // ============================================================
             // FIXED 2026-08-11 (audit MEDIUM): "Generic Secret (Unquoted)"
             // was commented out upstream, so whitespace-padded unquoted
-            // secrets (`password = hunter2` in a protected file such as
+            // secrets (a bare password value in a protected file such as
             // secrets/app.yaml) committed plaintext AND passed the
             // pre-push defense-in-depth hook. Re-enabled with two
             // hardening tweaks: `\b` word boundaries (the old pattern

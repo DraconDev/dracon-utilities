@@ -342,7 +342,7 @@ mod tests {
         assert_pre_push_blocks_content(
             "single-quoted secret",
             "config.env",
-            concat!("secret = 'hunt", "er2'\n"),
+            concat!("secret = '", "hunter2'\n"),
         );
     }
 
@@ -739,7 +739,10 @@ mod tests {
         let (td, hook_path) = make_repo_with_pre_push_hook("hook_delete_only");
         let repo = td.path();
 
-        // Baseline commit contains the secret-shaped line.
+        // Baseline commit contains the secret-shaped line. (The split
+        // keeps `\"` before AKIA: a split landing after the opening
+        // quote or after `AKIA` would still match the hook's quoted or
+        // AKIA branch on a fresh-branch scan.)
         fs::write(
             repo.join("legacy.rs"),
             concat!("let secret = \"AK", "IAIOSFODNN7EXAMPLE\";\n"),

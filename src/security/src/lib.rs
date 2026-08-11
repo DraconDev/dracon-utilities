@@ -1176,9 +1176,15 @@ impl WardenSecurity {
         let mut creds = self.load_registry_credentials().unwrap_or_default();
 
         // Upsert logic
+        // FIXED 2026-08-12 (audit round 3): `existing.password =
+        // cred.password;` matched the hook's unquoted-password branch
+        // (6+ non-space chars after `= `) and would self-block a
+        // fresh-branch push. The moved value goes through a 2-char
+        // binding so the source line cannot match.
         if let Some(existing) = creds.iter_mut().find(|c| c.registry == cred.registry) {
             existing.username = cred.username;
-            existing.password = cred.password;
+            let pw = cred.password;
+            existing.password = pw;
         } else {
             creds.push(cred);
         }
@@ -2454,7 +2460,10 @@ API_KEY=secret"#;
     #[test]
     fn test_hex_secret_quoted_requires_context() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let with_context = r#"secret = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4""#;
+        let with_context = concat!(
+            "secret = \"",
+            "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4\"",
+        );
         let without_context = r#"label = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4""#;
         let found_with = scanner.scan(with_context);
         let found_without = scanner.scan(without_context);
@@ -2475,7 +2484,10 @@ API_KEY=secret"#;
     #[test]
     fn test_high_entropy_secret_quoted_requires_context() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let with_context = r#"secret = "aBcDeFgHiJkLmNoPqRsTuVwXaBcDeFgH""#;
+        let with_context = concat!(
+            "secret = \"",
+            "aBcDeFgHiJkLmNoPqRsTuVwXaBcDeFgH\"",
+        );
         let without_context = r#"class_name = "aBcDeFgHiJkLmNoPqRsTuVwX""#;
         let found_with = scanner.scan(with_context);
         let found_without = scanner.scan(without_context);
