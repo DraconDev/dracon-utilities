@@ -88,6 +88,29 @@ fn test_scanner_detects_aws_access_key() {
 }
 
 #[test]
+fn test_scanner_detects_private_key_formats_by_specific_name() {
+    let scanner = SecretScanner::new().unwrap();
+    let cases = [
+        ("RSA PRIVATE KEY", "RSA Private Key"),
+        ("DSA PRIVATE KEY", "DSA Private Key"),
+        ("EC PRIVATE KEY", "EC Private Key"),
+        ("OPENSSH PRIVATE KEY", "OpenSSH Private Key"),
+        ("PGP PRIVATE KEY BLOCK", "PGP Private Key"),
+    ];
+
+    for (label, expected_name) in cases {
+        let content = format!(
+            "-----BEGIN {label}-----\nkey-material\n-----END {label}-----"
+        );
+        let result = scanner.scan_and_replace(&content, |name, _| name.to_string());
+        assert_eq!(
+            result, expected_name,
+            "{label} should be reported as {expected_name}, got: {result}"
+        );
+    }
+}
+
+#[test]
 fn test_scanner_detects_unquoted_padded_password() {
     // FIXED 2026-08-11 (audit MEDIUM): whitespace-padded UNQUOTED
     // passwords (a bare password value) were missed — the unquoted

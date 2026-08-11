@@ -225,19 +225,19 @@ impl SecretScanner {
             ),
             (
                 "DSA Private Key",
-                concat!(r"(?s)-----BEGIN RSA PRIV", r"ATE KEY-----.*?-----END RSA PRIVATE KEY-----"),
+                concat!(r"(?s)-----BEGIN DSA PRIV", r"ATE KEY-----.*?-----END DSA PRIVATE KEY-----"),
             ),
             (
                 "EC Private Key",
-                concat!(r"(?s)-----BEGIN RSA PRIV", r"ATE KEY-----.*?-----END RSA PRIVATE KEY-----"),
+                concat!(r"(?s)-----BEGIN EC PRIV", r"ATE KEY-----.*?-----END EC PRIVATE KEY-----"),
             ),
             (
                 "OpenSSH Private Key",
-                concat!(r"(?s)-----BEGIN RSA PRIV", r"ATE KEY-----.*?-----END RSA PRIVATE KEY-----"),
+                concat!(r"(?s)-----BEGIN OPENSSH PRIV", r"ATE KEY-----.*?-----END OPENSSH PRIVATE KEY-----"),
             ),
             (
                 "PGP Private Key",
-                concat!(r"(?s)-----BEGIN RSA PRIV", r"ATE KEY-----.*?-----END RSA PRIVATE KEY-----"),
+                concat!(r"(?s)-----BEGIN PGP PRIV", r"ATE KEY BLOCK-----.*?-----END PGP PRIVATE KEY BLOCK-----"),
             ),
             (
                 "SSH Private Key (generic)",
