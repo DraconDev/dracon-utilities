@@ -1,1 +1,0 @@
-{"schema":1,"type":"queue-item","id":"20260810213656-benve2","objective":"FIX LOW (system): cap_offenders_cpu_percent unclamped >100 → cpu-cap failed spam every interval (main.rs:943-944, 3351-3389)","addedAt":"2026-08-10T21:36:56.854Z"}
