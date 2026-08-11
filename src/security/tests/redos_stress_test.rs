@@ -56,7 +56,7 @@ fn test_scanner_performance_under_large_evil_input() {
 #[test]
 fn test_scanner_performance_mixed_secret_and_filler() {
     let scanner = SecretScanner::new().unwrap();
-    let secret = "" "AKIAIOSFOD" "NN7EXAMPLE".to_string();
+    let secret = concat!("AKIAIOSFOD", "NN7EXAMPLE").to_string();
     let filler = "x".repeat(5_000);
     let input = format!("{}\n{}\n{}", filler, secret, filler);
 

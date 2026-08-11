@@ -4,7 +4,7 @@ use dracon_security::SecretScanner;
 fn test_scanner_stress_1000() {
     let scanner = SecretScanner::new().unwrap();
     let clean_content = "fn main() { println!(\"Hello, world!\"); }";
-    let secret_content = "let api_key = \"AKIAIOSFOD" "NN7EXAMPLE\";";
+    let secret_content = concat!("let api_key = \"AKIAIOSFOD", "NN7EXAMPLE\";");
 
     for i in 0..1000 {
         let findings = scanner.scan(clean_content);

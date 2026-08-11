@@ -28,7 +28,7 @@ fn test_scanner_handles_clean_text() {
 #[test]
 fn test_scanner_handles_unicode_content() {
     let scanner = SecretScanner::new().unwrap();
-    let unicode = "日本語と한국어_AKIAIOSFOD" "NN7EXAMPLE";
+    let unicode = concat!("日本語と한국어_AKIAIOSFOD", "NN7EXAMPLE");
     let result = scanner.scan_and_replace(unicode, |_, _| "[REDACTED]".to_string());
     assert!(
         result.contains("[REDACTED]"),
@@ -125,7 +125,7 @@ fn test_scanner_ignores_too_short_unquoted_password() {
     // prose like a bare 4-character password (or a true/false flag)
     // does not encrypt protected files on sight.
     let scanner = SecretScanner::new().unwrap();
-    let content = "password = abcd" "\n";
+    let content = concat!("password = abcd", "\n");
     let result = scanner.scan_and_replace(content, |name, _| name.to_string());
     assert_eq!(
         result, content,
