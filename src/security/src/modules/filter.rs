@@ -118,7 +118,7 @@ pub fn path_is_protected(path_str: &str, protected_patterns: &[String]) -> bool 
                 } else {
                     // `**/name`: `name` as the FINAL component
                     // (glob semantics).
-                    if path_str.split('/').last() == Some(component) {
+                    if path_str.rsplit('/').next() == Some(component) {
                         return true;
                     }
                 }
