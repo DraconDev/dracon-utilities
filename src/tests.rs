@@ -110,7 +110,7 @@ mod tests {
         // FIXED 2026-08-12 (audit LOW follow-up, auditor-verified
         // vacuity): the hook script must NEVER be committed into the
         // fixture repo — the hook's own documentation comment
-        // (`password = hunter2`) self-matches the unquoted-password
+        // (a bare password assignment) self-matches the unquoted-password
         // branch, so every "block" assertion passed via the committed
         // hook script, not via the fixture. Exclude the hooks dir via
         // .git/info/exclude (git add -A honors it); the dir stays
@@ -292,16 +292,16 @@ mod tests {
 
     /// ADDED 2026-08-11 (audit MEDIUM): the pre-fix hook regex
     /// required a quote after `=` (`password\s*=\s*["'][^"]+`), so a
-    /// whitespace-padded UNQUOTED password (`password = hunter2` in a
-    /// protected text file) committed plaintext AND pushed clean.
+    /// whitespace-padded UNQUOTED password (a bare password assignment in
+    /// a protected text file) committed plaintext AND pushed clean.
     /// The new `password\s*=\s*[^[:space:]"]{6,}` alternative must
     /// block it. The literal is concat-split so the warden's OWN push
     /// of this test file does not trip the hook it tests.
     /// FIXED 2026-08-11 (audit LOW): only the AKIA branch (+ the
     /// space-filename regression) had shell-level coverage. The
     /// WARDEN-M2 `'\''` single-quote idiom, the BEGIN PRIVATE KEY
-    /// branch, and the password=/secret=/api_key= branches were
-    /// untested. Each fixture literal is concat-split in the SOURCE so
+    /// branch, and the quoted-assignment branches for the three key
+    /// names were untested. Each fixture literal is concat-split in the SOURCE so
     /// the warden's own live pre-push hook never self-blocks on the
     /// test file itself.
     fn assert_pre_push_blocks_content(name: &str, filename: &str, content: &str) {

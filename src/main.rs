@@ -2557,10 +2557,13 @@ trap 'rm -f "$SCAN_FILES_NUL" "$ADDED_FILES" "$REFS_FILE"' EXIT
 # branches were written `["''][^"'']` inside a shell single-quoted
 # string — POSIX shell collapses each `''` pair to the empty string,
 # so the EFFECTIVE regex was `["][^"]+`: single-quoted values
-# (`secret = 'hunter2'`) pushed clean. Use the `'\''` idiom so a real
-# `'` survives shell parsing (effective: `["'][^"']+`, verified with
-# sh -x). NOTE: this comment must never contain `password = <6+ chars>`
-# — the unquoted branch would self-match the hook's own text if the
+# pushed clean. Use the `'\''` idiom so a real `'` survives shell
+# parsing (effective: `["'][^"']+`, verified with sh -x).
+# NOTE (extended 2026-08-12, second audit round): this comment must
+# contain NO shape the regex can match — not a quoted or unquoted
+# password/secret/api-key assignment (quoted value, or a bare
+# 6+-character value), not an AKIA access-key shape, not a BEGIN
+# PRIVATE KEY line — the hook would self-match its own text if the
 # script is ever committed (the 2026-08-12 test-harness vacuity).
 SECRET_RE='(A{1}KIA[A-Z0-9]{16}|-----BEGIN [A-Z]+ PRIVATE KEY|password\s*=\s*["'\''][^"'\'']+|secret\s*=\s*["'\''][^"'\'']+|api_key\s*=\s*["'\''][^"'\'']+|password\s*=\s*[^[:space:]"'']{6,})'
 
