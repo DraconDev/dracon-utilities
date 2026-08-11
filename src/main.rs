@@ -209,6 +209,12 @@ enum Command {
         repo: Option<PathBuf>,
     },
     /// Scan plaintext JSON files for DRACON_SECRET markers and optionally scrub them.
+    ///
+    /// "Plaintext" here means files NOT matching the policy's
+    /// `protected_patterns` (protected files are skipped — their
+    /// markers are legitimate encryption tags). Only `.json` files are
+    /// considered; a marker in any other non-protected file is not
+    /// touched by this command.
     ScrubMarkers {
         /// Apply edits in-place. Without this flag, the command is a dry-run report.
         #[arg(long)]
