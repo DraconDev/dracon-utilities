@@ -61,3 +61,40 @@ fn test_backup_and_restore() {
         "Restored content should match original"
     );
 }
+
+#[test]
+fn test_backup_does_not_overwrite_same_second_backup() {
+    let _guard = HomeGuard::new();
+    let home_path = std::env::var("HOME").map(std::path::PathBuf::from).unwrap();
+    let mut security = WardenSecurity::new(None).expect("Failed to init WardenSecurity");
+    security.add_memory_identity(Identity::generate());
+
+    let original_path = home_path.join("rapid_backups.txt");
+    let first_content = b"first backup payload";
+    let second_content = b"second backup payload";
+
+    let first_backup = security
+        .backup_file(&original_path, first_content)
+        .expect("first backup failed");
+    let second_backup = security
+        .backup_file(&original_path, second_content)
+        .expect("second backup failed");
+
+    assert_ne!(
+        first_backup, second_backup,
+        "backups created in rapid succession must use distinct paths"
+    );
+    assert!(first_backup.exists());
+    assert!(second_backup.exists());
+
+    let backups = security
+        .list_backups(&original_path)
+        .expect("listing backups failed");
+    assert_eq!(backups.len(), 2, "both rapid backups must be retained");
+
+    let restored_backup = security
+        .restore_file(&original_path)
+        .expect("restore failed");
+    assert_eq!(restored_backup, second_backup);
+    assert_eq!(fs::read(&original_path).expect("read restored file failed"), second_content);
+}

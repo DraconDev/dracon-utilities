@@ -3,6 +3,7 @@
 use anyhow::Result;
 use sha2::{Digest, Sha256};
 use std::fs;
+use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
 use crate::WardenSecurity;
@@ -28,21 +29,43 @@ impl WardenSecurity {
         let hash = hasher.finalize();
         let hash_hex: String = hash.iter().map(|b| format!("{:02x}", b)).collect();
 
-        // Timestamp
-        let timestamp = std::time::SystemTime::now()
+        // Use nanoseconds in the filename so rapid backups do not collide.
+        // The exclusive create below is still required: clock resolution can
+        // be coarser than nanoseconds, and concurrent callers may observe the
+        // same timestamp.
+        let mut timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
-            .as_secs();
-
-        // Filename: <hash>_<timestamp>.age
-        let filename = format!("{}_{}.age", hash_hex, timestamp);
-        let backup_path = backup_dir.join(filename);
+            .as_nanos();
 
         // Encrypt logic (using encrypt_v2_for_all)
         let encrypted = self.encrypt_v2_for_all(content)?;
 
-        fs::write(&backup_path, encrypted)?;
-        Ok(backup_path)
+        // Filename: <hash>_<timestamp>.age. Retry with the next timestamp if
+        // another backup was created at the same instant.
+        loop {
+            let filename = format!("{}_{}.age", hash_hex, timestamp);
+            let backup_path = backup_dir.join(filename);
+            match fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&backup_path)
+            {
+                Ok(mut file) => {
+                    if let Err(error) = file.write_all(&encrypted) {
+                        let _ = fs::remove_file(&backup_path);
+                        return Err(error.into());
+                    }
+                    return Ok(backup_path);
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                    timestamp = timestamp
+                        .checked_add(1)
+                        .ok_or_else(|| anyhow::anyhow!("backup timestamp exhausted"))?;
+                }
+                Err(error) => return Err(error.into()),
+            }
+        }
     }
 
     pub fn restore_file(&self, file_path: &Path) -> Result<PathBuf> {
