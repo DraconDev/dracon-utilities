@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Operations documentation now matches dracon-system v0.112.36**: the
+  process-mitigation section documents renice, OOM-score bias, and optional
+  CPUQuota throttling, and no longer misstates `dracon-system guard clean`
+  as a process-adjustment rollback command; `guard clean` is documented as
+  reclaimable-space cleanup with dry-run/apply semantics.
 - **audit scripts now honour glob patterns in `exclude_dir_names`** (audit
   LOW, 2026-08-10): `scripts/audit-commit-activity.py` and
   `scripts/verify-ownership-mirrors.py` filtered `os.walk` directories by

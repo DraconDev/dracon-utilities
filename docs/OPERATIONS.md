@@ -194,12 +194,30 @@ dracon-system guard prune
 dracon-system guard clean
 ```
 
-### Process Renice
+### Process Mitigation
 
-The guard never kills processes — only renices. To undo:
+The guard never directly kills processes. During CPU, memory, or swap
+pressure, its optional reversible mitigations are:
+
+- graduated `renice` to lower the priority of heavy processes;
+- `oom_score_adj` biasing during critical pressure, which only influences
+  the kernel's last-resort OOM victim choice if the kernel kills anyway; and
+- optional `CPUQuota` throttling for a stuck busy-loop, without killing or
+  moving the process permanently.
+
+Tracked adjustments are restored when pressure recovers. The guard's
+notifications identify the top memory offenders; operators remain in control
+of any deliberate process termination.
+
+`guard clean` is **disk-space cleanup**, not process-mitigation rollback. It
+cleans reclaimable Rust targets, Trash, Nix generations, caches,
+`node_modules`, and Docker resources. It previews by default; add `--apply`
+to execute, or select targets with `--rust`, `--trash`, `--nix`, `--caches`,
+`--node-modules`, and `--docker`.
 
 ```bash
-dracon-system guard clean  # Releases all renices
+dracon-system guard clean                 # Preview all cleanup targets
+dracon-system guard clean --trash --apply  # Apply one selected cleanup
 ```
 
 ## Operational State
