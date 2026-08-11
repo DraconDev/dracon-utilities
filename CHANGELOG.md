@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Team key creation is now private and race-safe**: `create_team` uses
+  exclusive file creation with mode `0600` on Unix, matching invite
+  acceptance, so the encrypted key is never created with default umask
+  permissions or overwritten by a concurrent/repeated creation. Added
+  permission and no-overwrite regression coverage.
+
 - **Backups no longer overwrite rapid successive snapshots**: backup names
   now use nanosecond timestamps and exclusive file creation, retrying on the
   rare clock/concurrency collision. Added deterministic collision coverage
