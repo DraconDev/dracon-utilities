@@ -1,1 +1,0 @@
-{"schema":1,"type":"queue-item","id":"20260810213656-596kbk","objective":"FIX MEDIUM (system): legacy heavy-process release compares 15-char-truncated comm vs untruncated cmdline → false PID-recycled, pid never un-reniced (main.rs:2925-2945)","addedAt":"2026-08-10T21:36:56.854Z"}
