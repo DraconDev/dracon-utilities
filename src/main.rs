@@ -184,7 +184,7 @@ const ENCRYPTED_SECRETS_HEADER: &[&str] = &[
 ];
 const FORBIDDEN_PLAINTEXT_SUBSTRINGS: &[&str] = &[
     // Patterns that almost always carry secret material in our workflow.
-    ".env", "secrets/", "/secrets", "*.key", "*.pem", "*.age",
+    ".env", "secrets/", "/secrets", "passwords.txt", "*.key", "*.pem", "*.age",
 ];
 
 #[derive(Parser, Debug)]

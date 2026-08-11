@@ -1877,13 +1877,13 @@ watch_roots = ["/tmp/test"]
 
     #[test]
     fn warden_policy_validate_rejects_secretish_plaintext() {
-        // FIXED 2026-08-11 (audit LOW): the old fixture (`passwords.txt`)
-        // never contained a FORBIDDEN_PLAINTEXT_SUBSTRINGS needle — it
-        // was rejected by the allowlist branch, so the secret-ish guard
-        // was untested AND unreachable (check order). The fixture now
-        // trips the forbidden-substring branch and the error message
-        // pins it.
+        // FIXED 2026-08-11 (audit LOW): `passwords.txt` was not in
+        // FORBIDDEN_PLAINTEXT_SUBSTRINGS, so the old fixture was
+        // rejected by the allowlist branch instead of exercising the
+        // secret-ish guard. Keep it as an explicit regression case,
+        // alongside path-shaped and case-insensitive examples.
         for secretish in [
+            "passwords.txt",
             "secrets/app.json",
             "Secrets/App.json", // case-insensitive
             "config/.env.local",
