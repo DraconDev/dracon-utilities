@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Backups no longer overwrite rapid successive snapshots**: backup names
+  now use nanosecond timestamps and exclusive file creation, retrying on the
+  rare clock/concurrency collision. Added deterministic collision coverage
+  plus an end-to-end rapid-backup retention/restore regression.
+
 - **Private-key scanner patterns now match their actual formats**: DSA, EC,
   OpenSSH, and PGP private-key detectors no longer reuse the RSA armored-key
   expression. The PGP detector now matches `PGP PRIVATE KEY BLOCK` armor, and
