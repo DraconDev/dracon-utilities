@@ -1252,23 +1252,10 @@ impl WardenSecurity {
     }
 }
 
-pub struct Warden;
-
 /// Detect binary content by checking for null bytes.
 /// Git uses a similar heuristic: any null byte means binary.
 fn is_binary_content(bytes: &[u8]) -> bool {
     bytes.contains(&0)
-}
-
-impl Warden {
-    pub fn new() -> Result<Self> {
-        Ok(Warden)
-    }
-
-    pub fn smudge(&self, bytes: &[u8], _path: Option<&str>) -> Result<Vec<u8>> {
-        let security = WardenSecurity::new(None)?;
-        smudge_with_security(&security, bytes)
-    }
 }
 
 /// ADDED 2026-07-26 (audit H-9): shared smudge path for both entry

@@ -386,42 +386,6 @@ impl WardenSecurity {
         Ok(result)
     }
 
-    pub fn seal_clean(&self, file_path: Option<&str>) -> Result<()> {
-        use std::io::{Read, Write};
-
-        // 1. Read plaintext from stdin
-        let mut buffer = Vec::new();
-        std::io::stdin().read_to_end(&mut buffer)?;
-
-        // Auto-add key to avoid lockout (Ensure keys folder exists)
-        if let Err(e) = self.ensure_current_user_key() {
-            eprintln!("⚠️ failed to ensure user key: {}", e);
-        }
-
-        // 3. Backup (Safety Net) - must happen before buffer is potentially moved
-        if let Some(path) = file_path {
-            if path.contains(".env") {
-                if let Err(e) = self.backup_secret(path, &buffer) {
-                    eprintln!("⚠️ failed to backup .env file: {}", e);
-                }
-            }
-        }
-
-        // 4. Smart Clean: Targeted encryption only to preserve Git diffs.
-        // Every file (UTF-8) is scanned for secrets.
-        // Binary files are passed through untouched to preserve Git diffs.
-        let output = if let Ok(text_content) = std::str::from_utf8(&buffer) {
-            self.smart_clean(text_content)?.into_bytes()
-        } else {
-            buffer
-        };
-
-        // 5. Write to stdout
-        std::io::stdout().write_all(&output)?;
-
-        Ok(())
-    }
-
     pub fn decrypt_path(&self, root: &Path, recursive: bool, dry_run: bool) -> Result<usize> {
         let mut total_restored = 0;
         let mut walk_errors = 0;
@@ -565,18 +529,6 @@ impl WardenSecurity {
 
         Ok(stats)
     }
-
-    pub fn seal_smudge(&self, file_path: Option<&str>) -> Result<()> {
-        use std::io::{Read, Write};
-
-        // 1. Read content
-        let mut buffer = Vec::new();
-        if let Some(path) = file_path {
-            let mut file = fs::File::open(path)?;
-            file.read_to_end(&mut buffer)?;
-        } else {
-            std::io::stdin().read_to_end(&mut buffer)?;
-        }
 
         // 2. Check for V2 (Age) Header
         if buffer.starts_with(HEADER_V2_MAGIC) {
