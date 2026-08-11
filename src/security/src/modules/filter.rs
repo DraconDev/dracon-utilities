@@ -487,4 +487,47 @@ impl WardenSecurity {
             process_file(root)?;
             return Ok(stats);
         }
+
+        let walker = walkdir::WalkDir::new(root)
+            .follow_links(false) // FDRACONWARDEN-003 (2026-07-18): don't follow symlinks in migrate walk either.
+            .max_depth(if recursive { usize::MAX } else { 1 })
+            .into_iter()
+            .filter_entry(|e| {
+                let name = e.file_name().to_string_lossy();
+                if e.path() == root {
+                    return true;
+                }
+                !name.starts_with('.') || name == ".env"
+            });
+
+        for entry in walker {
+            let entry = match entry {
+                Ok(e) => e,
+                Err(e) => {
+                    eprintln!(
+                        "⚠️ walk error during marker scan at {}: {}",
+                        root.display(),
+                        e
+                    );
+                    stats.walk_errors += 1;
+                    continue;
+                }
+            };
+            if entry.file_type().is_file() {
+                if let Err(e) = process_file(entry.path()) {
+                    eprintln!("⚠️ failed to process {}: {}", entry.path().display(), e);
+                }
+            }
+        }
+
+        if stats.walk_errors > 0 {
+            return Err(anyhow::anyhow!(
+                "migrate_markers_in_path completed with {} walk error(s)",
+                stats.walk_errors
+            ));
+        }
+
+        Ok(stats)
+    }
+
 }
