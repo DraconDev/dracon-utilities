@@ -38,7 +38,8 @@
 #                         hook that regenerates the façades automatically.
 #                         Off by default so the script never silently
 #                         mutates .git/hooks.
-#   --remote <name>       Push to this git remote (default: github).
+#   --remote <name>       Push to this git remote (default: auto-resolved
+#                         from the repository's github.com remote URL).
 #   --yes                 Skip the interactive "are you sure" prompt before
 #                         push/publish/tag steps. Required for non-interactive
 #                         runs.
@@ -68,7 +69,7 @@ DRY_RUN=0
 ABORT=0
 SKIP_FACADE=0
 INSTALL_HOOK=0
-REMOTE=github
+REMOTE=""          # --remote override; empty = auto-detect the github.com remote
 ASSUME_YES=0
 VERSION=""
 
@@ -192,6 +193,23 @@ fi
 # Refuse to release a version that's already on crates.io
 require_credentials
 require_clean_tree
+
+# Resolve the github push remote from its URL rather than assuming the
+# conventional-but-not-universal `github` name. An explicit --remote remains
+# an escape hatch for operators intentionally pushing elsewhere.
+if [[ -n "$REMOTE" ]]; then
+    git config --get "remote.${REMOTE}.url" >/dev/null 2>&1 \
+        || die_pre "remote '$REMOTE' does not exist (git config remote.$REMOTE.url)"
+    ok "push remote: $REMOTE (explicit --remote override)"
+else
+    REMOTE="$SCRIPT_DIR/resolve-github-remote.sh"
+    if [[ ! -x "$REMOTE" ]]; then
+        die_pre "missing executable github remote resolver: $REMOTE"
+    fi
+    REMOTE="$("$REMOTE" "$MONOREPO_ROOT")" \
+        || die_pre "could not resolve a github remote (see above)"
+    ok "push remote: $REMOTE (auto-detected from remote.*.url)"
+fi
 
 # Validate the version string (semver-ish: N.N.N)
 if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
