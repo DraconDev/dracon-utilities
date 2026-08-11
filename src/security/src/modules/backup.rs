@@ -8,6 +8,39 @@ use std::path::{Path, PathBuf};
 
 use crate::WardenSecurity;
 
+fn write_backup(
+    backup_dir: &Path,
+    hash_hex: &str,
+    encrypted: &[u8],
+    mut timestamp: u128,
+) -> Result<PathBuf> {
+    // Filename: <hash>_<timestamp>.age. Retry with the next timestamp if
+    // another backup was created at the same instant.
+    loop {
+        let filename = format!("{}_{}.age", hash_hex, timestamp);
+        let backup_path = backup_dir.join(filename);
+        match fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&backup_path)
+        {
+            Ok(mut file) => {
+                if let Err(error) = file.write_all(encrypted) {
+                    let _ = fs::remove_file(&backup_path);
+                    return Err(error.into());
+                }
+                return Ok(backup_path);
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                timestamp = timestamp
+                    .checked_add(1)
+                    .ok_or_else(|| anyhow::anyhow!("backup timestamp exhausted"))?;
+            }
+            Err(error) => return Err(error.into()),
+        }
+    }
+}
+
 impl WardenSecurity {
     pub fn backup_file(&self, file_path: &Path, content: &[u8]) -> Result<PathBuf> {
         let path_str = file_path.to_string_lossy();
@@ -33,7 +66,7 @@ impl WardenSecurity {
         // The exclusive create below is still required: clock resolution can
         // be coarser than nanoseconds, and concurrent callers may observe the
         // same timestamp.
-        let mut timestamp = std::time::SystemTime::now()
+        let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_nanos();
@@ -41,31 +74,7 @@ impl WardenSecurity {
         // Encrypt logic (using encrypt_v2_for_all)
         let encrypted = self.encrypt_v2_for_all(content)?;
 
-        // Filename: <hash>_<timestamp>.age. Retry with the next timestamp if
-        // another backup was created at the same instant.
-        loop {
-            let filename = format!("{}_{}.age", hash_hex, timestamp);
-            let backup_path = backup_dir.join(filename);
-            match fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&backup_path)
-            {
-                Ok(mut file) => {
-                    if let Err(error) = file.write_all(&encrypted) {
-                        let _ = fs::remove_file(&backup_path);
-                        return Err(error.into());
-                    }
-                    return Ok(backup_path);
-                }
-                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
-                    timestamp = timestamp
-                        .checked_add(1)
-                        .ok_or_else(|| anyhow::anyhow!("backup timestamp exhausted"))?;
-                }
-                Err(error) => return Err(error.into()),
-            }
-        }
+        write_backup(&backup_dir, &hash_hex, &encrypted, timestamp)
     }
 
     pub fn restore_file(&self, file_path: &Path) -> Result<PathBuf> {
@@ -154,5 +163,31 @@ impl WardenSecurity {
         backups.sort_by(|a, b| b.cmp(a));
 
         Ok(backups)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn write_backup_retries_when_timestamp_already_exists() {
+        let temp_dir = tempfile::tempdir().expect("create temporary backup directory");
+
+        let first = write_backup(temp_dir.path(), "path-hash", b"first", 123);
+        let first = first.expect("first backup should be created");
+        let second = write_backup(temp_dir.path(), "path-hash", b"second", 123);
+        let second = second.expect("colliding backup should be retried");
+
+        assert_eq!(
+            first.file_name().and_then(|name| name.to_str()),
+            Some("path-hash_123.age")
+        );
+        assert_eq!(
+            second.file_name().and_then(|name| name.to_str()),
+            Some("path-hash_124.age")
+        );
+        assert_eq!(fs::read(first).expect("read first backup"), b"first");
+        assert_eq!(fs::read(second).expect("read second backup"), b"second");
     }
 }
