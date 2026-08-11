@@ -806,61 +806,6 @@ impl WardenSecurity {
         Ok(())
     }
 
-    fn backup_secret(&self, original_path: &str, content: &[u8]) -> Result<()> {
-        if original_path.contains("dracon/backups") || original_path.contains("arcane/backups") {
-            return Ok(()); // Silent skip for internal Git/Arcane backups
-        }
-        let repo_root = self.get_repo_root()?;
-        let backup_dir = repo_root.join(".git").join("arcane").join("backups");
-        fs::create_dir_all(&backup_dir)?;
-
-        let safe_name = original_path.replace("/", "_").replace("\\", "_");
-        let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)?
-            .as_secs();
-
-        let backup_path = backup_dir.join(format!("{}.{}.bak.age", safe_name, timestamp));
-
-        let identity = self
-            .master_identities
-            .first()
-            .context("Master identity required for secure backup")?;
-        let recipient = identity.to_public();
-
-        let recipients: Vec<Box<dyn age::Recipient + Send>> = vec![Box::new(recipient)];
-        let encryptor = age::Encryptor::with_recipients(recipients)
-            .context("Failed to create encryptor for backup")?;
-
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::OpenOptionsExt;
-            let mut file = fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .mode(0o400)
-                .open(&backup_path)?;
-            let mut writer = encryptor.wrap_output(&mut file)?;
-            writer.write_all(content)?;
-            writer.finish()?;
-        }
-        #[cfg(not(unix))]
-        {
-            let mut file = fs::File::create(&backup_path)?;
-            let mut perms = file.metadata()?.permissions();
-            perms.set_mode(0o400);
-            fs::set_permissions(&backup_path, perms)?;
-            let mut writer = encryptor.wrap_output(&mut file)?;
-            writer.write_all(content)?;
-            writer.finish()?;
-        }
-
-        Ok(())
-    }
-
-    // ============================================================
-    // V2: DIRECT RECIPIENT ENCRYPTION (Standard Age)
-    // ============================================================
-
     /// V2 Encryption: Encrypt directly to a list of recipients (No RepoKey)
     /// V2 Decryption: Decrypt using the User's Identities (Try ALL known keys)
     /// V2 Decryption: Decrypt using the User's Identities (Try ALL known keys)
