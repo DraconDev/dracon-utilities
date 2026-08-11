@@ -1,1 +1,0 @@
-{"schema":1,"type":"queue-item","id":"20260810213656-fw2eab","objective":"FIX LOW (warden): ScrubMarkers CLI help says JSON files but scans all protected files (main.rs:211 vs 1790)","addedAt":"2026-08-10T21:36:56.854Z"}
