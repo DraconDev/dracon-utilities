@@ -1,1 +1,0 @@
-{"schema":1,"type":"queue-item","id":"20260810213656-u9e0ex","objective":"FIX MEDIUM (system): release-path restore failures silently drop tracking — let _ = ignores errors then removes entries; add retry like uncap's continue-on-error (main.rs:2379-2382, 2404-2407)","addedAt":"2026-08-10T21:36:56.854Z"}
