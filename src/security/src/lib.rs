@@ -165,6 +165,11 @@ fn strip_env_version_header(content: &str) -> &str {
     // marker string is body content.
     let header_marker = ENV_HEADER_MARKER_LINE;
     for (idx, line) in content.lines().enumerate() {
+        // Same top-6 rule as `is_env_version_managed` (which gates
+        // this call): only lines 0-5 may hold the header marker.
+        if idx >= 6 {
+            break;
+        }
         if line.trim() == header_marker {
             // Byte offset of this line's start (lines() yields slices
             // into `content`, so the pointer delta is exact for both
@@ -1646,9 +1651,14 @@ mod tests {
             "header version must increment: {}",
             decrypted_str
         );
-        // Body identical to the original (incl. the trailing blank line).
-        let expected = v1.replace("# Version: 1", "# Version: 2");
-        assert_eq!(decrypted_str, expected, "body must round-trip byte-exact");
+        // Body must round-trip byte-exact — the old `stripped.trim()`
+        // dropped the trailing blank line, so the decrypted body ended
+        // at "TRAIL=value" (a rewritten blob on every re-encryption).
+        assert!(
+            decrypted_str.ends_with("API_KEY=secret\nTRAIL=value\n\n"),
+            "body incl. its trailing blank line must round-trip, got: {:?}",
+            decrypted_str
+        );
     }
 
     #[test]
