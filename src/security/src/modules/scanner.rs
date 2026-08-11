@@ -17,6 +17,22 @@ pub struct SecretScanner {
     full_regex: Regex,
 }
 
+/// Return a display snippet capped at `max_bytes` without splitting a UTF-8
+/// code point. A byte slice at the cap can panic on multi-byte secrets.
+fn snippet_for_display(value: &str, max_bytes: usize) -> String {
+    if value.len() <= max_bytes {
+        return value.to_string();
+    }
+
+    let end = value
+        .char_indices()
+        .map(|(start, ch)| (start, start + ch.len_utf8()))
+        .take_while(|(_, end)| *end <= max_bytes)
+        .last()
+        .map_or(0, |(_, end)| end);
+    format!("{}...", &value[..end])
+}
+
 impl SecretScanner {
     /// Expose patterns for integrity testing (e.g. Max Length Check)
     pub fn get_patterns() -> Vec<(&'static str, &'static str)> {
@@ -499,11 +515,7 @@ impl SecretScanner {
 
                     let line_num = content[..start_idx].chars().filter(|&c| c == '\n').count() + 1;
                     let matching_str = mat.as_str();
-                    let snippet = if matching_str.len() > 60 {
-                        format!("{}...", &matching_str[..60])
-                    } else {
-                        matching_str.to_string()
-                    };
+                    let snippet = snippet_for_display(matching_str, 60);
 
                     results.push(SecretFinding {
                         name: name.clone(),
@@ -589,5 +601,22 @@ mod tests {
         let scanner = SecretScanner::new_with_custom_patterns(&[]).unwrap();
         let findings = scanner.scan("no secrets here");
         assert!(findings.is_empty());
+    }
+
+    #[test]
+    fn test_scanner_truncates_utf8_snippet_at_char_boundary() {
+        let scanner = SecretScanner::new().unwrap();
+        let content = format!("password:\"{}\"", "🙂".repeat(20));
+        let findings = scanner.scan(&content);
+        let finding = findings
+            .iter()
+            .find(|finding| finding.name == "Generic Secret")
+            .expect("generic secret should be detected");
+
+        assert_eq!(
+            finding.snippet,
+            format!("password:\"{}...", "🙂".repeat(12))
+        );
+        assert!(finding.snippet.is_char_boundary(finding.snippet.len()));
     }
 }
