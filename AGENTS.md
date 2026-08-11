@@ -450,7 +450,7 @@ verification protocol, path/pattern lists). Short version:
 > `rewrite_ahead_paths()` (`dracon-sync/src/git/staging.rs:148-244`)
 > which uses `git filter-repo --invert-paths --force` when
 > `auto_repair_concerns = true` (default per
-> `dracon-sync/src/policy.rs:1864`). The 2026-06-30 audit confirmed
+> `dracon-sync/src/policy.rs:476-477`). The 2026-06-30 audit confirmed
 > this code path has never fired on our repos (zero
 > `backup/pre-sync-largeblob-fix-*` branches found), but the
 > contradiction between "NEVER rewrite history" and the default
@@ -470,7 +470,7 @@ what falls in between.
 - **`git add .`** — never use it; always specify explicit paths.
   The daemon itself uses `git add -A -- <explicit-paths>` and
   `git add -A -f -- <explicit-paths>` (see
-  `dracon-sync/src/sync.rs:858,859`) — a safer equivalent.
+  `dracon-sync/src/sync.rs:1079,1097`) — a safer equivalent.
 - **Force-push to repos with > 5 commits ahead** — daemon default
   is `force_push_when_behind = false` (`dracon-sync/src/git/mod.rs:684+`).
   `--force-with-lease` may be used for one-commit-behind divergences,
@@ -502,7 +502,7 @@ what falls in between.
   itself still uses `filter-repo --invert-paths --force`):
   - Function definition: `dracon-sync/src/git/staging.rs:152`
   - Call site: `dracon-sync/src/report.rs:3705`
-  - Default: `dracon-sync/src/policy.rs:1890`
+  - Default: `dracon-sync/src/policy.rs:1956`
     (`auto_repair_concerns: true`, set via
     `#[serde(default = "default_true")]` so TOML-loaded configs
     without an explicit value get `true`; the bare
@@ -785,6 +785,6 @@ ssh-agent bug fixed in `dracon-git v94.7.2` (upgraded from v94.7.1 on
 94.7.0 (unpatched) — visible as phantom untracked counts (2026-08-08,
 `docs/design/installed-binary-drops-patch-dracon-git-2026-08-08.md`).
 Guard: `dracon-sync/scripts/verify-install.sh` (fixture check; wired into
-`scripts/release.sh` step 6 against the packaged artifact, and reminded
+`dracon-sync/scripts/release.sh` step 7 against the packaged artifact, and reminded
 after every release).
 
