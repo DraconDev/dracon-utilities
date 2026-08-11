@@ -95,12 +95,37 @@ pub fn path_is_protected(path_str: &str, protected_patterns: &[String]) -> bool 
                 return true;
             }
         }
-        // 4. Multi-component `**`: `**/audit/**` matches any path with
-        //    `/audit/` as a component.
+        // 4. Multi-component `**`: `**/audit/**` and `**/secrets/**`
+        // match any path with `audit`/`secrets` as a path COMPONENT at
+        // any depth. FIXED 2026-08-12 (audit HIGH): the old code did
+        // `path_str.contains("secrets/**")` — a literal `*` never
+        // occurs in real paths, so the branch was dead and
+        // `**/secrets/**` files got `filter=dracon` in .gitattributes
+        // (git's own globset matches `**/`) while the clean gate
+        // passed them through UNENCRYPTED.
         if pat.starts_with("**/") {
-            let needle = pat.trim_start_matches("**");
-            // `**/audit/**` -> check for `/audit/` or `audit/`
-            if path_str.contains(needle.trim_start_matches("/")) {
+            let rest = pat.trim_start_matches("**/");
+            let component = rest.trim_end_matches("/**");
+            if !component.is_empty()
+                && !component.contains('/')
+                && !component.contains('*')
+            {
+                if rest.ends_with("/**") {
+                    // `**/name/**`: `name` as a component at any depth.
+                    if path_str.split('/').any(|c| c == component) {
+                        return true;
+                    }
+                } else {
+                    // `**/name`: `name` as the FINAL component
+                    // (glob semantics).
+                    if path_str.split('/').last() == Some(component) {
+                        return true;
+                    }
+                }
+            } else if path_str.contains(component) {
+                // Multi-component tail (`**/config/services.json`) or
+                // wildcard-containing component: literal substring
+                // fallback.
                 return true;
             }
         }

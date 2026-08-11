@@ -1313,6 +1313,32 @@ mod tests {
     }
 
     #[test]
+    fn test_path_is_protected_doublestar_components() {
+        // FIXED 2026-08-12 (audit HIGH): `**/secrets/**` was dead — the
+        // old code required a literal `*` in the path. `**/name` and
+        // `**/name/**` must match `name` as a path component at any
+        // depth (git's own globset already matched these, so the clean
+        // gate silently passed them through unencrypted).
+        let patterns: Vec<String> = vec!["**/secrets/**".to_string()];
+        assert!(path_is_protected("secrets/master.key", &patterns));
+        assert!(path_is_protected("a/b/secrets/c/d.env", &patterns));
+        assert!(!path_is_protected("src/main.rs", &patterns));
+        assert!(!path_is_protected("my-secrets-notes.txt", &patterns));
+
+        // `**/audit` (no trailing `/**`): `audit` as a final component.
+        let patterns: Vec<String> = vec!["**/audit".to_string()];
+        assert!(path_is_protected("config/audit", &patterns));
+        assert!(path_is_protected("audit", &patterns));
+        assert!(!path_is_protected("config/audit/team.json", &patterns));
+        assert!(!path_is_protected("my-audit-file.txt", &patterns));
+
+        // Multi-component tail after `**/`.
+        let patterns: Vec<String> = vec!["**/config/services.json".to_string()];
+        assert!(path_is_protected("plan/config/services.json", &patterns));
+        assert!(!path_is_protected("plan/services.json", &patterns));
+    }
+
+    #[test]
     fn test_path_is_protected_legacy_empty_passes_everything() {
         // Empty protected_patterns list = scan everything (legacy).
         let patterns: Vec<String> = vec![];
