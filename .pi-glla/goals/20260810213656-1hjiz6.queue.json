@@ -1,1 +1,0 @@
-{"schema":1,"type":"queue-item","id":"20260810213656-1hjiz6","objective":"FIX LOW (warden): tests.rs:1697-1712 fragile — passes only because FORBIDDEN_PLAINTEXT_SUBSTRINGS rejects first; add passwords.txt to forbidden list","addedAt":"2026-08-10T21:36:56.854Z"}
