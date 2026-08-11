@@ -1594,9 +1594,10 @@ mod tests {
 
     #[test]
     fn test_strip_env_version_header_only_strips_top_marker() {
-        // A marker in the BODY (past the top lines) is content, not a
-        // header — the old whole-file `find` stripped everything from
-        // the first occurrence anywhere (audit LOW 2026-08-12).
+        // A marker PAST the top lines is body content, not a header —
+        // the old whole-file `find` stripped everything from the first
+        // occurrence anywhere, mangling files whose body merely
+        // mentions the marker text (audit LOW 2026-08-12).
         let header = r#"# =============================================================================
 # Dracon Warden Encrypted Environment File
 # Version: 1
@@ -1607,10 +1608,15 @@ mod tests {
         let stripped = strip_env_version_header(&managed);
         assert_eq!(stripped, body, "body (incl. its own marker mention) must be preserved");
 
-        // A file with the marker only in the MIDDLE (never managed) is
-        // returned unchanged.
-        let unmanaged = "FIRST=1\n# Dracon Warden Encrypted Environment File\nLAST=2\n";
-        assert_eq!(strip_env_version_header(unmanaged), unmanaged);
+        // A marker on line 7+ (past the header region) with a closing
+        // banner after it must NOT be stripped — the old code returned
+        // everything after the marker (mangled).
+        let deep_marker = "ONE=1\nTWO=2\nTHREE=3\nFOUR=4\nFIVE=5\nSIX=6\n# Dracon Warden Encrypted Environment File\n# =============================================================================\nLAST=2\n";
+        assert_eq!(
+            strip_env_version_header(deep_marker),
+            deep_marker,
+            "deep marker must be left untouched"
+        );
     }
 
     #[test]
@@ -1630,7 +1636,7 @@ mod tests {
         // trailing newline on every re-encryption, so an unchanged
         // .env produced a modified blob each cycle (audit LOW
         // 2026-08-12).
-        let warden = Warden::new().unwrap();
+        let warden = DraconWarden::new().unwrap();
         let v1 = "# =============================================================================\n# Dracon Warden Encrypted Environment File\n# Version: 1\n# =============================================================================\nAPI_KEY=secret\nTRAIL=value\n\n";
         let encrypted = warden.clean(v1.as_bytes(), Some(".env")).unwrap();
         let decrypted = warden.smudge(&encrypted, Some(".env")).unwrap();
