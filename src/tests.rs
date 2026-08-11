@@ -315,9 +315,7 @@ mod tests {
         // assertion vacuous).
         run_git_in(repo, &["add", "--", filename]);
         run_git_in(repo, &["commit", "-q", "-m", "add fixture"]);
-        let head = git_in_output(repo, &["rev-parse", "HEAD"])
-            .trim()
-            .to_string();
+        let head = git_in_output(repo, &["rev-parse", "HEAD"]).trim().to_string();
         let (status, stderr) = run_hook(repo, &hook_path, &head, ZERO_SHA);
         assert_eq!(
             status.code(),
@@ -379,10 +377,7 @@ mod tests {
         )
         .unwrap();
         run_git_in(repo, &["add", "secrets/app.yaml"]);
-        run_git_in(
-            repo,
-            &["commit", "-q", "-m", "add padded unquoted password"],
-        );
+        run_git_in(repo, &["commit", "-q", "-m", "add padded unquoted password"]);
         let head = git_in_output(repo, &["rev-parse", "HEAD"])
             .trim()
             .to_string();
@@ -413,10 +408,7 @@ mod tests {
         data.extend_from_slice(b"\x00tail\x00");
         fs::write(repo.join("archive.bin"), &data).unwrap();
         run_git_in(repo, &["add", "archive.bin"]);
-        run_git_in(
-            repo,
-            &["commit", "-q", "-m", "add binary with key material"],
-        );
+        run_git_in(repo, &["commit", "-q", "-m", "add binary with key material"]);
         let head = git_in_output(repo, &["rev-parse", "HEAD"])
             .trim()
             .to_string();
@@ -438,11 +430,7 @@ mod tests {
         let (td, hook_path) = make_repo_with_pre_push_hook("hook_clean_binary");
         let repo = td.path();
 
-        fs::write(
-            repo.join("clean.bin"),
-            b"PK\x03\x04\x00\x00hello world\x00end",
-        )
-        .unwrap();
+        fs::write(repo.join("clean.bin"), b"PK\x03\x04\x00\x00hello world\x00end").unwrap();
         run_git_in(repo, &["add", "clean.bin"]);
         run_git_in(repo, &["commit", "-q", "-m", "add clean binary"]);
         let head = git_in_output(repo, &["rev-parse", "HEAD"])
@@ -622,10 +610,7 @@ mod tests {
         run_git_in(repo, &["config", "user.email", "test@test.local"]);
         run_git_in(repo, &["config", "user.name", "test"]);
         run_git_in(repo, &["checkout", "-q", "main"]);
-        run_git_in(
-            repo,
-            &["merge", "--no-ff", "-q", "-m", "merge feature", "feature"],
-        );
+        run_git_in(repo, &["merge", "--no-ff", "-q", "-m", "merge feature", "feature"]);
         let head = git_in_output(repo, &["rev-parse", "HEAD"])
             .trim()
             .to_string();
@@ -638,7 +623,10 @@ mod tests {
         // `git rev-list "$LOCAL_SHA" --not --remotes` should return
         // empty because everything reachable from the tag is also
         // reachable from the fake remote.
-        run_git_in(repo, &["update-ref", "refs/remotes/origin/main", &head]);
+        run_git_in(
+            repo,
+            &["update-ref", "refs/remotes/origin/main", &head],
+        );
 
         use std::io::Write;
         use std::process::{Command, Stdio};
@@ -678,7 +666,10 @@ mod tests {
         // Counter-test: with NO remote-tracking branch (i.e. nothing
         // published yet), the SAME scenario MUST be blocked — proving
         // the new logic still catches truly-new test-identity commits.
-        run_git_in(repo, &["update-ref", "-d", "refs/remotes/origin/main"]);
+        run_git_in(
+            repo,
+            &["update-ref", "-d", "refs/remotes/origin/main"],
+        );
         let mut child = Command::new(&hook_path)
             .current_dir(repo)
             .stdin(Stdio::piped())
@@ -944,10 +935,7 @@ mod tests {
             fs::read_to_string(repo.join(".gitattributes")).expect("read");
         fs::write(
             repo.join(".gitattributes"),
-            format!(
-                "# operator attr\n*.bin binary\n{}\n*.dat filter=custom\n",
-                gitattributes_after_first
-            ),
+            format!("# operator attr\n*.bin binary\n{}\n*.dat filter=custom\n", gitattributes_after_first),
         )
         .expect("write gitattributes");
 
@@ -963,8 +951,7 @@ mod tests {
             gitignore_final
         );
         assert!(
-            gitignore_final.contains("/dracon-sync/")
-                && gitignore_final.contains("/dracon-warden/"),
+            gitignore_final.contains("/dracon-sync/") && gitignore_final.contains("/dracon-warden/"),
             "operator footer section must survive harden (regression H8/F4.1): {:?}",
             gitignore_final
         );
@@ -973,8 +960,7 @@ mod tests {
             "managed block must still be present"
         );
         assert!(
-            gitattributes_final.contains("*.bin binary")
-                && gitattributes_final.contains("*.dat filter=custom"),
+            gitattributes_final.contains("*.bin binary") && gitattributes_final.contains("*.dat filter=custom"),
             "operator .gitattributes rules must survive harden: {:?}",
             gitattributes_final
         );
@@ -2313,11 +2299,7 @@ protected_patterns = ["secrets.json"]
 
     /// Create a temp git repo on `main` with ONE named hook installed in
     /// an isolated hooks dir (so global/template hooks cannot interfere).
-    fn make_repo_with_hook(
-        name: &str,
-        hook_name: &str,
-        content: &str,
-    ) -> (TestDir, std::path::PathBuf) {
+    fn make_repo_with_hook(name: &str, hook_name: &str, content: &str) -> (TestDir, std::path::PathBuf) {
         let td = TestDir::new(name);
         let repo = td.path();
         run_git_in(repo, &["init", "-q", "-b", "main"]);
@@ -2381,10 +2363,7 @@ protected_patterns = ["secrets.json"]
     /// Create `n` empty commits on the current branch.
     fn empty_commits(repo: &std::path::Path, n: usize) {
         for i in 0..n {
-            run_git_in(
-                repo,
-                &["commit", "-q", "--allow-empty", "-m", &format!("c{i}")],
-            );
+            run_git_in(repo, &["commit", "-q", "--allow-empty", "-m", &format!("c{i}")]);
         }
     }
 
@@ -2409,9 +2388,7 @@ protected_patterns = ["secrets.json"]
         let (td, hook_path) = make_repo_with_pre_push_hook("chain_push_ok");
         let repo = td.path();
         run_git_in(repo, &["commit", "-q", "--allow-empty", "-m", "c1"]);
-        let sha = git_in_output(repo, &["rev-parse", "HEAD"])
-            .trim()
-            .to_string();
+        let sha = git_in_output(repo, &["rev-parse", "HEAD"]).trim().to_string();
 
         // Repo-local hook (non-warden) that records its invocation.
         let local_hook = repo.join(".git/hooks/pre-push");
@@ -2422,12 +2399,8 @@ protected_patterns = ["secrets.json"]
         .expect("write local hook");
         chmod_755(&local_hook);
 
-        let (status, _stderr) = run_hook(
-            repo,
-            &hook_path,
-            &sha,
-            "0000000000000000000000000000000000000000",
-        );
+        let (status, _stderr) =
+            run_hook(repo, &hook_path, &sha, "0000000000000000000000000000000000000000");
         let log = fs::read_to_string(repo.join(".git/local-hook.log"))
             .expect("repo-local pre-push hook must have been chained (ran)");
         assert!(log.contains("local pre-push ran"));
@@ -2442,20 +2415,14 @@ protected_patterns = ["secrets.json"]
         let (td, hook_path) = make_repo_with_pre_push_hook("chain_push_fail");
         let repo = td.path();
         run_git_in(repo, &["commit", "-q", "--allow-empty", "-m", "c1"]);
-        let sha = git_in_output(repo, &["rev-parse", "HEAD"])
-            .trim()
-            .to_string();
+        let sha = git_in_output(repo, &["rev-parse", "HEAD"]).trim().to_string();
 
         let local_hook = repo.join(".git/hooks/pre-push");
         fs::write(&local_hook, "#!/bin/sh\nexit 3\n").expect("write local hook");
         chmod_755(&local_hook);
 
-        let (status, _stderr) = run_hook(
-            repo,
-            &hook_path,
-            &sha,
-            "0000000000000000000000000000000000000000",
-        );
+        let (status, _stderr) =
+            run_hook(repo, &hook_path, &sha, "0000000000000000000000000000000000000000");
         assert_eq!(
             status.code(),
             Some(3),
@@ -2477,20 +2444,14 @@ protected_patterns = ["secrets.json"]
         // fixture (anti-vacuity — never commit the hook script).
         run_git_in(repo, &["add", "--", "secret.txt"]);
         run_git_in(repo, &["commit", "-q", "-m", "secret"]);
-        let sha = git_in_output(repo, &["rev-parse", "HEAD"])
-            .trim()
-            .to_string();
+        let sha = git_in_output(repo, &["rev-parse", "HEAD"]).trim().to_string();
 
         let local_hook = repo.join(".git/hooks/pre-push");
         fs::write(&local_hook, "#!/bin/sh\ncat >/dev/null\nexit 0\n").expect("write local hook");
         chmod_755(&local_hook);
 
-        let (status, stderr) = run_hook(
-            repo,
-            &hook_path,
-            &sha,
-            "0000000000000000000000000000000000000000",
-        );
+        let (status, stderr) =
+            run_hook(repo, &hook_path, &sha, "0000000000000000000000000000000000000000");
         assert!(
             !status.success(),
             "warden scan must still run after the chained hook consumed stdin"
@@ -2527,8 +2488,7 @@ protected_patterns = ["secrets.json"]
 
     #[test]
     fn pre_rebase_hook_chains_and_propagates_local_hook_failure() {
-        let (td, hook_path) =
-            make_repo_with_hook("chain_rebase_fail", "pre-rebase", PRE_REBASE_HOOK);
+        let (td, hook_path) = make_repo_with_hook("chain_rebase_fail", "pre-rebase", PRE_REBASE_HOOK);
         let repo = td.path();
         run_git_in(repo, &["commit", "-q", "--allow-empty", "-m", "A"]);
 
@@ -2551,9 +2511,7 @@ protected_patterns = ["secrets.json"]
         let (td, hook) = make_repo_with_hook("rebase_unpub", "pre-rebase", PRE_REBASE_HOOK);
         let repo = td.path();
         run_git_in(repo, &["commit", "-q", "--allow-empty", "-m", "A"]);
-        let sha_a = git_in_output(repo, &["rev-parse", "HEAD"])
-            .trim()
-            .to_string();
+        let sha_a = git_in_output(repo, &["rev-parse", "HEAD"]).trim().to_string();
         // Remote-tracking ref at A; B is local-only.
         run_git_in(repo, &["update-ref", "refs/remotes/origin/main", &sha_a]);
         run_git_in(repo, &["commit", "-q", "--allow-empty", "-m", "B"]);
@@ -2570,21 +2528,14 @@ protected_patterns = ["secrets.json"]
         let (td, hook) = make_repo_with_hook("rebase_pub", "pre-rebase", PRE_REBASE_HOOK);
         let repo = td.path();
         run_git_in(repo, &["commit", "-q", "--allow-empty", "-m", "A"]);
-        let sha_a = git_in_output(repo, &["rev-parse", "HEAD"])
-            .trim()
-            .to_string();
+        let sha_a = git_in_output(repo, &["rev-parse", "HEAD"]).trim().to_string();
         run_git_in(repo, &["commit", "-q", "--allow-empty", "-m", "B"]);
-        let sha_b = git_in_output(repo, &["rev-parse", "HEAD"])
-            .trim()
-            .to_string();
+        let sha_b = git_in_output(repo, &["rev-parse", "HEAD"]).trim().to_string();
         // B is published.
         run_git_in(repo, &["update-ref", "refs/remotes/origin/main", &sha_b]);
 
         let (status, stderr) = run_hook_args(repo, &hook, &[&sha_a]);
-        assert!(
-            !status.success(),
-            "rebase of published commits must be blocked"
-        );
+        assert!(!status.success(), "rebase of published commits must be blocked");
         assert!(stderr.contains("refusing rebase"), "stderr: {stderr}");
     }
 
@@ -2595,15 +2546,11 @@ protected_patterns = ["secrets.json"]
         let (td, hook) = make_repo_with_hook("rebase_deep", "pre-rebase", PRE_REBASE_HOOK);
         let repo = td.path();
         run_git_in(repo, &["commit", "-q", "--allow-empty", "-m", "A"]);
-        let sha_a = git_in_output(repo, &["rev-parse", "HEAD"])
-            .trim()
-            .to_string();
+        let sha_a = git_in_output(repo, &["rev-parse", "HEAD"]).trim().to_string();
         // 105 commits on top of A; commit #5 from the bottom is
         // "published" — position 101 newest-first, outside head -100.
         empty_commits(repo, 5);
-        let sha_c5 = git_in_output(repo, &["rev-parse", "HEAD"])
-            .trim()
-            .to_string();
+        let sha_c5 = git_in_output(repo, &["rev-parse", "HEAD"]).trim().to_string();
         empty_commits(repo, 100);
         run_git_in(repo, &["update-ref", "refs/remotes/origin/topic", &sha_c5]);
 
@@ -2622,15 +2569,11 @@ protected_patterns = ["secrets.json"]
         let (td, hook) = make_repo_with_hook("rebase_twoarg", "pre-rebase", PRE_REBASE_HOOK);
         let repo = td.path();
         run_git_in(repo, &["commit", "-q", "--allow-empty", "-m", "A"]);
-        let sha_a = git_in_output(repo, &["rev-parse", "HEAD"])
-            .trim()
-            .to_string();
+        let sha_a = git_in_output(repo, &["rev-parse", "HEAD"]).trim().to_string();
         // feature = A + F, and F is published.
         run_git_in(repo, &["checkout", "-q", "-b", "feature"]);
         run_git_in(repo, &["commit", "-q", "--allow-empty", "-m", "F"]);
-        let sha_f = git_in_output(repo, &["rev-parse", "HEAD"])
-            .trim()
-            .to_string();
+        let sha_f = git_in_output(repo, &["rev-parse", "HEAD"]).trim().to_string();
         run_git_in(repo, &["update-ref", "refs/remotes/origin/topic", &sha_f]);
         // Back on main at A — HEAD contains nothing published.
         run_git_in(repo, &["checkout", "-q", "main"]);
@@ -2663,14 +2606,7 @@ protected_patterns = ["secrets.json"]
         let repo = td.path();
         // Marker present (filter configured) but .gitattributes missing
         // the patterns — drift must still block.
-        run_git_in(
-            repo,
-            &[
-                "config",
-                "filter.dracon.clean",
-                "dracon-warden filter-clean",
-            ],
-        );
+        run_git_in(repo, &["config", "filter.dracon.clean", "dracon-warden filter-clean"]);
 
         let (status, stderr) = run_hook_args(repo, &hook, &[]);
         assert!(!status.success(), "managed repo with drift must be blocked");
@@ -2719,14 +2655,7 @@ protected_patterns = ["secrets.json"]
         );
 
         // Control: with the LOCAL config present the same repo passes.
-        run_git_in(
-            repo,
-            &[
-                "config",
-                "filter.dracon.clean",
-                "dracon-warden filter-clean",
-            ],
-        );
+        run_git_in(repo, &["config", "filter.dracon.clean", "dracon-warden filter-clean"]);
         let output = Command::new(&hook)
             .current_dir(repo)
             .env("GIT_CONFIG_GLOBAL", &global_cfg)
@@ -2823,11 +2752,7 @@ protected_patterns = ["secrets.json"]
         let (merged, conflicted) = text_merge(ancestor, current, other).expect("clean merge");
         assert!(!conflicted);
         let text = String::from_utf8(merged).expect("utf8");
-        assert!(
-            text.contains("line2-A"),
-            "current-side change kept: {}",
-            text
-        );
+        assert!(text.contains("line2-A"), "current-side change kept: {}", text);
         assert!(text.contains("line4-B"), "other-side change kept: {}", text);
 
         // Conflict case: both sides edit the same line.
@@ -2982,10 +2907,7 @@ protected_patterns = ["secrets.json"]
             let out = git_in_output(repo, &["config", "--local", "--get", key]);
             assert!(!out.trim().is_empty(), "key {} must be registered", key);
         }
-        let textconv = git_in_output(
-            repo,
-            &["config", "--local", "--get", "diff.dracon.textconv"],
-        );
+        let textconv = git_in_output(repo, &["config", "--local", "--get", "diff.dracon.textconv"]);
         assert_eq!(textconv.trim(), "dracon-warden filter-smudge");
         let driver = git_in_output(repo, &["config", "--local", "--get", "merge.dracon.driver"]);
         assert_eq!(driver.trim(), "dracon-warden merge %O %A %B");
