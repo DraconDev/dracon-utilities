@@ -10,6 +10,30 @@ use std::path::{Path, PathBuf};
 use crate::TeamKey;
 use crate::WardenSecurity;
 
+/// Create a new private key file without following a check-then-create race.
+/// On Unix the mode is applied at creation so the encrypted key is never
+/// exposed with the process umask's default permissions.
+fn write_new_private_file(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(path)?;
+        file.write_all(bytes)
+    }
+    #[cfg(not(unix))]
+    {
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(path)?;
+        file.write_all(bytes)
+    }
+}
+
 impl WardenSecurity {
     pub fn load_team_key(&self, team_name: &str) -> Result<TeamKey> {
         let home = dirs::home_dir().context("Could not find home directory")?;
@@ -68,12 +92,6 @@ impl WardenSecurity {
         fs::create_dir_all(&team_dir)?;
 
         let team_key_path = team_dir.join(format!("{}.key", team_name));
-        if team_key_path.exists() {
-            return Err(anyhow::anyhow!(
-                "Team '{}' already exists in your keychain",
-                team_name
-            ));
-        }
 
         // Generate new Identity for the team
         let team_identity = x25519::Identity::generate();
@@ -97,8 +115,13 @@ impl WardenSecurity {
         writer.write_all(team_secret.as_bytes())?;
         writer.finish()?;
 
-        std::fs::write(&team_key_path, encrypted)?;
-        Ok(())
+        match write_new_private_file(&team_key_path, &encrypted) {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => Err(
+                anyhow::anyhow!("Team '{}' already exists in your keychain", team_name),
+            ),
+            Err(error) => Err(error.into()),
+        }
     }
 
     pub fn add_team_member(&self, alias: &str, public_key_str: &str) -> Result<()> {
@@ -219,24 +242,7 @@ impl WardenSecurity {
         writer.write_all(&key_bytes)?;
         writer.finish()?;
 
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::OpenOptionsExt;
-            let mut file = fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .mode(0o600)
-                .open(&team_key_path)?;
-            file.write_all(&encrypted)?;
-        }
-        #[cfg(not(unix))]
-        {
-            fs::write(&team_key_path, &encrypted)?;
-            let metadata = fs::metadata(&team_key_path)?;
-            let mut perms = metadata.permissions();
-            perms.set_mode(0o600);
-            fs::set_permissions(&team_key_path, perms)?;
-        }
+        write_new_private_file(&team_key_path, &encrypted)?;
 
         Ok(team_name.to_string())
     }

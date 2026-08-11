@@ -4,6 +4,8 @@ use common::{EnvRestorer, HomeGuard};
 use secrecy::ExposeSecret;
 use std::fs;
 use std::io::{Read, Write};
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 
 fn init_security() -> (dracon_security::WardenSecurity, HomeGuard) {
     let _guard = HomeGuard::new();
@@ -670,6 +672,39 @@ fn test_generate_master_identity_refuses_dedicated_master_public() {
 // =============================================================================
 // TeamKey tests — use the public API (create_team, load_team_key)
 // =============================================================================
+
+#[test]
+fn test_create_team_creates_private_key_without_overwrite() {
+    let (security, _guard) = init_security();
+    security
+        .create_team("private-team")
+        .expect("first team creation should succeed");
+
+    let home = std::env::var("HOME").map(std::path::PathBuf::from).unwrap();
+    let team_key_path = home
+        .join(".dracon")
+        .join("teams")
+        .join("private-team.key");
+    let original = fs::read(&team_key_path).expect("team key should be written");
+
+    #[cfg(unix)]
+    assert_eq!(
+        fs::metadata(&team_key_path)
+            .expect("team key metadata")
+            .permissions()
+            .mode()
+            & 0o777,
+        0o600,
+        "team key must be owner-only at creation"
+    );
+
+    let second = security.create_team("private-team");
+    assert!(second.is_err(), "recreating a team must not overwrite its key");
+    assert_eq!(
+        fs::read(&team_key_path).expect("team key should remain"),
+        original
+    );
+}
 
 #[test]
 fn test_create_team_name_validation_rejects_slash() {
