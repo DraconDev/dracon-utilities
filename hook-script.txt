@@ -1,0 +1,225 @@
+#!/bin/sh
+# Dracon Warden — pre-push hook
+# Defense-in-depth: scans push for plaintext secrets.
+# Catches --no-verify bypass of pre-commit hook.
+# Installed by: dracon-warden setup-hooks
+#
+# Plaintext-sibling escape hatch: a file with a `<path>.plaintext` sibling
+# is treated as intentionally plaintext. Such files are excluded from the
+# scan (silent allow). See docs/design/warden-plaintext-sibling.md.
+#
+# CHANGED 2026-07-21 (v0.112.32, audit M32/F4.6): filenames are
+# handled NUL-delimited. The previous
+# `for f in $(git diff --name-only "$RANGE")` word-split on
+# whitespace: a file named `prod secrets.env` split into `prod` and
+# `secrets.env`, neither fragment was scanned, and a plaintext
+# secret in a space-containing filename pushed clean. We now iterate
+# `git diff --name-only -z` (via `tr '\0' '\n'` + `IFS= read -r`,
+# which preserves spaces; the residual newline-in-filename edge is
+# accepted as absurd) and pass the accepted files to the second diff
+# as arguments via `xargs -0` (no word-splitting, no glob expansion
+# of metacharacters; `-r` = --no-run-if-empty on GNU xargs).
+# `--pathspec-from-file` was tried first but `git diff` does NOT
+# support it (usage error, exit 129 — verified against git 2.51.2).
+
+# Accumulator for the per-ref accepted file list (NUL-delimited).
+SCAN_FILES_NUL=$(mktemp)
+# Accumulator for added-file paths (newline-delimited) — used by the
+# added-blob scan below.
+ADDED_FILES=$(mktemp)
+trap 'rm -f "$SCAN_FILES_NUL" "$ADDED_FILES" "$REFS_FILE"' EXIT
+
+# Secret shapes scanned against added diff lines AND added file blobs
+# (see the added-blob scan below). Kept case-sensitive deliberately:
+# the warden's own test fixtures contain uppercase `PASSWORD=` forms,
+# and the case-insensitive primary gate (SecretScanner) covers
+# protected paths. Unquoted `secret=`/`api_key=` values are NOT in the
+# hook regex: the warden's own fixture corpus uses exactly those
+# shapes (`secret=hunter2` in plaintext_sibling_test,
+# `ibm_cloud_api_key = ...` in comprehensive_test), which would
+# self-block every future warden push.
+#
+# FIXED 2026-08-11 (audit MEDIUM): added the unquoted-password
+# alternative `password\s*=\s*[^[:space:]"]{6,}`. The pre-fix regex
+# required a quote after `=`, so a bare `password = abc` in an added
+# line pushed clean.
+# FIXED 2026-08-12 (audit LOW follow-up, auditor-verified): the quoted
+# branches were written `["''][^"'']` inside a shell single-quoted
+# string — POSIX shell collapses each `''` pair to the empty string,
+# so the EFFECTIVE regex was `["][^"]+`: single-quoted values
+# (`secret = 'hunter2'`) pushed clean. Use the `'\''` idiom so a real
+# `'` survives shell parsing (effective: `["'][^"']+`, verified with
+# sh -x). NOTE: this comment must never contain `password = <6+ chars>`
+# — the unquoted branch would self-match the hook's own text if the
+# script is ever committed (the 2026-08-12 test-harness vacuity).
+SECRET_RE='(A{1}KIA[A-Z0-9]{16}|-----BEGIN [A-Z]+ PRIVATE KEY|password\s*=\s*["'\''][^"'\'']+|secret\s*=\s*["'\''][^"'\'']+|api_key\s*=\s*["'\''][^"'\'']+|password\s*=\s*[^[:space:]"'']{6,})'
+
+# ── Repo-local hook chaining (FIXED 2026-08-11, audit MEDIUM — H-10
+#    follow-up) ──────────────────────────────────────────────────────
+# Global core.hooksPath shadows .git/hooks for every repo; the H-10
+# fix chained repo-local hooks for pre-commit only, leaving THIS hook
+# silently shadowing any repo-local pre-push. Chain first, like
+# pre-commit: git feeds the push refs on stdin exactly once, so
+# buffer them, hand the buffer to the local hook, and reuse it for
+# warden's own scan below — a local hook that consumes stdin cannot
+# starve the scan. The scan keeps its main-shell form
+# (`done < "$REFS_FILE"`, not a pipe): inside a piped subshell `exit
+# 1` would exit only the subshell and the hook would return 0,
+# silently defeating the guard. The "Dracon Warden" grep skips our
+# own seeded copies (no recursion). DRACON_ALLOW_REWRITE does NOT
+# gate this: that bypass is scoped to the history guard inside the
+# loop; a repo-local hook failure must abort the push regardless.
+REFS_FILE=$(mktemp)
+cat > "$REFS_FILE"
+
+REPO=$(git rev-parse --show-toplevel)
+LOCAL_HOOK="$REPO/.git/hooks/pre-push"
+if [ -x "$LOCAL_HOOK" ] && ! grep -q "Dracon Warden" "$LOCAL_HOOK" 2>/dev/null; then
+    "$LOCAL_HOOK" "$@" < "$REFS_FILE" || exit $?
+fi
+
+# Read push info from stdin (remote URL and branch refs)
+while read local_ref local_sha remote_ref remote_sha; do
+    # ── History-rewrite guard (ADDED 2026-07-25, v0.113.0) ──────
+    # A non-fast-forward push means rewritten history (amend/rebase
+    # of an already-pushed commit). The 2026-07-25 incident showed
+    # agent loops doing exactly this and racing dracon-sync's
+    # auto-push, producing permanent divergent-branch churn. GitLab
+    # branch protection covers gitlab; this hook is the
+    # forge-INVARIANT enforcement (GitHub free-tier private repos
+    # cannot be protected server-side). Amending UNPUSHED commits
+    # still pushes fine (fast-forward), so normal WIP flow is
+    # unaffected. Escape hatch: DRACON_ALLOW_REWRITE=1.
+    if [ -z "$DRACON_ALLOW_REWRITE" ]; then
+        if [ "$local_sha" = "0000000000000000000000000000000000000000" ]; then
+            echo "❌ dracon-warden: refusing to delete $remote_ref (history guard)." >&2
+            echo "   Bypass: DRACON_ALLOW_REWRITE=1" >&2
+            exit 1
+        fi
+        if [ "$remote_sha" != "0000000000000000000000000000000000000000" ]; then
+            if ! git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
+                echo "❌ dracon-warden: refusing non-fast-forward push to $remote_ref (history rewrite)." >&2
+                echo "   Merge instead: git pull --no-rebase" >&2
+                echo "   Bypass: DRACON_ALLOW_REWRITE=1" >&2
+                exit 1
+            fi
+        fi
+    fi
+
+    # Skip branch deletions (only reachable via the escape hatch)
+    if [ "$local_sha" = "0000000000000000000000000000000000000000" ]; then
+        continue
+    fi
+
+    # Determine the diff range to scan
+    if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
+        # New branch — scan the entire local commit history being pushed.
+        # Use the empty-tree SHA so `git diff` always has a valid left side,
+        # even if the remote ref hasn't been created yet.
+        RANGE="4b825dc642cb6eb9a060e54bf8d69288fbee4904..$local_sha"
+    else
+        # Existing branch — scan commits being pushed
+        RANGE="$remote_sha..$local_sha"
+    fi
+
+    # Collect non-hatched files (skip files with a `.plaintext` sibling)
+    : > "$SCAN_FILES_NUL"
+    git diff --name-only -z "$RANGE" 2>/dev/null | tr '\0' '\n' | while IFS= read -r f; do
+        if [ -f "$f.plaintext" ]; then
+            # Hatched file — silently allow
+            continue
+        fi
+        printf '%s\0' "$f" >> "$SCAN_FILES_NUL"
+    done
+
+    # Nothing left to scan — push is safe
+    if [ ! -s "$SCAN_FILES_NUL" ]; then
+        continue
+    fi
+
+    # Scan only newly added diff lines. Deletions of old secret-shaped fixtures
+    # are safe, while additions still trip the defense-in-depth guard.
+    DIFF=$(xargs -0 -r git diff --unified=0 "$RANGE" -- < "$SCAN_FILES_NUL" 2>/dev/null | grep -E '^\+[^+]' || true)
+    # CHANGED 2026-07-26 (v0.113.1, audit WARDEN-M2): `\x27` is NOT a
+    # hex escape in GNU grep ERE (verified grep 3.12: "stray \ before
+    # x" — the class became ["x27], matching literal x/2/7 instead of
+    # a single quote), so single-quoted secrets escaped the scan. Use
+    # the shell `'`\\`''` idiom to embed a literal single quote.
+    if echo "$DIFF" | grep -qE "$SECRET_RE"; then
+        echo "⚠️  Possible plaintext secrets detected in push." >&2
+        echo "   The warden filter may have been bypassed." >&2
+        echo "   Run: dracon-warden once $(git rev-parse --show-toplevel)" >&2
+        exit 1
+    fi
+
+    # ADDED 2026-08-11 (audit MEDIUM): `git diff --unified=0` emits NO
+    # `+` lines for binary files (only "Binary files ... differ"), so
+    # binary additions were never scanned. Scan the FULL blob of every
+    # ADDED file with `grep -a` (treats binary data as text). For a new
+    # file the added content IS the whole file, so this is equivalent
+    # to the diff-line scan for text additions and covers binaries for
+    # the first time. MODIFIED files keep the added-lines diff scan
+    # only: scanning whole modified blobs would re-trip on key-shaped
+    # bytes that predate the push.
+    git diff --name-only --diff-filter=A -z "$RANGE" 2>/dev/null | tr '\0' '\n' > "$ADDED_FILES"
+    while IFS= read -r af; do
+        # Skip files hatched via a `.plaintext` sibling, matching the
+        # text scan above.
+        [ -f "$af.plaintext" ] && continue
+        if git cat-file blob "$local_sha:$af" 2>/dev/null | grep -aqE "$SECRET_RE"; then
+            echo "⚠️  Possible plaintext secrets detected in added file $af (binary-safe scan)." >&2
+            echo "   The warden filter may have been bypassed." >&2
+            echo "   Run: dracon-warden once $(git rev-parse --show-toplevel)" >&2
+            exit 1
+        fi
+    done < "$ADDED_FILES"
+
+    # ADDED 2026-07-21 (v0.112.33, audit H2/F0.1 follow-up): reject
+    # pushes containing commits authored by known TEST identities.
+    # The F0.1 incident showed a test writing `user.email = test@test`
+    # into a LIVE repo's config (via a positional `git config` arg),
+    # after which the daemon committed with the poisoned identity and
+    # the poisoned commit landed on all mirrors. Only the PUSHED
+    # range is scanned, so historical commits are unaffected.
+    #
+    # CHANGED 2026-07-27 (v0.113.2): for TAG pushes (`remote_sha = 0`,
+    # i.e. the ref is brand new) the old `git log empty..tag-sha` range
+    # covered the ENTIRE repo history reachable from the tag object,
+    # not just the NEW commits — a test-identity commit reachable only
+    # via a non-first-parent merge of a feature branch then blocked the
+    # tag push even though the first-parent history is clean. Now the
+    # scan distinguishes:
+    #
+    #   * existing-ref update (branch push, remote_sha != 0):
+    #     `git rev-list "$LOCAL_SHA" --not "$REMOTE_SHA"` — only the
+    #     new commits being added to the branch tip.
+    #
+    #   * new-ref push (tag or new branch, remote_sha == 0):
+    #     `git rev-list "$LOCAL_SHA" --not --remotes` — only commits
+    #     reachable from the tag object that are NOT already on ANY
+    #     remote-tracking branch. Anything already published (and
+    #     therefore already accepted by a prior scan) is excluded.
+    #
+    # This is the correct F0.1 defense surface: only NEWLY-PUBLISHED
+    # commits need scrutiny. A test-identity commit on a side branch
+    # merge that was already pushed to all mirrors in a prior commit
+    # cannot be retroactively un-published, so re-scanning it on a
+    # later tag push is wasted and prone to false positives. Defense
+    # in depth is preserved for the new push itself.
+    if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
+        # New ref (tag or branch). Scan only commits not yet on any remote.
+        NEW_COMMITS=$(git rev-list "$local_sha" --not --remotes 2>/dev/null || true)
+    else
+        # Existing-ref update. Scan only the new commits being added.
+        NEW_COMMITS=$(git rev-list "$local_sha" --not "$remote_sha" 2>/dev/null || true)
+    fi
+    if [ -n "$NEW_COMMITS" ]; then
+        BAD_AUTHORS=$(printf '%s\n' "$NEW_COMMITS" | xargs -I{} git log -1 --format='%ae%n%ce' {} 2>/dev/null | sort -u | grep -Eix '^test@test$|^test@test\.com$|^test@example\.com$' || true)
+        if [ -n "$BAD_AUTHORS" ]; then
+            echo "⚠️  Push contains commits authored by a test identity:" >&2
+            echo "$BAD_AUTHORS" | sed 's/^/   /' >&2
+            echo "   Amend the author identity before pushing (git commit --amend --reset-author)." >&2
+            exit 1
+        fi
+    fi
+done < "$REFS_FILE"
