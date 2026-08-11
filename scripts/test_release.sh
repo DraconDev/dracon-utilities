@@ -8,6 +8,8 @@
 #   3. Re-running with the same version is a no-op (idempotent bump).
 #   4. Precondition violations exit with non-zero.
 #   5. The dry-run summary message says no remote state was changed.
+#   6. The GitHub remote resolver prefers the canonical URL and fails loudly
+#      when no github.com remote is configured.
 #
 # No external dependencies (no bats, no shellcheck, no cargo publish).
 # Runs in <5s. Exit 0 = all tests pass; non-zero = at least one test failed.
@@ -76,7 +78,11 @@ make_workspace_copy() {
     cp "$MONOREPO_ROOT/dracon-system/Cargo.toml" "$dest/dracon-system/Cargo.toml"
     cp "$MONOREPO_ROOT/CHANGELOG.md" "$dest/CHANGELOG.md"
     cp "$RELEASE_SH" "$dest/release.sh"
-    chmod +x "$dest/release.sh"
+    cp "$SCRIPT_DIR/resolve-github-remote.sh" "$dest/resolve-github-remote.sh"
+    chmod +x "$dest/release.sh" "$dest/resolve-github-remote.sh"
+    # The release script must auto-resolve the GitHub remote in the fixture,
+    # just as it does in the real parent repo.
+    (cd "$dest" && git remote add origin https://github.com/DraconDev/dracon-utilities.git)
     # Commit the initial state so the script sees a clean tree
     (cd "$dest" && git add -A && git commit -q -m "initial")
 }
@@ -237,10 +243,43 @@ test_script_integrity() {
         FAIL=$((FAIL + 1))
         FAILURES+=("release.sh syntax")
     fi
+
+    local help
+    help=$("$RELEASE_SH" --help 2>&1)
+    assert_match "help documents auto-resolved GitHub remote" "$help" "*default: auto-resolved*"
+}
+
+# Test 6: GitHub remote resolution
+test_resolve_github_remote() {
+    echo
+    echo "=== Test 6: GitHub remote resolution ==="
+    local work; work=$(mktemp -d)
+    git -C "$work" init -q -b main
+    git -C "$work" remote add origin https://github.com/DraconDev/dracon-utilities.git
+    git -C "$work" remote add gitlab git@gitlab.com:DraconDev/dracon-utilities.git
+
+    local out rc
+    out=$(bash "$MONOREPO_ROOT/scripts/resolve-github-remote.sh" "$work" 2>/dev/null)
+    assert "resolves origin by GitHub URL" "$out" "origin"
+
+    # A canonical repository URL wins over a lexically earlier unrelated
+    # GitHub remote, keeping the choice deterministic in multi-remote repos.
+    git -C "$work" remote add github https://github.com/example/other.git
+    out=$(bash "$MONOREPO_ROOT/scripts/resolve-github-remote.sh" "$work" 2>/dev/null)
+    assert "prefers canonical dracon-utilities URL" "$out" "origin"
+
+    git -C "$work" remote remove origin
+    git -C "$work" remote remove github
+    out=$(bash "$MONOREPO_ROOT/scripts/resolve-github-remote.sh" "$work" 2>&1)
+    rc=$?
+    assert "fails without a GitHub remote" "$rc" "2"
+    assert_match "no-GitHub error is actionable" "$out" "*no github.com remote configured*"
+    rm -rf "$work"
 }
 
 # Run all tests
 test_script_integrity
+test_resolve_github_remote
 test_dry_run_is_noop
 test_bump_and_abort
 test_dry_run_then_abort
