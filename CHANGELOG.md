@@ -42,6 +42,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   output), encrypted roundtrip proving ciphertext-in → plaintext merge →
   ciphertext-out, and config registration + idempotence.
 
+- **Scanner snippets are now UTF-8 safe**: long multi-byte secret matches are
+  truncated at the nearest valid character boundary instead of using a raw
+  byte slice that could panic the scanner.
+
 ## [0.113.4] - 2026-08-09
 
 - **Test-only helper gated `#[cfg(test)]`**: `clear_filter_managed_patterns` (and its security-crate import) are only used by tests; gating them removes the dead-code warning from the release build. No behavior change. crates.io max stable; tags + gh releases on all forges.
