@@ -59,8 +59,19 @@ fi
 
 # 2. Protected path: the filter must STILL work — the sk- key in key.pem
 #    gets replaced with a [DRACON_SECRET:...] tag.
-OUT2="$(DRACON_WARDEN_POLICY="$TMP/policy.toml" "$BIN" filter-clean work/key.pem < work/key.pem 2>/dev/null || true)"
-if [[ "$OUT2" == *"sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"* ]] && [[ "$OUT2" != *"DRACON_SECRET"* ]]; then
+#    FIXED 2026-08-12 (audit LOW-MEDIUM, scripts/verify-install.sh:54-60):
+#    the old check captured with `|| true`, so a filter binary that ERRORS
+#    on protected files (empty OUT2 — e.g. no recipients configured) passed
+#    both `[[ ]]` tests (empty is not sk-*) and reported "✓ OK". An errored
+#    filter is a FAIL: check the exit code FIRST, then tag presence.
+if OUT2="$(DRACON_WARDEN_POLICY="$TMP/policy.toml" "$BIN" filter-clean work/key.pem < work/key.pem 2>/dev/null)"; then
+    :
+else
+    rc=$?
+    echo "✗ FAIL: filter-clean errored on the protected file (exit $rc) — filter not functional (e.g. no recipients configured)." >&2
+    exit 1
+fi
+if [[ "$OUT2" != *"DRACON_SECRET"* ]] || [[ "$OUT2" == *"sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"* ]]; then
     echo "✗ FAIL: protected key.pem was not encrypted — filter not functional." >&2
     exit 1
 fi
