@@ -1,1 +1,0 @@
-{"schema":1,"type":"queue-item","id":"20260810213656-bqif1f","objective":"FIX LOW (warden): create_team writes team key with default umask + no overwrite guard; accept_team_invite does it right (team.rs:88 vs 176-190)","addedAt":"2026-08-10T21:36:56.854Z"}
