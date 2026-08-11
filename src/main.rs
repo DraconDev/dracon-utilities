@@ -415,11 +415,13 @@ impl WardenPolicy {
         }
 
         for p in &plaintext {
-            if !is_allowed_plaintext_pattern(p) {
-                return Err(anyhow::anyhow!(
-                    "invalid policy: plaintext_patterns is allowlisted; refusing: {p}"
-                ));
-            }
+            // FIXED 2026-08-11 (audit LOW): the forbidden-substring check
+            // ran AFTER the allowlist check, which made it unreachable —
+            // no allowlisted pattern can contain a forbidden substring,
+            // so a secretish pattern like `secrets/app.json` was always
+            // rejected by the allowlist branch with a misleading message
+            // and the specific guard never fired. Check it first so the
+            // actionable "secret-ish paths" error wins.
             let pl = p.to_lowercase();
             if FORBIDDEN_PLAINTEXT_SUBSTRINGS
                 .iter()
@@ -427,6 +429,11 @@ impl WardenPolicy {
             {
                 return Err(anyhow::anyhow!(
                     "invalid policy: refusing plaintext_patterns entry that disables encryption for secret-ish paths: {p}"
+                ));
+            }
+            if !is_allowed_plaintext_pattern(p) {
+                return Err(anyhow::anyhow!(
+                    "invalid policy: plaintext_patterns is allowlisted; refusing: {p}"
                 ));
             }
         }

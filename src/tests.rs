@@ -1877,19 +1877,34 @@ watch_roots = ["/tmp/test"]
 
     #[test]
     fn warden_policy_validate_rejects_secretish_plaintext() {
-        let policy = WardenPolicy {
-            protected_patterns: vec![],
-            plaintext_patterns: vec!["passwords.txt".into()],
-            hygiene_patterns: vec![],
-            repo_roots: vec![],
-            discover_roots: vec![],
-            ..Default::default()
-        };
-        let result = policy.validate();
-        assert!(
-            result.is_err(),
-            "should reject plaintext pattern with 'password'"
-        );
+        // FIXED 2026-08-11 (audit LOW): the old fixture (`passwords.txt`)
+        // never contained a FORBIDDEN_PLAINTEXT_SUBSTRINGS needle — it
+        // was rejected by the allowlist branch, so the secret-ish guard
+        // was untested AND unreachable (check order). The fixture now
+        // trips the forbidden-substring branch and the error message
+        // pins it.
+        for secretish in [
+            "secrets/app.json",
+            "Secrets/App.json", // case-insensitive
+            "config/.env.local",
+        ] {
+            let policy = WardenPolicy {
+                protected_patterns: vec![],
+                plaintext_patterns: vec![secretish.into()],
+                hygiene_patterns: vec![],
+                repo_roots: vec![],
+                discover_roots: vec![],
+                ..Default::default()
+            };
+            let err = policy
+                .validate()
+                .expect_err("secret-ish plaintext pattern must be rejected")
+                .to_string();
+            assert!(
+                err.contains("secret-ish"),
+                "expected the secret-ish guard message, got: {err}"
+            );
+        }
     }
 
     #[test]
