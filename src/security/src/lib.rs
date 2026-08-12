@@ -70,15 +70,11 @@ pub fn clear_managed_patterns_override() {
 
 static ALLOW_V1_FALLBACK: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
-// DEPRECATED 2026-07-18 (FDRACONWARDEN-001): V1 decryption uses
-// AES-256-CFB with a deterministic IV derived as SHA256(repo_key)[..16].
-// This is a textbook CFB nonce-misuse vulnerability: identical plaintexts
-// under the same key produce identical ciphertexts. We retain the
-// runtime gate ONLY for one migration cycle so operators can recover
-// V1-format ciphertexts. The escape hatch will be removed in v0.113.0.
-// To migrate: set `allow_v1_fallback = true` in the policy, decrypt once
-// to re-encrypt under V2 (AES-256-GCM with a random nonce), then unset
-// the gate.
+// Legacy V1 AES-CFB decryption is intentionally unavailable. CFB has no
+// authenticated integrity, so a wrong-key result can look like valid text
+// and cannot be distinguished safely from a correct-key plaintext. The
+// `allow_v1_fallback` policy field and these accessors remain only for
+// configuration/API compatibility; they never enable legacy decryption.
 pub fn set_allow_v1_fallback(allow: bool) {
     ALLOW_V1_FALLBACK.store(allow, std::sync::atomic::Ordering::Relaxed);
 }
@@ -1002,7 +998,8 @@ impl WardenSecurity {
     /// Migrate secret marker prefixes in-place without touching encrypted payload bytes.
     /// Example: `[OLD_MARKER:...]` -> `[DRACON_SECRET:...]`.
     /// Git Smudge Filter: Decrypt stdin/file -> stdout
-    /// Gracefully handles: V2 (Direct), V1 (RepoKey), Plaintext, REDACTED_REGEX wrapped
+    /// Gracefully handles: V2 (Direct), authenticated repo-key V1, plaintext,
+    /// and REDACTED_REGEX-wrapped content. Legacy AES-CFB is refused.
     /// Encrypt data using the repo key with AES-256-GCM.
     ///
     /// SECURITY NOTE: Uses a random 12-byte nonce per encryption. For very high-volume
@@ -1010,9 +1007,7 @@ impl WardenSecurity {
     /// becomes a meaningful risk for GCM mode. For typical use, the random nonce
     /// per-file is sufficient. Consider key rotation if your repo will exceed this scale.
     /// Decrypt data using the repo key
-    /// Decrypt data using the legacy Git Seal V1 format (AES-256-CFB with derived IV).
-    /// WARNING: This format uses a deterministic IV derived from the key (SHA-256 hash → first 16 bytes), which violates AES-CFB security requirements. Using the same IV for multiple encryptions leaks information about plaintext relationships. This format exists for backward compatibility with legacy git-seal ciphertexts. DO NOT use this for new encryptions. If you have ciphertexts created with this format, consider migrating to AES-256-GCM (encrypt_with_repo_key) with random nonces.
-    /// "Drunk guy with keychain" - try all keys from ~/.dracon/keys/
+    /// "Drunk guy with keychain" - try authenticated keys from ~/.dracon/keys/
     fn try_keychain_bruteforce(&self, ciphertext: &[u8]) -> Option<Vec<u8>> {
         let home = match std::env::var("HOME") {
             Ok(h) => PathBuf::from(h),
@@ -1077,15 +1072,6 @@ impl WardenSecurity {
                             return Some(plaintext);
                         }
 
-                        // Try AES-CFB (git-seal style)
-                        if let Ok(plaintext) = self.decrypt_git_seal(&repo_key, ciphertext) {
-                            #[cfg(debug_assertions)]
-                            eprintln!(
-                                "🔓 Decrypted with keychain key (AES-CFB): {:?}",
-                                path.file_name()
-                            );
-                            return Some(plaintext);
-                        }
                     }
                 }
             }
@@ -2123,71 +2109,18 @@ API_KEY=secret"#;
         assert_eq!(cleaned, real);
     }
 
-    /// Mirror of the legacy git-seal V1 format: AES-256-CFB with
-    /// key = sha256(repo_key)[..32], IV = sha256(repo_key)[..16].
-    fn legacy_cfb_encrypt(repo_key: &[u8], plaintext: &[u8]) -> Vec<u8> {
-        use cfb_mode::cipher::{AsyncStreamCipher, KeyIvInit};
-        use sha2::{Digest, Sha256};
-        let mut hasher = Sha256::new();
-        hasher.update(repo_key);
-        let hash = hasher.finalize();
-        let cipher =
-            cfb_mode::Encryptor::<aes::Aes256>::new_from_slices(&hash[..32], &hash[..16])
-                .unwrap();
-        let mut out = plaintext.to_vec();
-        cipher.encrypt(&mut out);
-        out
-    }
-
-    /// FIXED 2026-08-11 (audit MEDIUM): the V1 CFB fallback was
-    /// unauthenticated with a first-20-bytes-ASCII-ONLY heuristic — a
-    /// wrong-key decrypt whose output merely STARTED printable was
-    /// returned as silent garbage plaintext (whole-file secret
-    /// corruption). The gate is now whole-buffer UTF-8 + first-20
-    /// ASCII (legacy git-seal payloads are text secrets).
+    /// FIXED 2026-08-12 (audit MEDIUM follow-up): legacy AES-CFB has no
+    /// authentication, so whole-buffer UTF-8/text heuristics are not a
+    /// safe discriminator. The fallback must fail closed rather than
+    /// return a wrong-key plaintext that happens to be printable.
     #[test]
-    fn test_git_seal_cfb_roundtrip_and_wrong_key_rejected() {
+    fn test_git_seal_v1_is_refused_even_for_textual_ciphertext() {
         let security = test_security_with_identity();
         set_allow_v1_fallback(true);
-        let key_a = vec![0x42u8; 32];
-        let key_b = vec![0x24u8; 32];
-
-        // 1. Correct key: legacy CFB ciphertext decrypts back to text.
-        let plaintext = "DATABASE_PASSWORD = s3cr3t-value\nAPI_KEY = abc123\n"
-            .as_bytes()
-            .to_vec();
-        let ct = legacy_cfb_encrypt(&key_a, &plaintext);
-        let out = security
-            .decrypt_git_seal(&RepoKey(key_a.clone()), &ct)
-            .unwrap();
-        assert_eq!(out, plaintext);
-
-        // 2. Wrong key: a 300-byte payload makes the UTF-8 gate
-        // deterministic — random CFB output cannot be valid UTF-8.
-        let long: Vec<u8> = (0u32..300).map(|i| b'a' + (i % 26) as u8).collect();
-        let ct = legacy_cfb_encrypt(&key_a, &long);
-        assert!(
-            security.decrypt_git_seal(&RepoKey(key_b), &ct).is_err(),
-            "wrong-key CFB output must be rejected, not returned as plaintext"
-        );
-    }
-
-    /// FIXED 2026-08-11 (audit MEDIUM): the EXACT hole — a payload
-    /// whose first 20 bytes are printable ASCII but whose tail is
-    /// invalid UTF-8 passed the old first-20 heuristic and would have
-    /// been returned as garbage plaintext even with the CORRECT key.
-    #[test]
-    fn test_git_seal_rejects_ascii_prefix_binary_tail() {
-        let security = test_security_with_identity();
-        set_allow_v1_fallback(true);
-        let key = vec![0x77u8; 32];
-        let mut sneaky = b"looks like text!!! ".to_vec(); // 20 ASCII bytes
-        sneaky.extend_from_slice(&[0xFF, 0xFE, 0xC3, 0x28, 0xA0, 0x81]); // invalid UTF-8
-        let ct = legacy_cfb_encrypt(&key, &sneaky);
-        assert!(
-            security.decrypt_git_seal(&RepoKey(key), &ct).is_err(),
-            "ASCII-prefix + binary-tail must be rejected, not returned as plaintext"
-        );
+        let error = security
+            .decrypt_git_seal(&RepoKey(vec![0x42; 32]), b"legacy ciphertext")
+            .expect_err("unauthenticated V1 must never return plaintext");
+        assert!(error.to_string().contains("unauthenticated integrity"));
     }
 
     /// FIXED 2026-08-11 (audit MEDIUM): the unlock error dumped the
