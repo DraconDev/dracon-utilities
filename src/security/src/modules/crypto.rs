@@ -6,15 +6,12 @@ use aes_gcm::{
 };
 use age::x25519;
 use anyhow::{Context, Result};
-use cfb_mode::cipher::{AsyncStreamCipher, KeyIvInit};
-use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::fs;
 use std::io::{Read, Write};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use crate::is_v1_fallback_allowed;
 use crate::RepoKey;
 use crate::WardenSecurity;
 
@@ -368,53 +365,23 @@ only canonical mesh keys are honored in repo key dirs",
         Ok(plaintext)
     }
 
-    pub fn decrypt_git_seal(&self, repo_key: &RepoKey, ciphertext: &[u8]) -> Result<Vec<u8>> {
-        if !is_v1_fallback_allowed() {
-            return Err(anyhow::anyhow!(
-                "V1 decryption disabled: legacy format uses deterministic IV which violates AES-CFB security. \
-                 Enable with allow_v1_fallback = true in policy, then migrate ciphertexts to V2."
-            ));
-        }
-        eprintln!("⚠️ WARNING: decrypting legacy V1 ciphertext (deterministic IV — insecure). Migrate to V2.");
-        let mut hasher = Sha256::new();
-        hasher.update(&repo_key.0);
-        let key_hash = hasher.finalize();
-
-        let key = &key_hash[..32];
-        let iv = &key_hash[..16];
-
-        // Using dynamic dispatch or just specific type
-        // Using specific Decryptor type from cfb_mode
-        let cipher = cfb_mode::Decryptor::<aes::Aes256>::new_from_slices(key, iv)
-            .map_err(|e| anyhow::anyhow!("CFB init error: {}", e))?;
-
-        let mut plaintext = ciphertext.to_vec();
-        cipher.decrypt(&mut plaintext);
-
-        // FIXED 2026-08-11 (audit MEDIUM): the old heuristic checked
-        // ONLY the first 20 bytes for ASCII — a wrong-key decrypt whose
-        // CFB output merely STARTED printable was returned as silent
-        // garbage plaintext (whole-file secret corruption). CFB has no
-        // authentication, so the discriminator is plausibility over the
-        // WHOLE buffer: legacy git-seal ciphertexts are TEXT secrets, so
-        // the entire plaintext must be valid UTF-8 (ASCII-first-20 +
-        // garbage-tail now fails; a wrong-key 300-byte output passes
-        // UTF-8 with probability ~1e-60). The first-20 ASCII gate is
-        // kept for control-character rejection (low bytes are valid
-        // UTF-8 but not text). Binary legacy payloads are rejected with
-        // a clear error instead of being silently corrupted.
-        let is_likely_plaintext = std::str::from_utf8(&plaintext).is_ok()
-            && plaintext
-                .iter()
-                .take(20)
-                .all(|&b| b.is_ascii() && (b.is_ascii_graphic() || b.is_ascii_whitespace() || b == 0));
-
-        if !is_likely_plaintext {
-            return Err(anyhow::anyhow!(
-                "Git Seal decryption produced binary garbage"
-            ));
-        }
-
-        Ok(plaintext)
+    /// Refuse the unauthenticated legacy Git-Seal format.
+    ///
+    /// AES-CFB has no integrity tag, so no plaintext heuristic can tell a
+    /// correct-key result from a wrong-key result: even a short wrong-key
+    /// decrypt can be valid UTF-8 and printable. The configuration field
+    /// `allow_v1_fallback` is retained for backwards-compatible policy
+    /// parsing, but it cannot re-enable this unsafe path. Legacy ciphertexts
+    /// must be recovered from a trusted plaintext source and re-encrypted
+    /// using authenticated V2 encryption.
+    pub fn decrypt_git_seal(
+        &self,
+        _repo_key: &RepoKey,
+        _ciphertext: &[u8],
+    ) -> Result<Vec<u8>> {
+        Err(anyhow::anyhow!(
+            "V1 decryption refused: legacy AES-CFB ciphertext has no authenticated integrity; \
+             recover the plaintext from a trusted source and re-encrypt with V2"
+        ))
     }
 }
