@@ -206,7 +206,13 @@ owner_key = "~/.dracon/keys/owner.age"
 ~/.dracon/master.age           — Sovereign master key  
 ~/.dracon/keys/*.age           — Additional identities
 ~/.dracon/data/keys/machine_*.age — Machine-level secret keys
-~/.dracon/data/keys/owner_*.pub  — Owner key for repo authorization
+~/.dracon/data/keys/owner_*.pub  — Local owner recipient trust anchors
+
+Repository `.dracon/data/keys/` and legacy `.git/arcane/keys/` files are
+not trusted by filename alone: `gather_all_recipients` accepts only canonical
+`owner_*.pub`/`master.pub` candidates whose single valid age recipient matches
+a local owner trust anchor. HOME key files remain operator-trusted for
+compatibility.
 ```
 
 ### Key Generation

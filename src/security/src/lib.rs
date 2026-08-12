@@ -2220,12 +2220,26 @@ API_KEY=secret"#;
         let good = x25519::Identity::generate();
         let evil = x25519::Identity::generate();
         let secret_holder = x25519::Identity::generate();
-        let home_key = x25519::Identity::generate();
+        let oversized_holder = x25519::Identity::generate();
+
+        // The local identity is the authorization anchor. A canonical
+        // owner_*.pub file for that recipient is accepted.
+        let mut sec = WardenSecurity::new(Some(&repo)).unwrap();
+        sec.set_mock_home(home.clone());
+        sec.master_identities.clear();
+        sec.master_identities.push(good.clone());
 
         // Canonical mesh file (keygen/publish output): honored.
         fs::write(
             repo.join(".dracon/data/keys/owner_good.pub"),
             good.to_public().to_string(),
+        )
+        .unwrap();
+        // A contributor can choose owner_evil.pub too, but cannot make its
+        // recipient trusted merely by choosing the canonical-looking name.
+        fs::write(
+            repo.join(".dracon/data/keys/owner_evil.pub"),
+            evil.to_public().to_string(),
         )
         .unwrap();
         // Attacker-pushable non-owner file with a VALID age recipient:
@@ -2235,12 +2249,12 @@ API_KEY=secret"#;
             evil.to_public().to_string(),
         )
         .unwrap();
-        // .key file that also contains secret key material: refused
-        // wholesale (publish-path content validation). Literal is
-        // concat-split so the warden's own pushes of this test never
-        // trip the scanner it backs.
+        // Canonical names still go through content validation. A `.pub`
+        // file containing secret key material must not contribute its second
+        // line as a recipient. Literal is concat-split so the warden's own
+        // pushes of this test never trip the scanner it backs.
         fs::write(
-            repo.join(".dracon/data/keys/owner_secret.key"),
+            repo.join(".dracon/data/keys/owner_secret.pub"),
             format!(
                 "AGE-SECRET-{}Y-1ABCDEFGHIJKLMNOPQRSTUVWXYZ\n{}",
                 "KE",
@@ -2248,17 +2262,25 @@ API_KEY=secret"#;
             ),
         )
         .unwrap();
+        fs::write(
+            repo.join(".dracon/data/keys/owner_oversized.pub"),
+            format!("{}\n{}", oversized_holder.to_public(), "x".repeat(256)),
+        )
+        .unwrap();
+        // Exercise the legacy contributor-pushable path too.
+        fs::create_dir_all(repo.join(".git/arcane/keys")).unwrap();
+        fs::write(
+            repo.join(".git/arcane/keys/owner_evil.pub"),
+            evil.to_public().to_string(),
+        )
+        .unwrap();
         // Home trust domain: non-owner file still honored.
+        let home_key = x25519::Identity::generate();
         fs::write(
             home.join(".dracon/data/keys/random.pub"),
             home_key.to_public().to_string(),
         )
         .unwrap();
-
-        let mut sec = WardenSecurity::new(Some(&repo)).unwrap();
-        sec.set_mock_home(home.clone());
-        sec.master_identities.clear();
-        sec.master_identities.push(x25519::Identity::generate());
 
         let strs: Vec<String> = sec
             .gather_all_recipients()
@@ -2268,15 +2290,19 @@ API_KEY=secret"#;
             .collect();
         assert!(
             strs.contains(&good.to_public().to_string()),
-            "owner_*.pub mesh key must be included"
+            "trusted owner_*.pub mesh key must be included"
         );
         assert!(
             !strs.contains(&evil.to_public().to_string()),
-            "non-owner repo key file must NOT become a recipient"
+            "attacker-controlled owner_evil.pub must NOT become a recipient"
         );
         assert!(
             !strs.contains(&secret_holder.to_public().to_string()),
-            "file containing secret key material must NOT become a recipient"
+            "canonical file containing secret key material must NOT become a recipient"
+        );
+        assert!(
+            !strs.contains(&oversized_holder.to_public().to_string()),
+            "oversized canonical file must NOT become a recipient"
         );
         assert!(
             strs.contains(&home_key.to_public().to_string()),
