@@ -170,8 +170,8 @@ impl WardenSecurity {
                 warn_once(
                     &WARNED_NON_OWNER_REPO_FILE,
                     &format!(
-                        "ignoring recipient file {} (not owner_*.pub); \
-only canonical mesh keys are honored in repo key dirs",
+                        "ignoring recipient file {} (not a canonical owner/master public key); \
+only authorized mesh keys are honored in repo key dirs",
                         path.display()
                     ),
                 );
@@ -244,9 +244,46 @@ only canonical mesh keys are honored in repo key dirs",
         }
     }
 
+    /// Return recipients that are trusted by the local operator and may
+    /// therefore be accepted from a repository-controlled key file.
+    ///
+    /// A repository filename is not an authorization mechanism: contributors
+    /// can choose both its basename and its contents. The local private
+    /// identities and operator-owned HOME key directory are the trust anchors.
+    fn local_recipient_trust_anchors(&self) -> HashSet<String> {
+        let mut trusted = self
+            .master_identities
+            .iter()
+            .chain(self.imported_identities.iter())
+            .map(|identity| identity.to_public().to_string())
+            .collect::<HashSet<_>>();
+        let mut seen_keys = HashSet::new();
+        let mut home_recipients = Vec::new();
+        let no_repo_trust_anchors = HashSet::new();
+
+        if let Ok(home) = self.get_home() {
+            for keys_dir in [
+                home.join(".dracon").join("data").join("keys"),
+                home.join(".dracon").join("keys"),
+            ] {
+                self.load_public_recipients_from_dir(
+                    &keys_dir,
+                    &mut seen_keys,
+                    &mut home_recipients,
+                    false,
+                    &no_repo_trust_anchors,
+                );
+            }
+        }
+        trusted.extend(home_recipients.into_iter().map(|recipient| recipient.to_string()));
+        trusted
+    }
+
     pub fn gather_all_recipients(&self) -> Result<Vec<x25519::Recipient>> {
         let mut seen_keys = HashSet::new();
         let mut recipients = Vec::new();
+        let trusted_repo_recipients = self.local_recipient_trust_anchors();
+        let no_repo_trust_anchors = HashSet::new();
 
         // 1. Local master identity, when the private key is available on this machine.
         if let Some(master) = self.master_identities.first() {
@@ -255,19 +292,16 @@ only canonical mesh keys are honored in repo key dirs",
             recipients.push(master_pub);
         }
 
-        // 2. Canonical mesh recipients from ~/.dracon/data/keys/*.pub. This keeps
-        // encryption aligned with the documented mesh even when the owner/master
-        // private key is stored off-box and only the public recipient is present.
-        // FIXED 2026-08-11 (audit MEDIUM): the home dir is the operator's own
-        // trust domain — non-owner_* files remain honored (micro2_*, master.pub
-        // are legitimate mesh additions) but load_public_recipients_from_dir
-        // flags them once. Repo key dirs below are strict (owner_*.pub only).
+        // 2. Public recipients from the operator's HOME key directory. HOME
+        // is an explicit local trust domain, so legacy non-owner names remain
+        // supported there; repository-controlled files use the stricter gate.
         if let Ok(home) = self.get_home() {
             self.load_public_recipients_from_dir(
                 &home.join(".dracon").join("data").join("keys"),
                 &mut seen_keys,
                 &mut recipients,
                 false,
+                &no_repo_trust_anchors,
             );
         }
 
@@ -282,11 +316,9 @@ only canonical mesh keys are honored in repo key dirs",
 
         // 4. Authorized Machine & Team Keys from the current repo
         if let Ok(repo_root) = self.get_repo_root() {
-            // Check BOTH new committed path (V2 Standard) and legacy path
-            // FIXED 2026-08-11 (audit MEDIUM): repo key dirs are the
-            // contributor-pushable surface — require the canonical
-            // `owner_*.pub` naming there so a pushed `evil.pub` can no
-            // longer add its holder to every future encryption.
+            // Check BOTH new committed path (V2 Standard) and legacy path.
+            // These are contributor-pushable, so a basename is not enough:
+            // the parsed recipient must also match a local owner trust anchor.
             let search_paths = vec![
                 repo_root.join(".dracon").join("data").join("keys"), // V2 Standard
                 repo_root.join(".git").join("arcane").join("keys"),  // Legacy
@@ -298,6 +330,7 @@ only canonical mesh keys are honored in repo key dirs",
                     &mut seen_keys,
                     &mut recipients,
                     true,
+                    &trusted_repo_recipients,
                 );
             }
         }
