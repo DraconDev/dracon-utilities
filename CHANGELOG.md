@@ -26,6 +26,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   regression coverage verifies each format is reported under its specific
   finding name.
 
+- **Legacy AES-CFB V1 decryption now fails closed**: `allow_v1_fallback`
+  remains accepted for configuration compatibility, but the unauthenticated
+  Git-Seal CFB decryptor is no longer callable. Wrong-key output can look like
+  valid text, so legacy ciphertext must be recovered from a trusted plaintext
+  source and re-encrypted with authenticated V2. Regression coverage includes
+  a short printable wrong-key counterexample, a corrected 20-byte prefix case,
+  and the ciphertext-free error path.
+
 - **`.env` header versioning no longer parses body text**: `get_env_version`
   scanned the whole file for the first `"Version: "` substring and the
   header-strip gate used `contains("Dracon Warden")` — an unrelated
@@ -114,7 +122,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 1. **`harden_repo` no longer wipes operator `.gitignore` / `.gitattributes` content** (H8/F4.1). The surgical `replace_managed_block` (previously `#[cfg(test)]`-only) is now used in production for both files: replace only the delimited managed block, preserve everything outside it, append if absent. Verified live: `dracon-warden once` on dracon-utilities preserved the operator's nested-repo section (a 2026-06-28 harden pass had wiped the previous one, commit `3a67685f`).
 2. **Whole-file-encrypted BINARY secrets round-trip as bytes** (H9/F4.2). New `decrypt_whole_file_tag` in `dracon-security`: when the entire content is one secret tag (the format used for binary files in sensitive locations), decrypt to RAW BYTES in `seal_smudge` + `decrypt_file`. The previous `String::from_utf8_lossy` path corrupted non-UTF-8 payloads (DER keys, SQLite, .kdbx) with U+FFFD, and the corruption re-encrypted into history.
-3. **`allow_v1_fallback = true` policy field now works** (M29/F4.3). Wired to the runtime gate in `WardenPolicy::load` — the documented V1 (AES-CFB) migration path ("set the flag, decrypt once to re-encrypt under V2, unset") is now actually accessible.
+3. **`allow_v1_fallback` remains a compatibility field but cannot enable
+   unauthenticated V1 AES-CFB decryption** (M29/F4.3 follow-up). Legacy
+   ciphertext is refused rather than heuristically returned as plaintext;
+   recover it from a trusted source and re-encrypt under authenticated V2.
 4. **`setup-hooks --local` works** (M30/F4.4). Was `git config local core.hooksPath <dir>` (missing `--`) — always failed after the hook files were written.
 5. **Filter-clean fails closed for oversized/refused inputs** (M31/F4.5). The >10 MiB and path guards previously passed the input through to git in the clean direction — the file was committed UNENCRYPTED with no warning. Now exit non-zero so git aborts the add.
 6. **Pre-push hook scans filenames with spaces** (M32/F4.6). NUL-delimited iteration + `xargs -0` argument passing (the old `for f in $(git diff --name-only ...)` word-split on whitespace, silently skipping space-containing filenames).

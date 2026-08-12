@@ -171,7 +171,9 @@ secret_marker = "DRACON_SECRET"
 # Encryption version (1 or 2)
 encryption_version = 2
 
-# Allow V1 fallback (for migration)
+# Legacy V1 AES-CFB is always refused (field retained for compatibility).
+# Recover legacy ciphertext from a trusted plaintext source and re-encrypt
+# with authenticated V2; this setting cannot enable the unsafe format.
 allow_v1_fallback = false
 
 # Team keys (for shared access)
