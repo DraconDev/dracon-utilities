@@ -264,12 +264,11 @@ only canonical mesh keys are honored in repo key dirs",
             }
         }
 
-        // 2. Try RepoKey (V1) format - if we have a RepoKey
+        // 2. Try the authenticated repo-key format (AES-GCM).
+        // Legacy AES-CFB is intentionally not attempted: it has no
+        // integrity mechanism and can return wrong-key plaintext.
         if let Ok(repo_key) = self.load_repo_key() {
             if let Ok(plaintext) = self.decrypt_with_repo_key(&repo_key, encrypted_data) {
-                return Ok(plaintext);
-            }
-            if let Ok(plaintext) = self.decrypt_git_seal(&repo_key, encrypted_data) {
                 return Ok(plaintext);
             }
         }

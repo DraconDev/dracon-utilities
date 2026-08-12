@@ -318,15 +318,11 @@ pub(crate) struct WardenPolicy {
     watch_roots: Vec<String>,
     #[serde(default)]
     discover_roots: Vec<String>,
-    /// ADDED 2026-07-21 (v0.112.32, audit M29/F4.3): one-migration-
-    /// cycle escape hatch for legacy V1 (AES-CFB) ciphertexts.
-    /// FDRACONWARDEN-001's remediation kept the runtime gate
-    /// (`set_allow_v1_fallback`) but never wired it — this field did
-    /// not exist, so the documented migration path ("set
-    /// `allow_v1_fallback = true`, decrypt once to re-encrypt under
-    /// V2, then unset") was inaccessible: `set_allow_v1_fallback`
-    /// had zero callers and serde silently ignored the TOML key.
-    /// Default false = V1 ciphertexts are refused.
+    /// Backwards-compatible policy field for the removed legacy V1
+    /// (AES-CFB) migration escape hatch. The value is still parsed and
+    /// propagated for old configurations, but V1 decryption now always
+    /// refuses because AES-CFB has no authenticated integrity; setting
+    /// this field cannot re-enable the unsafe format.
     #[serde(default)]
     allow_v1_fallback: bool,
 }
@@ -337,10 +333,9 @@ impl WardenPolicy {
             .with_context(|| format!("failed to read policy {}", path.display()))?;
         let policy: Self = toml::from_str(&content)
             .with_context(|| format!("failed to parse policy {}", path.display()))?;
-        // ADDED 2026-07-21 (v0.112.32, audit M29/F4.3): wire the V1
-        // escape hatch at the single chokepoint every migration-
-        // relevant command (repair / resmudge / once / filter paths
-        // that load this policy) goes through.
+        // Preserve the compatibility state for callers that still inspect
+        // the legacy policy field. The security crate independently refuses
+        // all unauthenticated AES-CFB decryption.
         dracon_security_kit::set_allow_v1_fallback(policy.allow_v1_fallback);
         Ok(policy)
     }

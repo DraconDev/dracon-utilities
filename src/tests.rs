@@ -494,11 +494,11 @@ mod tests {
         assert!(filter_clean_refusal_reason(true, 10, Some("src/main.rs")).is_none());
     }
 
-    /// ADDED 2026-07-21 (v0.112.32, audit M29/F4.3): the
-    /// `allow_v1_fallback` policy field must parse AND drive the
-    /// runtime gate — pre-fix the field did not exist and
-    /// `set_allow_v1_fallback` had zero callers, so the documented
-    /// V1 migration path was inaccessible.
+    /// COMPATIBILITY 2026-08-12 (audit MEDIUM follow-up): the
+    /// `allow_v1_fallback` policy field still parses and updates its
+    /// compatibility state, but the security crate refuses every legacy
+    /// AES-CFB decrypt because the format has no authenticated integrity.
+    /// The field must not be able to re-enable the unsafe path.
     #[test]
     fn warden_policy_allow_v1_fallback_wires_the_gate() {
         let td = TestDir::new("v1_fallback_policy");
@@ -507,7 +507,7 @@ mod tests {
         let _ = WardenPolicy::load(&with_flag).expect("load with flag");
         assert!(
             dracon_security_kit::is_v1_fallback_allowed(),
-            "gate must be ON after loading a policy with allow_v1_fallback = true"
+            "compatibility state must remain ON after loading allow_v1_fallback = true"
         );
 
         let without_flag = td.path().join("without.toml");
@@ -515,7 +515,7 @@ mod tests {
         let _ = WardenPolicy::load(&without_flag).expect("load without flag");
         assert!(
             !dracon_security_kit::is_v1_fallback_allowed(),
-            "gate must be OFF (default) after loading a policy without the field"
+            "compatibility state must be OFF after loading a policy without the field"
         );
     }
 

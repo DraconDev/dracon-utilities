@@ -2109,18 +2109,77 @@ API_KEY=secret"#;
         assert_eq!(cleaned, real);
     }
 
-    /// FIXED 2026-08-12 (audit MEDIUM follow-up): legacy AES-CFB has no
-    /// authentication, so whole-buffer UTF-8/text heuristics are not a
-    /// safe discriminator. The fallback must fail closed rather than
-    /// return a wrong-key plaintext that happens to be printable.
+    /// Mirror the legacy Git-Seal AES-CFB encoding only to construct
+    /// regression fixtures. Production code deliberately has no CFB
+    /// decryptor because the format has no authenticated integrity.
+    fn legacy_cfb_encrypt(repo_key: &[u8], plaintext: &[u8]) -> Vec<u8> {
+        use cfb_mode::cipher::{AsyncStreamCipher, KeyIvInit};
+        use sha2::{Digest, Sha256};
+        let mut hasher = Sha256::new();
+        hasher.update(repo_key);
+        let hash = hasher.finalize();
+        let cipher =
+            cfb_mode::Encryptor::<aes::Aes256>::new_from_slices(&hash[..32], &hash[..16])
+                .unwrap();
+        let mut out = plaintext.to_vec();
+        cipher.encrypt(&mut out);
+        out
+    }
+
+    fn legacy_cfb_decrypt_for_fixture(repo_key: &[u8], ciphertext: &[u8]) -> Vec<u8> {
+        use cfb_mode::cipher::{AsyncStreamCipher, KeyIvInit};
+        use sha2::{Digest, Sha256};
+        let mut hasher = Sha256::new();
+        hasher.update(repo_key);
+        let hash = hasher.finalize();
+        let cipher =
+            cfb_mode::Decryptor::<aes::Aes256>::new_from_slices(&hash[..32], &hash[..16])
+                .unwrap();
+        let mut out = ciphertext.to_vec();
+        cipher.decrypt(&mut out);
+        out
+    }
+
+    /// FIXED 2026-08-12 (audit MEDIUM follow-up): a short wrong-key
+    /// decrypt can be valid printable text, so UTF-8 and ASCII heuristics
+    /// cannot authenticate legacy CFB. This fixture is the auditor's
+    /// counterexample: `secret` encrypted under one key decrypts as the
+    /// printable `zR|11[` under another. Production must refuse it.
     #[test]
-    fn test_git_seal_v1_is_refused_even_for_textual_ciphertext() {
+    fn test_git_seal_v1_rejects_short_valid_text_wrong_key() {
         let security = test_security_with_identity();
         set_allow_v1_fallback(true);
+        let key_a = vec![0x42u8; 32];
+        let key_b = vec![0x53u8; 32];
+        let ciphertext = legacy_cfb_encrypt(&key_a, b"secret");
+        let wrong_plaintext = legacy_cfb_decrypt_for_fixture(&key_b, &ciphertext);
+        assert_eq!(wrong_plaintext, b"zR|11[");
+        assert!(wrong_plaintext.iter().all(|byte| {
+            byte.is_ascii() && (byte.is_ascii_graphic() || byte.is_ascii_whitespace() || *byte == 0)
+        }));
         let error = security
-            .decrypt_git_seal(&RepoKey(vec![0x42; 32]), b"legacy ciphertext")
+            .decrypt_git_seal(&RepoKey(key_b), &ciphertext)
             .expect_err("unauthenticated V1 must never return plaintext");
-        assert!(error.to_string().contains("unauthenticated integrity"));
+        assert!(error.to_string().contains("no authenticated integrity"));
+    }
+
+    /// FIXED 2026-08-12 (audit MEDIUM follow-up): the old first-20-byte
+    /// gate also accepted a 20-byte printable prefix followed by invalid
+    /// binary data. Keep the corrected 20-byte fixture as a regression
+    /// against restoring any plaintext heuristic.
+    #[test]
+    fn test_git_seal_v1_rejects_ascii_prefix_binary_tail() {
+        let security = test_security_with_identity();
+        set_allow_v1_fallback(true);
+        let key = vec![0x77u8; 32];
+        let mut sneaky = b"looks like text!!!! ".to_vec();
+        assert_eq!(sneaky.len(), 20);
+        sneaky.extend_from_slice(&[0xFF, 0xFE, 0xC3, 0x28, 0xA0, 0x81]);
+        let ciphertext = legacy_cfb_encrypt(&key, &sneaky);
+        let error = security
+            .decrypt_git_seal(&RepoKey(key), &ciphertext)
+            .expect_err("unauthenticated V1 must never return plaintext");
+        assert!(error.to_string().contains("no authenticated integrity"));
     }
 
     /// FIXED 2026-08-11 (audit MEDIUM): the unlock error dumped the
