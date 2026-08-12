@@ -27,6 +27,46 @@ fn is_owner_pubkey_filename(path: &Path) -> bool {
     name.starts_with("owner_") && name.ends_with(".pub")
 }
 
+/// The dedicated master recipient is also a supported repository key name.
+/// Unlike the old arbitrary `*.pub`/`*.key` scan, this name is only a source
+/// candidate; its single recipient still has to match a local trust anchor.
+fn is_canonical_repo_recipient_filename(path: &Path) -> bool {
+    is_owner_pubkey_filename(path)
+        || path.file_name().and_then(|name| name.to_str()) == Some("master.pub")
+}
+
+fn parse_public_recipient_lines(content: &str) -> Vec<x25519::Recipient> {
+    content
+        .lines()
+        .filter_map(|line| {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                return None;
+            }
+            line.parse::<x25519::Recipient>().ok()
+        })
+        .collect()
+}
+
+/// Repository recipient files are an authorization boundary, not a key
+/// transport format. Require exactly one valid recipient and compare it to
+/// the operator's local trust anchors; a contributor cannot authorize a new
+/// recipient by choosing an `owner_*.pub` basename.
+fn parse_single_repo_recipient(content: &str) -> Option<x25519::Recipient> {
+    let mut parsed = None;
+    for line in content.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let recipient = line.parse::<x25519::Recipient>().ok()?;
+        if parsed.replace(recipient).is_some() {
+            return None;
+        }
+    }
+    parsed
+}
+
 /// Warn-once-per-process eprintln (a gather runs on every protected-file
 /// clean; repeating per file would spam the journal).
 fn warn_once(flag: &AtomicBool, msg: &str) {
@@ -36,6 +76,7 @@ fn warn_once(flag: &AtomicBool, msg: &str) {
 }
 
 static WARNED_NON_OWNER_REPO_FILE: AtomicBool = AtomicBool::new(false);
+static WARNED_UNTRUSTED_REPO_FILE: AtomicBool = AtomicBool::new(false);
 static WARNED_SUSPICIOUS_FILE: AtomicBool = AtomicBool::new(false);
 
 impl WardenSecurity {
@@ -94,6 +135,7 @@ impl WardenSecurity {
         seen_keys: &mut HashSet<String>,
         recipients: &mut Vec<x25519::Recipient>,
         require_owner_naming: bool,
+        trusted_repo_recipients: &HashSet<String>,
     ) {
         if !keys_dir.exists() {
             return;
@@ -124,7 +166,7 @@ impl WardenSecurity {
             // its own trust domain: files there stay honored (parsed
             // per line, see below) but a warning flags non-canonical
             // names.
-            if require_owner_naming && !is_owner_pubkey_filename(&path) {
+            if require_owner_naming && !is_canonical_repo_recipient_filename(&path) {
                 warn_once(
                     &WARNED_NON_OWNER_REPO_FILE,
                     &format!(
@@ -165,15 +207,37 @@ only canonical mesh keys are honored in repo key dirs",
                 continue;
             }
 
-            for line in pub_str.lines() {
-                let line = line.trim();
-                if line.is_empty() || line.starts_with('#') {
+            if require_owner_naming {
+                let Some(recipient) = parse_single_repo_recipient(&pub_str) else {
+                    warn_once(
+                        &WARNED_SUSPICIOUS_FILE,
+                        &format!(
+                            "ignoring recipient file {} (expected exactly one valid age recipient)",
+                            path.display()
+                        ),
+                    );
+                    continue;
+                };
+                let recipient_string = recipient.to_string();
+                if !trusted_repo_recipients.contains(&recipient_string) {
+                    warn_once(
+                        &WARNED_UNTRUSTED_REPO_FILE,
+                        &format!(
+                            "ignoring recipient file {} (recipient is not in the local owner trust anchors)",
+                            path.display()
+                        ),
+                    );
                     continue;
                 }
-                if !seen_keys.insert(line.to_string()) {
-                    continue;
+                if seen_keys.insert(recipient_string) {
+                    recipients.push(recipient);
                 }
-                if let Ok(recipient) = line.parse::<x25519::Recipient>() {
+                continue;
+            }
+
+            for recipient in parse_public_recipient_lines(&pub_str) {
+                let recipient_string = recipient.to_string();
+                if seen_keys.insert(recipient_string) {
                     recipients.push(recipient);
                 }
             }
