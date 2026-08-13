@@ -2311,6 +2311,66 @@ API_KEY=secret"#;
     }
 
     #[test]
+    fn test_gather_all_recipients_separates_overlapping_home_repo() {
+        let tmp = tempfile::tempdir().unwrap();
+        let home = tmp.path().join("home");
+        let repo = home.clone();
+        fs::create_dir_all(repo.join(".dracon/data/keys")).unwrap();
+
+        let evil = x25519::Identity::generate();
+        let owner = x25519::Identity::generate();
+        fs::write(
+            repo.join(".dracon/data/keys/owner_evil.pub"),
+            evil.to_public().to_string(),
+        )
+        .unwrap();
+
+        let mut security = WardenSecurity::new(Some(&repo)).unwrap();
+        security.set_mock_home(home);
+        security.master_identities.clear();
+        security.master_identities.push(owner);
+
+        let recipients = security.gather_all_recipients().unwrap();
+        assert!(
+            !recipients
+                .iter()
+                .any(|recipient| recipient.to_string() == evil.to_public().to_string()),
+            "a repository rooted at HOME must not get permissive HOME loading"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_gather_all_recipients_separates_symlinked_home_repo() {
+        let tmp = tempfile::tempdir().unwrap();
+        let home = tmp.path().join("home");
+        let repo_alias = tmp.path().join("repo-alias");
+        fs::create_dir_all(home.join(".dracon/data/keys")).unwrap();
+
+        let evil = x25519::Identity::generate();
+        let owner = x25519::Identity::generate();
+        fs::write(
+            home.join(".dracon/data/keys/owner_evil.pub"),
+            evil.to_public().to_string(),
+        )
+        .unwrap();
+        std::os::unix::fs::symlink(&home, &repo_alias).unwrap();
+
+        let mut security = WardenSecurity::new(Some(&repo_alias)).unwrap();
+        security.set_mock_home(home);
+        security.master_identities.clear();
+        security.master_identities.push(owner);
+
+        let recipients = security.gather_all_recipients().unwrap();
+        assert!(
+            !recipients
+                .iter()
+                .any(|recipient| recipient.to_string() == evil.to_public().to_string()),
+            "a symlinked repository root must not bypass the repository gate"
+        );
+    }
+
+    #[test]
     fn test_encrypt_v2_decrypt_v2_roundtrip() {
         let security = test_security_with_identity();
         let plaintext = b"hello world, this is a secret message";

@@ -160,10 +160,18 @@ impl WardenSecurity {
         let machine_file = keys_dir.join(format!("machine:{}.age", safe_name));
         let pub_file = keys_dir.join(format!("machine:{}.pub", safe_name));
 
-        // Save public key (for V2 filtering)
-        fs::write(&pub_file, public_key_str)?;
-
         self.encrypt_and_save_key(&repo_key, &recipient, &machine_file)?;
+
+        // The public file is contributor-visible, so its basename is not an
+        // authorization signal. Store a repo-key-authenticated sidecar that
+        // binds this exact machine recipient to the authorization operation.
+        fs::write(&pub_file, public_key_str)?;
+        self.write_repo_recipient_authorization(
+            &repo_key,
+            &pub_file,
+            "machine",
+            &recipient,
+        )?;
 
         Ok(())
     }

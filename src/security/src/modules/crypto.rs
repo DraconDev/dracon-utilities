@@ -153,9 +153,25 @@ impl WardenSecurity {
         recipients: &mut Vec<x25519::Recipient>,
         require_owner_naming: bool,
         trusted_repo_recipients: &HashSet<String>,
+        repo_authorization_key: Option<&RepoKey>,
     ) {
         if !keys_dir.exists() {
             return;
+        }
+        if require_owner_naming {
+            let Ok(metadata) = fs::symlink_metadata(keys_dir) else {
+                return;
+            };
+            if metadata.file_type().is_symlink() {
+                warn_once(
+                    &WARNED_SUSPICIOUS_FILE,
+                    &format!(
+                        "ignoring repository recipient directory {} (symlinks are not a trust boundary)",
+                        keys_dir.display()
+                    ),
+                );
+                return;
+            }
         }
 
         let Ok(entries) = fs::read_dir(keys_dir) else {
@@ -164,6 +180,18 @@ impl WardenSecurity {
 
         for entry in entries.flatten() {
             let path = entry.path();
+            if require_owner_naming {
+                let Ok(metadata) = fs::symlink_metadata(&path) else {
+                    continue;
+                };
+                if metadata.file_type().is_symlink() {
+                    warn_once(
+                        &WARNED_SUSPICIOUS_FILE,
+                        &format!("ignoring repository recipient symlink {}", path.display()),
+                    );
+                    continue;
+                }
+            }
             if !path.is_file() {
                 continue;
             }
@@ -172,29 +200,7 @@ impl WardenSecurity {
                 continue;
             }
 
-            // FIXED 2026-08-11 (audit MEDIUM): any `.pub`/`.key` file
-            // was trusted as a recipient source. In REPO key dirs
-            // (`.dracon/data/keys`, `.git/arcane/keys` — the
-            // contributor-pushable surface) only the canonical
-            // `owner_*.pub` mesh files written by keygen/publish
-            // (main.rs publish_repo_pubkey) are honored; anything else
-            // is refused with a warning instead of silently joining
-            // every future encryption. The operator's HOME key dir is
-            // its own trust domain: files there stay honored (parsed
-            // per line, see below) but a warning flags non-canonical
-            // names.
-            if require_owner_naming && !is_canonical_repo_recipient_filename(&path) {
-                warn_once(
-                    &WARNED_NON_OWNER_REPO_FILE,
-                    &format!(
-                        "ignoring recipient file {} (not a canonical owner/master public key); \
-only authorized mesh keys are honored in repo key dirs",
-                        path.display()
-                    ),
-                );
-                continue;
-            }
-
+            let canonical_name = is_canonical_repo_recipient_filename(&path);
             let Ok(pub_str) = fs::read_to_string(&path) else {
                 continue;
             };
@@ -236,14 +242,33 @@ only authorized mesh keys are honored in repo key dirs",
                     continue;
                 };
                 let recipient_string = recipient.to_string();
-                if !trusted_repo_recipients.contains(&recipient_string) {
-                    warn_once(
-                        &WARNED_UNTRUSTED_REPO_FILE,
-                        &format!(
-                            "ignoring recipient file {} (recipient is not in the local owner trust anchors)",
-                            path.display()
-                        ),
-                    );
+                let local_owner = trusted_repo_recipients.contains(&recipient_string);
+                let delegated_age_path = path.with_extension("age");
+                let has_delegated_age = fs::symlink_metadata(&delegated_age_path)
+                    .map(|metadata| metadata.file_type().is_file())
+                    .unwrap_or(false);
+                let authenticated_machine_or_team = has_delegated_age
+                    && repo_authorization_key.is_some_and(|key| {
+                        self.verify_repo_recipient_authorization(&path, &recipient, key)
+                    });
+                if !local_owner && !authenticated_machine_or_team {
+                    if !canonical_name {
+                        warn_once(
+                            &WARNED_NON_OWNER_REPO_FILE,
+                            &format!(
+                                "ignoring recipient file {} (not a canonical owner/master public key or authenticated machine/team key)",
+                                path.display()
+                            ),
+                        );
+                    } else {
+                        warn_once(
+                            &WARNED_UNTRUSTED_REPO_FILE,
+                            &format!(
+                                "ignoring recipient file {} (recipient is not in the local owner trust anchors)",
+                                path.display()
+                            ),
+                        );
+                    }
                     continue;
                 }
                 if seen_keys.insert(recipient_string) {
@@ -261,13 +286,63 @@ only authorized mesh keys are honored in repo key dirs",
         }
     }
 
+    /// Return the HOME key directories that are not also controlled by the
+    /// repository being processed. Physical-path checks are intentional:
+    /// `repo_root` may be a symlink, or a repository key directory may be a
+    /// symlink into HOME. In either case, loading the path permissively would
+    /// let a contributor-controlled checkout bypass the repository gate.
+    fn home_key_dirs_for_repo(&self, repo_root: Option<&Path>) -> Vec<PathBuf> {
+        let Ok(home) = self.get_home() else {
+            return Vec::new();
+        };
+        let home_dirs = vec![
+            home.join(".dracon").join("data").join("keys"),
+            home.join(".dracon").join("keys"),
+        ];
+        let Some(repo_root) = repo_root else {
+            return home_dirs;
+        };
+        let Ok(repo_root) = fs::canonicalize(repo_root) else {
+            // If the boundary cannot be established, fail closed rather than
+            // silently treating a potentially repository-controlled path as
+            // operator-owned HOME.
+            return Vec::new();
+        };
+        let repo_key_dirs = [
+            repo_root.join(".dracon").join("data").join("keys"),
+            repo_root.join(".git").join("arcane").join("keys"),
+        ]
+        .into_iter()
+        .filter_map(|path| fs::canonicalize(path).ok())
+        .collect::<Vec<_>>();
+
+        home_dirs
+            .into_iter()
+            .filter(|home_dir| {
+                let Ok(home_dir) = fs::canonicalize(home_dir) else {
+                    // A missing or inaccessible HOME directory has nothing
+                    // safe to load in this pass. Fail closed if its boundary
+                    // cannot be resolved.
+                    return false;
+                };
+                // A repository rooted at HOME (or below it) owns this path.
+                if home_dir.starts_with(&repo_root) {
+                    return false;
+                }
+                // A repository symlink can point its key directory directly
+                // at a HOME key directory even when the roots differ.
+                !repo_key_dirs.iter().any(|repo_dir| repo_dir == &home_dir)
+            })
+            .collect()
+    }
+
     /// Return recipients that are trusted by the local operator and may
     /// therefore be accepted from a repository-controlled key file.
     ///
     /// A repository filename is not an authorization mechanism: contributors
     /// can choose both its basename and its contents. The local private
     /// identities and operator-owned HOME key directory are the trust anchors.
-    fn local_recipient_trust_anchors(&self) -> HashSet<String> {
+    fn local_recipient_trust_anchors(&self, home_key_dirs: &[PathBuf]) -> HashSet<String> {
         let mut trusted = self
             .master_identities
             .iter()
@@ -278,29 +353,129 @@ only authorized mesh keys are honored in repo key dirs",
         let mut home_recipients = Vec::new();
         let no_repo_trust_anchors = HashSet::new();
 
-        if let Ok(home) = self.get_home() {
-            for keys_dir in [
-                home.join(".dracon").join("data").join("keys"),
-                home.join(".dracon").join("keys"),
-            ] {
-                self.load_public_recipients_from_dir(
-                    &keys_dir,
-                    &mut seen_keys,
-                    &mut home_recipients,
-                    false,
-                    &no_repo_trust_anchors,
-                );
-            }
+        for keys_dir in home_key_dirs {
+            self.load_public_recipients_from_dir(
+                keys_dir,
+                &mut seen_keys,
+                &mut home_recipients,
+                false,
+                &no_repo_trust_anchors,
+                None,
+            );
         }
         trusted.extend(home_recipients.into_iter().map(|recipient| recipient.to_string()));
         trusted
     }
 
+    /// Verify a repo-key-authenticated authorization sidecar written by
+    /// `whitelist_machine` or `add_team_member`. The sidecar binds the exact
+    /// basename and recipient, so copying it cannot authorize a different
+    /// file or key. The repo key is secret to an authorized operator; a
+    /// contributor who can push repository files cannot forge this proof.
+    fn verify_repo_recipient_authorization(
+        &self,
+        public_path: &Path,
+        recipient: &x25519::Recipient,
+        repo_key: &RepoKey,
+    ) -> bool {
+        let Ok(file_name) = public_path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or(())
+        else {
+            return false;
+        };
+        let auth_path = recipient_authorization_path(public_path);
+        let Ok(auth_metadata) = fs::symlink_metadata(&auth_path) else {
+            return false;
+        };
+        if !auth_metadata.file_type().is_file() {
+            return false;
+        }
+        let Ok(ciphertext) = fs::read(auth_path) else {
+            return false;
+        };
+        if ciphertext.len() > MAX_RECIPIENT_AUTH_BYTES {
+            return false;
+        }
+        let Ok(plaintext) = self.decrypt_with_repo_key(repo_key, &ciphertext) else {
+            return false;
+        };
+        let Ok(auth) = serde_json::from_slice::<RepoRecipientAuthorization>(&plaintext) else {
+            return false;
+        };
+        auth.version == RECIPIENT_AUTH_VERSION
+            && matches!(
+                auth.role.as_str(),
+                RECIPIENT_AUTH_ROLE_MACHINE | RECIPIENT_AUTH_ROLE_TEAM
+            )
+            && auth.file_name == file_name
+            && auth.recipient == recipient.to_string()
+    }
+
+    /// Write an authenticated authorization sidecar for a machine/team public
+    /// recipient. This is deliberately repo-key encrypted rather than based
+    /// on a contributor-chosen filename; the loader can therefore preserve
+    /// the machine/team APIs without reopening the arbitrary-file trust gap.
+    pub(crate) fn write_repo_recipient_authorization(
+        &self,
+        repo_key: &RepoKey,
+        public_path: &Path,
+        role: &str,
+        recipient: &x25519::Recipient,
+    ) -> Result<()> {
+        if !matches!(role, RECIPIENT_AUTH_ROLE_MACHINE | RECIPIENT_AUTH_ROLE_TEAM) {
+            anyhow::bail!("invalid repository recipient authorization role")
+        }
+        let file_name = public_path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .context("recipient public key path is not valid UTF-8")?;
+        let auth = RepoRecipientAuthorization {
+            version: RECIPIENT_AUTH_VERSION,
+            role: role.to_string(),
+            file_name: file_name.to_string(),
+            recipient: recipient.to_string(),
+        };
+        let payload = serde_json::to_vec(&auth).context("serialize recipient authorization")?;
+        let ciphertext = self.encrypt_with_repo_key(repo_key, &payload)?;
+        let auth_path = recipient_authorization_path(public_path);
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(0o600)
+                .open(&auth_path)
+                .with_context(|| {
+                    format!("create recipient authorization {}", auth_path.display())
+                })?
+                .write_all(&ciphertext)?;
+        }
+        #[cfg(not(unix))]
+        {
+            fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&auth_path)
+                .with_context(|| {
+                    format!("create recipient authorization {}", auth_path.display())
+                })?
+                .write_all(&ciphertext)?;
+        }
+        Ok(())
+    }
+
     pub fn gather_all_recipients(&self) -> Result<Vec<x25519::Recipient>> {
         let mut seen_keys = HashSet::new();
         let mut recipients = Vec::new();
-        let trusted_repo_recipients = self.local_recipient_trust_anchors();
+        let repo_root = self.get_repo_root().ok();
+        let home_key_dirs = self.home_key_dirs_for_repo(repo_root.as_deref());
+        let trusted_repo_recipients = self.local_recipient_trust_anchors(&home_key_dirs);
         let no_repo_trust_anchors = HashSet::new();
+        let repo_authorization_key = repo_root.as_ref().and_then(|_| self.load_repo_key().ok());
 
         // 1. Local master identity, when the private key is available on this machine.
         if let Some(master) = self.master_identities.first() {
@@ -311,14 +486,15 @@ only authorized mesh keys are honored in repo key dirs",
 
         // 2. Public recipients from the operator's HOME key directory. HOME
         // is an explicit local trust domain, so legacy non-owner names remain
-        // supported there; repository-controlled files use the stricter gate.
-        if let Ok(home) = self.get_home() {
+        // supported there; overlapping repository paths are excluded above.
+        for keys_dir in &home_key_dirs {
             self.load_public_recipients_from_dir(
-                &home.join(".dracon").join("data").join("keys"),
+                keys_dir,
                 &mut seen_keys,
                 &mut recipients,
                 false,
                 &no_repo_trust_anchors,
+                None,
             );
         }
 
@@ -332,10 +508,11 @@ only authorized mesh keys are honored in repo key dirs",
         }
 
         // 4. Authorized Machine & Team Keys from the current repo
-        if let Ok(repo_root) = self.get_repo_root() {
+        if let Some(repo_root) = repo_root {
             // Check BOTH new committed path (V2 Standard) and legacy path.
-            // These are contributor-pushable, so a basename is not enough:
-            // the parsed recipient must also match a local owner trust anchor.
+            // Owner files must match a local trust anchor. Machine/team files
+            // additionally require a repo-key-authenticated sidecar generated
+            // by their authorization APIs.
             let search_paths = vec![
                 repo_root.join(".dracon").join("data").join("keys"), // V2 Standard
                 repo_root.join(".git").join("arcane").join("keys"),  // Legacy
@@ -348,6 +525,7 @@ only authorized mesh keys are honored in repo key dirs",
                     &mut recipients,
                     true,
                     &trusted_repo_recipients,
+                    repo_authorization_key.as_ref(),
                 );
             }
         }

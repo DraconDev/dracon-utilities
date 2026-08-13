@@ -148,11 +148,19 @@ impl WardenSecurity {
             return Err(anyhow::anyhow!("Member '{}' already exists", alias));
         }
 
-        // Save public key (for V2 filtering)
-        fs::write(&pub_key_path, public_key_str)?;
-
         // Save Age key (encrypted for member)
         self.encrypt_and_save_key(&repo_key, &recipient, &key_path)?;
+
+        // The public file is contributor-visible, so its basename is not an
+        // authorization signal. Store a repo-key-authenticated sidecar that
+        // binds this exact team recipient to the authorization operation.
+        fs::write(&pub_key_path, public_key_str)?;
+        self.write_repo_recipient_authorization(
+            &repo_key,
+            &pub_key_path,
+            "team",
+            &recipient,
+        )?;
 
         Ok(())
     }

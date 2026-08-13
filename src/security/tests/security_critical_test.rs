@@ -417,6 +417,71 @@ fn test_encrypt_v2_for_all_uses_global_mesh_pub_without_master_identity() {
 // =============================================================================
 
 #[test]
+fn test_machine_and_team_recipients_require_authenticated_sidecars() {
+    let _guard = HomeGuard::new();
+    let tmp = tempfile::TempDir::new().expect("temp dir");
+    let repo_root = tmp.path();
+    let master_identity = age::x25519::Identity::generate();
+    let _repo_key = setup_repo_with_age_key(repo_root, &master_identity);
+
+    let mut security = dracon_security::WardenSecurity::new(Some(repo_root))
+        .expect("init security");
+    security.add_memory_identity(master_identity);
+
+    let machine_identity = age::x25519::Identity::generate();
+    let machine_public = machine_identity.to_public().to_string();
+    security
+        .whitelist_machine(&machine_public)
+        .expect("authorize machine");
+
+    let team_identity = age::x25519::Identity::generate();
+    let team_public = team_identity.to_public().to_string();
+    security
+        .add_team_member("build-team", &team_public)
+        .expect("authorize team member");
+
+    let keys_dir = make_keys_dir(repo_root);
+    let machine_safe_name = machine_public
+        .replace(':', "_")
+        .chars()
+        .take(12)
+        .collect::<String>();
+    let machine_pub_path = keys_dir.join(format!("machine:{}.pub", machine_safe_name));
+    let team_pub_path = keys_dir.join("build-team.pub");
+    assert!(
+        machine_pub_path.with_extension("auth").exists(),
+        "machine authorization must write an authenticated sidecar"
+    );
+    assert!(
+        team_pub_path.with_extension("auth").exists(),
+        "team authorization must write an authenticated sidecar"
+    );
+
+    let recipients = security.gather_all_recipients().expect("gather authorized");
+    assert!(recipients.iter().any(|r| r.to_string() == machine_public));
+    assert!(recipients.iter().any(|r| r.to_string() == team_public));
+
+    // Removing the proof must revoke the recipient from future encryption,
+    // even though the contributor-visible .pub and .age files remain.
+    fs::remove_file(machine_pub_path.with_extension("auth")).expect("remove machine proof");
+    let recipients = security
+        .gather_all_recipients()
+        .expect("gather after proof removal");
+    assert!(!recipients.iter().any(|r| r.to_string() == machine_public));
+    assert!(recipients.iter().any(|r| r.to_string() == team_public));
+
+    // A contributor can add a valid age recipient under an arbitrary name,
+    // but cannot forge the repo-key-authenticated sidecar.
+    let evil = age::x25519::Identity::generate();
+    fs::write(keys_dir.join("evil.pub"), evil.to_public().to_string())
+        .expect("write attacker key");
+    let recipients = security.gather_all_recipients().expect("gather attacker file");
+    assert!(!recipients
+        .iter()
+        .any(|r| r.to_string() == evil.to_public().to_string()));
+}
+
+#[test]
 fn test_unlock_payload_wrong_key() {
     let tmp = tempfile::TempDir::new().expect("temp dir");
     let (security, _, _guard) = make_repo_with_master(tmp.path());
