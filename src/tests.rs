@@ -898,6 +898,79 @@ mod tests {
     }
 
     #[test]
+    fn install_hooks_for_repo_skips_shadowed_git_hooks() {
+        // A global (or repo-local) core.hooksPath makes .git/hooks inactive.
+        // Warden's global wrappers chain any pre-existing foreign hooks, so
+        // hardening must not seed inactive Warden copies into the shadowed
+        // directory.
+        let td = TestDir::new("warden_hooks_shadowed");
+        let repo = td.path().join("repo");
+        fs::create_dir_all(&repo).expect("repo");
+        let status = ProcessCommand::new("git")
+            .arg("init")
+            .arg(&repo)
+            .status()
+            .expect("git init");
+        assert!(status.success(), "git init should succeed");
+
+        let hooks_dir = repo.join(".git/hooks");
+        for name in ["pre-commit", "pre-push", "pre-rebase"] {
+            fs::remove_file(hooks_dir.join(name)).expect("remove template hook");
+        }
+        let shadow_dir = td.path().join("effective-hooks");
+        fs::create_dir_all(&shadow_dir).expect("shadow hooks dir");
+        run_git_in(
+            &repo,
+            &[
+                "config",
+                "--local",
+                "core.hooksPath",
+                shadow_dir.to_str().expect("utf8 shadow path"),
+            ],
+        );
+
+        install_hooks_for_repo(&repo).expect("shadowed hook seeding should be skipped");
+        for name in ["pre-commit", "pre-push", "pre-rebase"] {
+            assert!(
+                !hooks_dir.join(name).exists(),
+                "inactive .git/hooks/{name} must not be seeded"
+            );
+            assert!(
+                !shadow_dir.join(name).exists(),
+                "install_hooks_for_repo must not write global/effective hooks"
+            );
+        }
+    }
+
+    #[test]
+    fn harden_repo_surfaces_hook_install_failure() {
+        // The hardening path must not turn a hook-install failure into a
+        // successful-looking pass.  Use a file where .git/hooks must be a
+        // directory so the first seed write fails deterministically.
+        let td = TestDir::new("warden_hooks_error");
+        let repo = td.path().join("repo");
+        fs::create_dir_all(&repo).expect("repo");
+        let status = ProcessCommand::new("git")
+            .arg("init")
+            .arg(&repo)
+            .status()
+            .expect("git init");
+        assert!(status.success(), "git init should succeed");
+        run_git_in(&repo, &["config", "--local", "core.hooksPath", ".git/hooks"]);
+
+        let hooks_dir = repo.join(".git/hooks");
+        fs::remove_dir_all(&hooks_dir).expect("remove template hooks");
+        fs::write(&hooks_dir, "not a directory\n").expect("block hook directory");
+
+        let error = harden_repo(&repo, &sample_policy(), None, true)
+            .expect_err("hook installation failure must be returned");
+        assert!(
+            error.to_string().contains("hooks") || error.to_string().contains("exists"),
+            "unexpected hook installation error: {error:#}"
+        );
+    }
+
+    #[test]
     fn harden_repo_preserves_operator_content_outside_managed_block() {
         // ADDED 2026-07-21 (v0.112.32, audit H8/F4.1): previously
         // `harden_repo` overwrote the ENTIRE .gitignore /

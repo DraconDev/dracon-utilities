@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Hook hardening no longer seeds inactive local copies**: when Git dispatches
+  hooks through a global or repository-local `core.hooksPath`, `harden_repo`
+  leaves the shadowed `.git/hooks` directory untouched; global wrappers chain
+  pre-existing foreign hooks explicitly. Hook-installation failures now
+  propagate instead of being silently discarded, with regressions covering
+  both shadowed-path skipping and error propagation.
+
 - **Repository recipient files are now authorization-checked, not merely
   name-checked**: `gather_all_recipients` accepts canonical
   `owner_*.pub`/`master.pub` candidates only when they contain exactly one

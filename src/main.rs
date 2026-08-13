@@ -1218,8 +1218,10 @@ pub(crate) fn harden_repo(
         None => false,
     };
 
-    // Install git hooks if not already present
-    let _ = install_hooks_for_repo(repo);
+    // Install git hooks if not already present.  Propagate failures: silently
+    // dropping this error leaves a repo without the local fallback hooks that
+    // the global wrappers may need to chain.
+    install_hooks_for_repo(repo)?;
 
     Ok((
         gitignore_changed,
@@ -2910,9 +2912,65 @@ fn run_setup_hooks(mode: HookMode, repo: Option<&Path>) -> Result<()> {
     Ok(())
 }
 
+/// Resolve the hooks directory Git will actually dispatch for `repo`.
+///
+/// A global `core.hooksPath` shadows `.git/hooks`; the global wrappers already
+/// chain foreign local hooks explicitly, so seeding Warden copies into the
+/// shadowed directory is both inactive and a source of confusing recursion
+/// guards.  Keep local seeding only when Git's effective hooks directory is
+/// the repository's own `.git/hooks`.
+fn effective_hooks_dir(repo: &Path) -> Result<PathBuf> {
+    let output = ProcessCommand::new("git")
+        .args(["-C"])
+        .arg(repo)
+        .args(["rev-parse", "--git-path", "hooks"])
+        .output()
+        .with_context(|| format!("failed to resolve git hooks path for {}", repo.display()))?;
+    if !output.status.success() {
+        return Err(anyhow::anyhow!(
+            "failed to resolve git hooks path for {}: {}",
+            repo.display(),
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+
+    let raw = String::from_utf8(output.stdout)
+        .context("git returned a non-UTF-8 hooks path")?
+        .trim()
+        .to_owned();
+    if raw.is_empty() {
+        return Err(anyhow::anyhow!(
+            "git returned an empty hooks path for {}",
+            repo.display()
+        ));
+    }
+
+    let path = PathBuf::from(raw);
+    Ok(if path.is_absolute() {
+        path
+    } else {
+        repo.join(path)
+    })
+}
+
+fn same_path(a: &Path, b: &Path) -> bool {
+    match (fs::canonicalize(a), fs::canonicalize(b)) {
+        (Ok(a), Ok(b)) => a == b,
+        _ => a == b,
+    }
+}
+
 fn install_hooks_for_repo(repo: &Path) -> Result<()> {
     let hooks_dir = repo.join(".git/hooks");
     if !hooks_dir.exists() {
+        return Ok(());
+    }
+
+    let effective_hooks = effective_hooks_dir(repo)?;
+    if !same_path(&effective_hooks, &hooks_dir) {
+        // Global or repo-local core.hooksPath is active.  Do not seed files
+        // into an inactive directory; the effective wrapper is responsible
+        // for chaining any pre-existing foreign local hooks.
         return Ok(());
     }
 
@@ -2925,7 +2983,9 @@ fn install_hooks_for_repo(repo: &Path) -> Result<()> {
         return Ok(());
     }
 
-    fs::create_dir_all(&hooks_dir)?;
+    fs::create_dir_all(&hooks_dir).with_context(|| {
+        format!("failed to create repository hooks directory {}", hooks_dir.display())
+    })?;
 
     if !pre_commit_path.exists() {
         fs::write(&pre_commit_path, PRE_COMMIT_HOOK)?;
