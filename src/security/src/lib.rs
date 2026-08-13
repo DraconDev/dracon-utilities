@@ -666,6 +666,11 @@ impl WardenSecurity {
         let repo_root = self.get_repo_root()?;
         let keys_dir = repo_root.join(".git").join("arcane").join("keys");
         std::fs::create_dir_all(&keys_dir)?;
+        let keys_metadata = fs::symlink_metadata(&keys_dir)
+            .context("inspect repository recipient directory")?;
+        if !keys_metadata.file_type().is_dir() {
+            anyhow::bail!("repository recipient directory must be a real directory")
+        }
 
         let output_path = keys_dir.join(format!("{}.age", recipient));
         let public_path = keys_dir.join(format!("{}.pub", recipient));
@@ -690,12 +695,6 @@ impl WardenSecurity {
                 .mode(0o600)
                 .open(&output_path)?
                 .write_all(&encrypted)?;
-            fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .mode(0o644)
-                .open(&public_path)?
-                .write_all(recipient.to_string().as_bytes())?;
         }
         #[cfg(not(unix))]
         {
@@ -704,12 +703,8 @@ impl WardenSecurity {
                 .create_new(true)
                 .open(&output_path)?
                 .write_all(&encrypted)?;
-            fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&public_path)?
-                .write_all(recipient.to_string().as_bytes())?;
         }
+        self.write_repo_public_recipient(&public_path, recipient)?;
         self.write_repo_recipient_authorization(
             &repo_key,
             &public_path,

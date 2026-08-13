@@ -141,14 +141,31 @@ impl WardenSecurity {
 
         let repo_root = self.get_repo_root()?;
         let keys_dir = repo_root.join(".git").join("arcane").join("keys");
+        let keys_metadata = fs::symlink_metadata(&keys_dir)
+            .context("inspect repository recipient directory")?;
+        if !keys_metadata.file_type().is_dir() {
+            anyhow::bail!("repository recipient directory must be a real directory")
+        }
         let key_path = keys_dir.join(format!("{}.age", alias));
         let pub_key_path = keys_dir.join(format!("{}.pub", alias));
 
         if key_path.exists() {
+            if !matches!(
+                fs::symlink_metadata(&key_path),
+                Ok(metadata) if metadata.file_type().is_file()
+            ) {
+                anyhow::bail!("existing team delegation must be a regular file")
+            }
             // Legacy team entries predate the authenticated sidecar. An
             // operator who explicitly re-authorizes the same recipient can
             // add the proof in place; arbitrary existing files are never
             // trusted automatically.
+            if !matches!(
+                fs::symlink_metadata(&pub_key_path),
+                Ok(metadata) if metadata.file_type().is_file()
+            ) {
+                anyhow::bail!("existing team public key must be a regular file")
+            }
             let existing = fs::read_to_string(&pub_key_path).unwrap_or_default();
             if existing.trim() == recipient.to_string()
                 && !pub_key_path.with_extension("auth").exists()
@@ -170,7 +187,7 @@ impl WardenSecurity {
         // The public file is contributor-visible, so its basename is not an
         // authorization signal. Store a repo-key-authenticated sidecar that
         // binds this exact team recipient to the authorization operation.
-        fs::write(&pub_key_path, public_key_str)?;
+        self.write_repo_public_recipient(&pub_key_path, &recipient)?;
         self.write_repo_recipient_authorization(
             &repo_key,
             &pub_key_path,

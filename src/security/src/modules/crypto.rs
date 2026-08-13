@@ -588,6 +588,47 @@ impl WardenSecurity {
         )
     }
 
+    pub(crate) fn write_repo_public_recipient(
+        &self,
+        public_path: &Path,
+        recipient: &x25519::Recipient,
+    ) -> Result<()> {
+        let parent = public_path
+            .parent()
+            .context("recipient public key has no parent directory")?;
+        let parent_metadata = fs::symlink_metadata(parent)
+            .with_context(|| format!("inspect recipient directory {}", parent.display()))?;
+        if !parent_metadata.file_type().is_dir() {
+            anyhow::bail!("recipient public-key directory is not a regular directory")
+        }
+        if let Ok(metadata) = fs::symlink_metadata(public_path) {
+            if metadata.file_type().is_symlink() || !metadata.file_type().is_file() {
+                anyhow::bail!("refusing to overwrite non-regular recipient public key")
+            }
+            anyhow::bail!("recipient public key already exists")
+        }
+        let bytes = format!("{}\n", recipient);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(0o644)
+                .open(public_path)?
+                .write_all(bytes.as_bytes())?;
+        }
+        #[cfg(not(unix))]
+        {
+            fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(public_path)?
+                .write_all(bytes.as_bytes())?;
+        }
+        Ok(())
+    }
+
     /// Write an authenticated authorization sidecar for a machine/team public
     /// recipient. The repo-key proof serves ordinary operator paths; the
     /// owner-DH proof prevents a contributor from forging a repo key in the

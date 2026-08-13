@@ -150,6 +150,11 @@ impl WardenSecurity {
 
         let repo_root = self.get_repo_root()?;
         let keys_dir = repo_root.join(".git").join("arcane").join("keys");
+        let keys_metadata = fs::symlink_metadata(&keys_dir)
+            .context("inspect repository recipient directory")?;
+        if !keys_metadata.file_type().is_dir() {
+            anyhow::bail!("repository recipient directory must be a real directory")
+        }
 
         // Use hash or similar ID for filename
         let safe_name = public_key_str
@@ -165,6 +170,18 @@ impl WardenSecurity {
         // the proof in place; arbitrary existing files are never trusted
         // automatically.
         if machine_file.exists() {
+            if !matches!(
+                fs::symlink_metadata(&machine_file),
+                Ok(metadata) if metadata.file_type().is_file()
+            ) {
+                anyhow::bail!("existing machine delegation must be a regular file")
+            }
+            if !matches!(
+                fs::symlink_metadata(&pub_file),
+                Ok(metadata) if metadata.file_type().is_file()
+            ) {
+                anyhow::bail!("existing machine public key must be a regular file")
+            }
             let existing = fs::read_to_string(&pub_file).unwrap_or_default();
             if existing.trim() == recipient.to_string()
                 && !pub_file.with_extension("auth").exists()
@@ -187,7 +204,7 @@ impl WardenSecurity {
         // The public file is contributor-visible, so its basename is not an
         // authorization signal. Store a repo-key-authenticated sidecar that
         // binds this exact machine recipient to the authorization operation.
-        fs::write(&pub_file, public_key_str)?;
+        self.write_repo_public_recipient(&pub_file, &recipient)?;
         self.write_repo_recipient_authorization(
             &repo_key,
             &pub_file,
