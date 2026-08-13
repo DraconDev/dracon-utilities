@@ -422,7 +422,7 @@ fn test_machine_and_team_recipients_require_authenticated_sidecars() {
     let tmp = tempfile::TempDir::new().expect("temp dir");
     let repo_root = tmp.path();
     let master_identity = age::x25519::Identity::generate();
-    let _repo_key = setup_repo_with_age_key(repo_root, &master_identity);
+    let repo_key = setup_repo_with_age_key(repo_root, &master_identity);
 
     let mut security = dracon_security::WardenSecurity::new(Some(repo_root))
         .expect("init security");
@@ -464,6 +464,40 @@ fn test_machine_and_team_recipients_require_authenticated_sidecars() {
     let recipients = security.gather_all_recipients().expect("gather authorized");
     assert!(recipients.iter().any(|r| r.to_string() == machine_public));
     assert!(recipients.iter().any(|r| r.to_string() == team_public));
+
+    // Explicit reauthorization upgrades a legacy same-recipient pair without
+    // trusting its contributor-visible files automatically.
+    let legacy_identity = age::x25519::Identity::generate();
+    let legacy_public = legacy_identity.to_public().to_string();
+    let legacy_pub_path = keys_dir.join("legacy-team.pub");
+    let legacy_age_path = keys_dir.join("legacy-team.age");
+    fs::write(&legacy_pub_path, &legacy_public).expect("write legacy recipient");
+    fs::write(
+        &legacy_age_path,
+        encrypt_for_recipient(&legacy_identity.to_public(), &repo_key),
+    )
+    .expect("write legacy delegation");
+    security
+        .add_team_member("legacy-team", &legacy_public)
+        .expect("reauthorize legacy team member");
+    assert!(legacy_pub_path.with_extension("auth").exists());
+    let recipients = security.gather_all_recipients().expect("gather reauthorized legacy");
+    assert!(recipients.iter().any(|r| r.to_string() == legacy_public));
+
+    // A copied proof is bound to both the original filename and recipient.
+    let swapped_identity = age::x25519::Identity::generate();
+    let swapped_public = swapped_identity.to_public().to_string();
+    let swapped_pub_path = keys_dir.join("swapped-team.pub");
+    fs::write(&swapped_pub_path, &swapped_public).expect("write swapped recipient");
+    fs::copy(&team_age_path, swapped_pub_path.with_extension("age"))
+        .expect("copy delegated age");
+    fs::copy(&team_auth_path, swapped_pub_path.with_extension("auth"))
+        .expect("copy delegated proof");
+    let recipients = security.gather_all_recipients().expect("gather swapped proof");
+    assert!(!recipients.iter().any(|r| r.to_string() == swapped_public));
+    fs::remove_file(swapped_pub_path).expect("remove swapped recipient");
+    fs::remove_file(keys_dir.join("swapped-team.age")).expect("remove swapped age");
+    fs::remove_file(keys_dir.join("swapped-team.auth")).expect("remove swapped proof");
 
     // The proof is not sufficient without the corresponding delegated age
     // key, and tampering or adding a second recipient invalidates the file.
