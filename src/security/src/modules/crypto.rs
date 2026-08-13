@@ -6,18 +6,21 @@ use aes_gcm::{
 };
 use age::x25519;
 use anyhow::{Context, Result};
+use secrecy::ExposeSecret;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
+use x25519_dalek::{PublicKey, StaticSecret};
 
 use crate::RepoKey;
 use crate::WardenSecurity;
 
 const HEADER_V2_MAGIC: &[u8] = b"age-encryption.org/v1";
-const RECIPIENT_AUTH_VERSION: u8 = 1;
+const RECIPIENT_AUTH_VERSION: u8 = 2;
 const RECIPIENT_AUTH_ROLE_MACHINE: &str = "machine";
 const RECIPIENT_AUTH_ROLE_TEAM: &str = "team";
 const MAX_RECIPIENT_AUTH_BYTES: usize = 4096;
@@ -28,6 +31,19 @@ struct RepoRecipientAuthorization {
     role: String,
     file_name: String,
     recipient: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct OwnerRecipientAuthorization {
+    signer: String,
+    ciphertext: Vec<u8>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct RepoRecipientAuthorizationEnvelope {
+    version: u8,
+    repo_key_ciphertext: Vec<u8>,
+    owner_proofs: Vec<OwnerRecipientAuthorization>,
 }
 
 /// Mirrors `is_owner_pubkey_filename` in the warden binary (main.rs):
@@ -82,6 +98,57 @@ fn parse_single_repo_recipient(content: &str) -> Option<x25519::Recipient> {
         }
     }
     parsed
+}
+
+/// Derive a proof key from an age X25519 identity and recipient. The writer
+/// uses the owner private key + delegated recipient public key; a machine-only
+/// reader uses the machine private key + owner public key. Both sides compute
+/// the same Diffie-Hellman secret, while a contributor who knows only public
+/// keys cannot forge the proof.
+fn recipient_proof_key(
+    identity: &x25519::Identity,
+    recipient: &x25519::Recipient,
+) -> Option<RepoKey> {
+    let identity_text = identity.to_string();
+    let (identity_hrp, identity_bytes) = bech32::decode(identity_text.expose_secret()).ok()?;
+    if !identity_hrp.to_string().eq_ignore_ascii_case("age-secret-key-") {
+        return None;
+    }
+    let identity_bytes: [u8; 32] = identity_bytes.try_into().ok()?;
+
+    let recipient_text = recipient.to_string();
+    let (recipient_hrp, recipient_bytes) = bech32::decode(&recipient_text).ok()?;
+    if recipient_hrp.to_string() != "age" {
+        return None;
+    }
+    let recipient_bytes: [u8; 32] = recipient_bytes.try_into().ok()?;
+
+    let secret = StaticSecret::from(identity_bytes);
+    let public = PublicKey::from(recipient_bytes);
+    let shared = secret.diffie_hellman(&public);
+    let mut hasher = Sha256::new();
+    hasher.update(b"dracon-warden recipient authorization v1");
+    hasher.update(shared.as_bytes());
+    Some(RepoKey(hasher.finalize().to_vec()))
+}
+
+fn authorization_matches(
+    auth: &RepoRecipientAuthorization,
+    public_path: &Path,
+    recipient: &x25519::Recipient,
+    required_role: Option<&str>,
+) -> bool {
+    let Some(file_name) = public_path.file_name().and_then(|name| name.to_str()) else {
+        return false;
+    };
+    auth.version == RECIPIENT_AUTH_VERSION
+        && required_role.is_none_or(|role| auth.role == role)
+        && matches!(
+            auth.role.as_str(),
+            RECIPIENT_AUTH_ROLE_MACHINE | RECIPIENT_AUTH_ROLE_TEAM
+        )
+        && auth.file_name == file_name
+        && auth.recipient == recipient.to_string()
 }
 
 /// Warn-once-per-process eprintln (a gather runs on every protected-file
