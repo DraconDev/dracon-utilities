@@ -689,19 +689,56 @@ impl WardenSecurity {
         dir: &Path,
         identity: &x25519::Identity,
     ) -> Result<RepoKey> {
+        let dir_metadata = fs::symlink_metadata(dir)?;
+        if dir_metadata.file_type().is_symlink() {
+            return Err(anyhow::anyhow!(
+                "repository machine-key directory must not be a symlink"
+            ));
+        }
+        let machine_recipient = identity.to_public();
         for entry in fs::read_dir(dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().and_then(|s| s.to_str()) == Some("age") {
-                let filename = path.file_name().unwrap_or_default().to_string_lossy();
-                if filename.starts_with("machine:") {
-                    if let Ok(repo_key) = self.try_decrypt_key_file(&path, identity) {
-                        return Ok(repo_key);
-                    }
-                }
+            let metadata = fs::symlink_metadata(&path)?;
+            if !metadata.file_type().is_file() {
+                continue;
+            }
+            if path.extension().and_then(|s| s.to_str()) != Some("age") {
+                continue;
+            }
+            let filename = path.file_name().unwrap_or_default().to_string_lossy();
+            if !filename.starts_with("machine:") {
+                continue;
+            }
+            let pub_path = path.with_extension("pub");
+            match fs::symlink_metadata(&pub_path) {
+                Ok(metadata) if metadata.file_type().is_file() => {}
+                _ => continue,
+            }
+            let Ok(public_content) = fs::read_to_string(&pub_path) else {
+                continue;
+            };
+            let Some(recipient) = crate::modules::crypto::parse_single_repo_recipient(
+                &public_content,
+            ) else {
+                continue;
+            };
+            if recipient != machine_recipient {
+                continue;
+            }
+            let Ok(repo_key) = self.try_decrypt_key_file(&path, identity) else {
+                continue;
+            };
+            if self.verify_machine_recipient_authorization(
+                &pub_path,
+                &recipient,
+                identity,
+                &repo_key,
+            ) {
+                return Ok(repo_key);
             }
         }
-        Err(anyhow::anyhow!("No matching machine key found"))
+        Err(anyhow::anyhow!("No authenticated matching machine key found"))
     }
 
     /// Generate a new Machine Identity (Private Key, Public Key)

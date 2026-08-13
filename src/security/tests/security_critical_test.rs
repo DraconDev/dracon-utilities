@@ -607,6 +607,85 @@ fn test_load_repo_key_master_identity_success() {
 }
 
 #[test]
+fn test_machine_only_repo_key_requires_owner_authenticated_proof() {
+    let _guard = HomeGuard::new();
+    let tmp = tempfile::TempDir::new().expect("temp dir");
+    let repo_root = tmp.path();
+    let home = std::env::var("HOME").map(std::path::PathBuf::from).unwrap();
+    let home_keys = home.join(".dracon/data/keys");
+    fs::create_dir_all(&home_keys).expect("create owner trust anchors");
+
+    let owner_identity = age::x25519::Identity::generate();
+    let repo_key = setup_repo_with_age_key(repo_root, &owner_identity);
+    fs::write(
+        home_keys.join("owner_operator.pub"),
+        owner_identity.to_public().to_string(),
+    )
+    .expect("write owner trust anchor");
+
+    let machine_identity = age::x25519::Identity::generate();
+    let machine_public = machine_identity.to_public().to_string();
+    let mut owner_security = dracon_security::WardenSecurity::new(Some(repo_root))
+        .expect("init owner security");
+    owner_security.add_memory_identity(owner_identity);
+    owner_security
+        .whitelist_machine(&machine_public)
+        .expect("authorize machine");
+
+    let keys_dir = make_keys_dir(repo_root);
+    let safe_name = machine_public
+        .replace(':', "_")
+        .chars()
+        .take(12)
+        .collect::<String>();
+    let machine_age_path = keys_dir.join(format!("machine:{}.age", safe_name));
+    let original_machine_age = fs::read(&machine_age_path).expect("read machine delegation");
+
+    let _machine_env = EnvRestorer::new(
+        "ARCANE_MACHINE_KEY",
+        machine_identity.to_string().expose_secret(),
+    );
+    let machine_security = dracon_security::WardenSecurity::new(Some(repo_root))
+        .expect("init machine-only security");
+    let loaded = machine_security
+        .load_repo_key()
+        .expect("owner-authenticated machine delegation should load");
+    assert_eq!(loaded.get_key(), repo_key.as_slice());
+
+    // Replacing the encrypted machine blob while retaining the valid owner
+    // proof must fail: the proof commits to the actual repository key.
+    let attacker_key: [u8; 32] = rand::random();
+    fs::write(
+        &machine_age_path,
+        encrypt_for_recipient(&machine_identity.to_public(), &attacker_key),
+    )
+    .expect("replace machine delegation");
+    assert!(
+        machine_security.load_repo_key().is_err(),
+        "a valid proof must not bless a replaced machine ciphertext"
+    );
+    fs::write(&machine_age_path, original_machine_age).expect("restore machine delegation");
+
+    // A contributor can also add a fresh machine-looking blob, but cannot
+    // forge the owner-DH proof required by machine-only discovery.
+    let arbitrary_machine_age = keys_dir.join("machine:attacker.age");
+    fs::write(
+        &arbitrary_machine_age,
+        encrypt_for_recipient(&machine_identity.to_public(), &attacker_key),
+    )
+    .expect("write arbitrary machine blob");
+    fs::write(
+        keys_dir.join("machine:attacker.pub"),
+        machine_public,
+    )
+    .expect("write arbitrary machine recipient");
+    assert!(
+        machine_security.load_repo_key().is_ok(),
+        "the valid authorized delegation remains usable"
+    );
+}
+
+#[test]
 fn test_load_repo_key_ignores_arbitrary_master_encrypted_age_blob() {
     let tmp = tempfile::TempDir::new().expect("temp dir");
     let repo_root = tmp.path();

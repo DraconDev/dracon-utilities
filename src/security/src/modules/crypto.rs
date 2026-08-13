@@ -31,6 +31,8 @@ struct RepoRecipientAuthorization {
     role: String,
     file_name: String,
     recipient: String,
+    #[serde(default)]
+    repo_key_commitment: Vec<u8>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -85,7 +87,7 @@ fn parse_public_recipient_lines(content: &str) -> Vec<x25519::Recipient> {
 /// transport format. Require exactly one valid recipient and compare it to
 /// the operator's local trust anchors; a contributor cannot authorize a new
 /// recipient by choosing an `owner_*.pub` basename.
-fn parse_single_repo_recipient(content: &str) -> Option<x25519::Recipient> {
+pub(crate) fn parse_single_repo_recipient(content: &str) -> Option<x25519::Recipient> {
     let mut parsed = None;
     for line in content.lines() {
         let line = line.trim();
@@ -137,18 +139,27 @@ fn authorization_matches(
     public_path: &Path,
     recipient: &x25519::Recipient,
     required_role: Option<&str>,
+    expected_repo_key: Option<&RepoKey>,
 ) -> bool {
     let Some(file_name) = public_path.file_name().and_then(|name| name.to_str()) else {
         return false;
     };
-    auth.version == RECIPIENT_AUTH_VERSION
-        && required_role.is_none_or(|role| auth.role == role)
+    matches!(auth.version, 1 | RECIPIENT_AUTH_VERSION)
+        && required_role.map_or(true, |role| auth.role == role)
+        && (auth.version == 1
+            || expected_repo_key.is_some_and(|repo_key| {
+                auth.repo_key_commitment == repo_key_commitment(repo_key)
+            }))
         && matches!(
             auth.role.as_str(),
             RECIPIENT_AUTH_ROLE_MACHINE | RECIPIENT_AUTH_ROLE_TEAM
         )
         && auth.file_name == file_name
         && auth.recipient == recipient.to_string()
+}
+
+fn repo_key_commitment(repo_key: &RepoKey) -> Vec<u8> {
+    Sha256::digest(&repo_key.0).to_vec()
 }
 
 /// Warn-once-per-process eprintln (a gather runs on every protected-file
@@ -434,6 +445,22 @@ impl WardenSecurity {
         trusted
     }
 
+    fn read_authorization_envelope(
+        &self,
+        public_path: &Path,
+    ) -> Option<RepoRecipientAuthorizationEnvelope> {
+        let auth_path = recipient_authorization_path(public_path);
+        let metadata = fs::symlink_metadata(&auth_path).ok()?;
+        if !metadata.file_type().is_file() {
+            return None;
+        }
+        let ciphertext = fs::read(auth_path).ok()?;
+        if ciphertext.len() > MAX_RECIPIENT_AUTH_BYTES {
+            return None;
+        }
+        serde_json::from_slice(&ciphertext).ok()
+    }
+
     /// Verify a repo-key-authenticated authorization sidecar written by
     /// `whitelist_machine` or `add_team_member`. The sidecar binds the exact
     /// basename and recipient, so copying it cannot authorize a different
@@ -445,45 +472,97 @@ impl WardenSecurity {
         recipient: &x25519::Recipient,
         repo_key: &RepoKey,
     ) -> bool {
-        let Ok(file_name) = public_path
-            .file_name()
-            .and_then(|name| name.to_str())
-            .ok_or(())
-        else {
-            return false;
-        };
         let auth_path = recipient_authorization_path(public_path);
-        let Ok(auth_metadata) = fs::symlink_metadata(&auth_path) else {
+        let Ok(auth_bytes) = fs::read(&auth_path) else {
             return false;
         };
-        if !auth_metadata.file_type().is_file() {
+        if auth_bytes.len() > MAX_RECIPIENT_AUTH_BYTES {
             return false;
         }
-        let Ok(ciphertext) = fs::read(auth_path) else {
+
+        // Accept the pre-envelope proof format only for already-issued files;
+        // new writer output always includes the owner proof needed by
+        // machine-only ARCANE_MACHINE_KEY readers.
+        if let Ok(plaintext) = self.decrypt_with_repo_key(repo_key, &auth_bytes) {
+            if let Ok(auth) = serde_json::from_slice::<RepoRecipientAuthorization>(&plaintext) {
+                if authorization_matches(&auth, public_path, recipient, None, Some(repo_key)) {
+                    return true;
+                }
+            }
+        }
+
+        let Some(envelope) = serde_json::from_slice::<RepoRecipientAuthorizationEnvelope>(&auth_bytes).ok() else {
             return false;
         };
-        if ciphertext.len() > MAX_RECIPIENT_AUTH_BYTES {
+        if envelope.version != RECIPIENT_AUTH_VERSION {
             return false;
         }
-        let Ok(plaintext) = self.decrypt_with_repo_key(repo_key, &ciphertext) else {
+        let Ok(plaintext) = self.decrypt_with_repo_key(repo_key, &envelope.repo_key_ciphertext) else {
             return false;
         };
         let Ok(auth) = serde_json::from_slice::<RepoRecipientAuthorization>(&plaintext) else {
             return false;
         };
-        auth.version == RECIPIENT_AUTH_VERSION
-            && matches!(
-                auth.role.as_str(),
-                RECIPIENT_AUTH_ROLE_MACHINE | RECIPIENT_AUTH_ROLE_TEAM
-            )
-            && auth.file_name == file_name
-            && auth.recipient == recipient.to_string()
+        authorization_matches(&auth, public_path, recipient, None, Some(repo_key))
+    }
+
+    /// Verify the owner-DH proof when the local process only has a machine
+    /// identity (the `ARCANE_MACHINE_KEY` path). The repo key cannot be used
+    /// as its own trust anchor: a contributor could otherwise forge both an
+    /// arbitrary machine `.age` blob and a proof encrypted under that chosen
+    /// value. The owner public recipient is the trust anchor, and the proof
+    /// requires the corresponding owner private key on the authorizing side.
+    pub(crate) fn verify_machine_recipient_authorization(
+        &self,
+        public_path: &Path,
+        recipient: &x25519::Recipient,
+        machine_identity: &x25519::Identity,
+        repo_key: &RepoKey,
+    ) -> bool {
+        let Some(envelope) = self.read_authorization_envelope(public_path) else {
+            return false;
+        };
+        if envelope.version != RECIPIENT_AUTH_VERSION {
+            return false;
+        }
+        let repo_root = self.get_repo_root().ok();
+        let home_dirs = self.home_key_dirs_for_repo(repo_root.as_deref());
+        let trusted = self.local_recipient_trust_anchors(&home_dirs);
+
+        for owner_proof in envelope.owner_proofs {
+            if !trusted.contains(&owner_proof.signer) {
+                continue;
+            }
+            let Ok(owner_public) = owner_proof.signer.parse::<x25519::Recipient>() else {
+                continue;
+            };
+            let Some(proof_key) = recipient_proof_key(machine_identity, &owner_public) else {
+                continue;
+            };
+            let Ok(plaintext) = self.decrypt_with_repo_key(&proof_key, &owner_proof.ciphertext)
+            else {
+                continue;
+            };
+            let Ok(auth) = serde_json::from_slice::<RepoRecipientAuthorization>(&plaintext) else {
+                continue;
+            };
+            if authorization_matches(
+                &auth,
+                public_path,
+                recipient,
+                Some(RECIPIENT_AUTH_ROLE_MACHINE),
+                Some(repo_key),
+            ) {
+                return true;
+            }
+        }
+        false
     }
 
     /// Write an authenticated authorization sidecar for a machine/team public
-    /// recipient. This is deliberately repo-key encrypted rather than based
-    /// on a contributor-chosen filename; the loader can therefore preserve
-    /// the machine/team APIs without reopening the arbitrary-file trust gap.
+    /// recipient. The repo-key proof serves ordinary operator paths; the
+    /// owner-DH proof prevents a contributor from forging a repo key in the
+    /// machine-only ARCANE_MACHINE_KEY path.
     pub(crate) fn write_repo_recipient_authorization(
         &self,
         repo_key: &RepoKey,
@@ -494,6 +573,9 @@ impl WardenSecurity {
         if !matches!(role, RECIPIENT_AUTH_ROLE_MACHINE | RECIPIENT_AUTH_ROLE_TEAM) {
             anyhow::bail!("invalid repository recipient authorization role")
         }
+        if self.master_identities.is_empty() {
+            anyhow::bail!("owner identity required to authorize repository recipients")
+        }
         let file_name = public_path
             .file_name()
             .and_then(|name| name.to_str())
@@ -503,9 +585,32 @@ impl WardenSecurity {
             role: role.to_string(),
             file_name: file_name.to_string(),
             recipient: recipient.to_string(),
+            repo_key_commitment: repo_key_commitment(repo_key),
         };
         let payload = serde_json::to_vec(&auth).context("serialize recipient authorization")?;
-        let ciphertext = self.encrypt_with_repo_key(repo_key, &payload)?;
+        let repo_key_ciphertext = self.encrypt_with_repo_key(repo_key, &payload)?;
+        let mut owner_proofs = Vec::new();
+        for signer in &self.master_identities {
+            let Some(proof_key) = recipient_proof_key(signer, recipient) else {
+                continue;
+            };
+            owner_proofs.push(OwnerRecipientAuthorization {
+                signer: signer.to_public().to_string(),
+                ciphertext: self.encrypt_with_repo_key(&proof_key, &payload)?,
+            });
+        }
+        if owner_proofs.is_empty() {
+            anyhow::bail!("failed to derive owner authorization proof")
+        }
+        let envelope = RepoRecipientAuthorizationEnvelope {
+            version: RECIPIENT_AUTH_VERSION,
+            repo_key_ciphertext,
+            owner_proofs,
+        };
+        let encoded = serde_json::to_vec(&envelope).context("serialize authorization envelope")?;
+        if encoded.len() > MAX_RECIPIENT_AUTH_BYTES {
+            anyhow::bail!("recipient authorization envelope is too large")
+        }
         let auth_path = recipient_authorization_path(public_path);
 
         #[cfg(unix)]
@@ -516,10 +621,8 @@ impl WardenSecurity {
                 .create_new(true)
                 .mode(0o600)
                 .open(&auth_path)
-                .with_context(|| {
-                    format!("create recipient authorization {}", auth_path.display())
-                })?
-                .write_all(&ciphertext)?;
+                .with_context(|| format!("create recipient authorization {}", auth_path.display()))?
+                .write_all(&encoded)?;
         }
         #[cfg(not(unix))]
         {
@@ -527,10 +630,8 @@ impl WardenSecurity {
                 .write(true)
                 .create_new(true)
                 .open(&auth_path)
-                .with_context(|| {
-                    format!("create recipient authorization {}", auth_path.display())
-                })?
-                .write_all(&ciphertext)?;
+                .with_context(|| format!("create recipient authorization {}", auth_path.display()))?
+                .write_all(&encoded)?;
         }
         Ok(())
     }
