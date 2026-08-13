@@ -214,10 +214,12 @@ not trusted by filename alone. `gather_all_recipients` accepts canonical
 recipient matches a local owner trust anchor. `whitelist_machine` and
 `add_team_member` write machine/team `.pub` files with a versioned `.auth`
 envelope bound to the exact filename, recipient, and repository-key
-commitment; it also carries an owner-DH proof so machine-only
-`ARCANE_MACHINE_KEY` discovery cannot bless an attacker-chosen repo key. The
-matching `.age` delegation must also exist before those recipients are
-included. `authorize_recipient` uses the same owner-authenticated proof for
+commitment; it also carries an owner signature bound to the age owner
+recipient, so the DH transport proof cannot be forged by a delegated private
+key and machine-only `ARCANE_MACHINE_KEY` discovery cannot bless an
+attacker-chosen repo key. The matching `.age` delegation must also exist
+before those recipients are included. `authorize_recipient` uses the same
+owner-authenticated proof for
 recipient-named `.pub`/`.age` pairs. Arbitrary
 contributor-added files, missing/tampered proofs, and symlinked repository key
 directories are rejected. HOME key files remain operator-trusted only when
@@ -226,7 +228,7 @@ Existing machine/team files created before authenticated sidecars must be
 explicitly re-authorized through the same API (same recipient and alias) before
 they participate in future encryption; the API adds the missing proof in place
 without silently trusting the legacy pair. Machine-only consumers require the
-new owner-DH envelope; legacy repo-key-only sidecars must be reissued.
+new owner-signature envelope; legacy repo-key-only sidecars must be reissued.
 ```
 
 ### Key Generation

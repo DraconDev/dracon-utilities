@@ -6,9 +6,12 @@ use aes_gcm::{
 };
 use age::x25519;
 use anyhow::{Context, Result};
+use curve25519_dalek::montgomery::MontgomeryPoint;
+use ed25519_dalek::hazmat::{raw_sign, ExpandedSecretKey};
+use ed25519_dalek::{Signature, VerifyingKey};
 use secrecy::ExposeSecret;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
+use sha2::{Digest, Sha256, Sha512};
 use std::collections::HashSet;
 use std::fs;
 use std::io::{Read, Write};
@@ -39,6 +42,7 @@ struct RepoRecipientAuthorization {
 #[derive(Debug, Deserialize, Serialize)]
 struct OwnerRecipientAuthorization {
     signer: String,
+    signature: Vec<u8>,
     ciphertext: Vec<u8>,
 }
 
@@ -103,29 +107,34 @@ pub(crate) fn parse_single_repo_recipient(content: &str) -> Option<x25519::Recip
     parsed
 }
 
-/// Derive a proof key from an age X25519 identity and recipient. The writer
-/// uses the owner private key + delegated recipient public key; a machine-only
-/// reader uses the machine private key + owner public key. Both sides compute
-/// the same Diffie-Hellman secret, while a contributor who knows only public
-/// keys cannot forge the proof.
-fn recipient_proof_key(
-    identity: &x25519::Identity,
-    recipient: &x25519::Recipient,
-) -> Option<RepoKey> {
+fn decode_identity_bytes(identity: &x25519::Identity) -> Option<[u8; 32]> {
     let identity_text = identity.to_string();
     let (identity_hrp, identity_bytes) = bech32::decode(identity_text.expose_secret()).ok()?;
     if !identity_hrp.to_string().eq_ignore_ascii_case("age-secret-key-") {
         return None;
     }
-    let identity_bytes: [u8; 32] = identity_bytes.try_into().ok()?;
+    identity_bytes.try_into().ok()
+}
 
+fn decode_recipient_bytes(recipient: &x25519::Recipient) -> Option<[u8; 32]> {
     let recipient_text = recipient.to_string();
     let (recipient_hrp, recipient_bytes) = bech32::decode(&recipient_text).ok()?;
     if recipient_hrp.to_string() != "age" {
         return None;
     }
-    let recipient_bytes: [u8; 32] = recipient_bytes.try_into().ok()?;
+    recipient_bytes.try_into().ok()
+}
 
+/// Derive a proof-encryption key from an age X25519 identity and recipient.
+/// This is only a confidential transport for the authorization payload; it is
+/// not the authentication mechanism. Authentication is provided by the
+/// owner signature below because either DH participant can derive this key.
+fn recipient_proof_key(
+    identity: &x25519::Identity,
+    recipient: &x25519::Recipient,
+) -> Option<RepoKey> {
+    let identity_bytes = decode_identity_bytes(identity)?;
+    let recipient_bytes = decode_recipient_bytes(recipient)?;
     let secret = StaticSecret::from(identity_bytes);
     let public = PublicKey::from(recipient_bytes);
     let shared = secret.diffie_hellman(&public);
@@ -136,6 +145,55 @@ fn recipient_proof_key(
     hasher.update(b"dracon-warden recipient authorization v1");
     hasher.update(shared.as_bytes());
     Some(RepoKey(hasher.finalize().to_vec()))
+}
+
+/// Build an Ed25519 signing key whose scalar is the same clamped scalar used
+/// by the age X25519 identity. Curve25519's Montgomery and Edwards forms share
+/// the base point, so the public key can be recovered from the age recipient
+/// alone. The domain-separated prefix keeps deterministic EdDSA nonces from
+/// reusing any age protocol hash state.
+fn owner_signature_key(
+    identity: &x25519::Identity,
+) -> Option<(ExpandedSecretKey, VerifyingKey)> {
+    let identity_bytes = decode_identity_bytes(identity)?;
+    let mut expanded_bytes = [0u8; 64];
+    expanded_bytes[..32].copy_from_slice(&identity_bytes);
+    let mut prefix_hasher = Sha512::new();
+    prefix_hasher.update(b"dracon-warden owner authorization signature prefix v1");
+    prefix_hasher.update(identity_bytes);
+    expanded_bytes[32..].copy_from_slice(&prefix_hasher.finalize()[..32]);
+    let expanded = ExpandedSecretKey::from_bytes(&expanded_bytes);
+    let verifying_key = VerifyingKey::from(&expanded);
+    Some((expanded, verifying_key))
+}
+
+fn owner_signature(
+    identity: &x25519::Identity,
+    payload: &[u8],
+) -> Option<Vec<u8>> {
+    let (expanded, verifying_key) = owner_signature_key(identity)?;
+    Some(raw_sign::<Sha512>(&expanded, payload, &verifying_key).to_bytes().to_vec())
+}
+
+fn owner_signature_is_valid(
+    signer: &x25519::Recipient,
+    payload: &[u8],
+    signature_bytes: &[u8],
+) -> bool {
+    let Ok(signature_bytes) = <[u8; 64]>::try_from(signature_bytes) else {
+        return false;
+    };
+    let signature = Signature::from_bytes(&signature_bytes);
+    let Some(recipient_bytes) = decode_recipient_bytes(signer) else {
+        return false;
+    };
+    let montgomery = MontgomeryPoint(recipient_bytes);
+    [0u8, 1u8].into_iter().any(|sign| {
+        montgomery
+            .to_edwards(sign)
+            .map(VerifyingKey::from)
+            .is_some_and(|verifying_key| verifying_key.verify_strict(payload, &signature).is_ok())
+    })
 }
 
 fn authorization_matches(
@@ -178,6 +236,119 @@ fn warn_once(flag: &AtomicBool, msg: &str) {
 static WARNED_NON_OWNER_REPO_FILE: AtomicBool = AtomicBool::new(false);
 static WARNED_UNTRUSTED_REPO_FILE: AtomicBool = AtomicBool::new(false);
 static WARNED_SUSPICIOUS_FILE: AtomicBool = AtomicBool::new(false);
+
+#[cfg(test)]
+mod authorization_tests {
+    use super::*;
+    use std::fs;
+
+    fn encrypt_for_age_recipient(
+        recipient: &x25519::Recipient,
+        plaintext: &[u8],
+    ) -> Vec<u8> {
+        let encryptor = age::Encryptor::with_recipients(vec![Box::new(recipient.clone())])
+            .expect("create age encryptor");
+        let mut ciphertext = Vec::new();
+        let mut writer = encryptor
+            .wrap_output(&mut ciphertext)
+            .expect("wrap age output");
+        writer.write_all(plaintext).expect("write age plaintext");
+        writer.finish().expect("finish age output");
+        ciphertext
+    }
+
+    #[test]
+    fn delegated_dh_cannot_forge_owner_authorization_signature() {
+        let tmp = tempfile::tempdir().expect("create temp directory");
+        let repo_root = tmp.path().join("repo");
+        let home = tmp.path().join("home");
+        let keys_dir = repo_root.join(".git/arcane/keys");
+        let home_keys_dir = home.join(".dracon/data/keys");
+        fs::create_dir_all(&keys_dir).expect("create repository keys");
+        fs::create_dir_all(&home_keys_dir).expect("create home keys");
+
+        let owner = x25519::Identity::generate();
+        let delegated = x25519::Identity::generate();
+        let owner_recipient = owner.to_public();
+        let delegated_recipient = delegated.to_public();
+        fs::write(
+            home_keys_dir.join("owner_operator.pub"),
+            owner_recipient.to_string(),
+        )
+        .expect("write owner trust anchor");
+
+        let forged_repo_key_bytes: [u8; 32] = rand::random();
+        fs::write(
+            keys_dir.join("repo.key.age"),
+            encrypt_for_age_recipient(&owner_recipient, &forged_repo_key_bytes),
+        )
+        .expect("write forged canonical repo key");
+        fs::write(
+            keys_dir.join("evil.pub"),
+            delegated_recipient.to_string(),
+        )
+        .expect("write delegated recipient");
+        fs::write(keys_dir.join("evil.age"), b"delegation")
+            .expect("write delegated age marker");
+
+        let auth = RepoRecipientAuthorization {
+            version: RECIPIENT_AUTH_VERSION,
+            role: RECIPIENT_AUTH_ROLE_DIRECT.to_string(),
+            file_name: "evil.pub".to_string(),
+            recipient: delegated_recipient.to_string(),
+            repo_key_commitment: repo_key_commitment(&RepoKey(
+                forged_repo_key_bytes.to_vec(),
+            )),
+        };
+        let payload = serde_json::to_vec(&auth).expect("serialize authorization");
+        let forged_repo_key = RepoKey(forged_repo_key_bytes.to_vec());
+        let repo_key_ciphertext = {
+            let security = WardenSecurity::new(Some(&repo_root)).expect("init security");
+            security
+                .encrypt_with_repo_key(&forged_repo_key, &payload)
+                .expect("encrypt repository authorization")
+        };
+
+        // The attacker can derive the mutual-DH transport key with its own
+        // delegated private key and the trusted owner's public key. It can
+        // also sign with its own unrelated scalar, while labeling the proof
+        // as if the owner signed it. The signature must be rejected.
+        let proof_key = recipient_proof_key(&delegated, &owner_recipient)
+            .expect("derive attacker-visible DH transport key");
+        let proof_ciphertext = {
+            let security = WardenSecurity::new(Some(&repo_root)).expect("init security");
+            security
+                .encrypt_with_repo_key(&proof_key, &payload)
+                .expect("encrypt forged owner proof payload")
+        };
+        let forged_signature = owner_signature(&delegated, &payload)
+            .expect("derive attacker signature");
+        let envelope = RepoRecipientAuthorizationEnvelope {
+            version: RECIPIENT_AUTH_VERSION,
+            repo_key_ciphertext,
+            owner_proofs: vec![OwnerRecipientAuthorization {
+                signer: owner_recipient.to_string(),
+                signature: forged_signature,
+                ciphertext: proof_ciphertext,
+            }],
+        };
+        fs::write(
+            keys_dir.join("evil.auth"),
+            serde_json::to_vec(&envelope).expect("serialize forged authorization envelope"),
+        )
+        .expect("write forged authorization envelope");
+
+        let mut security = WardenSecurity::new(Some(&repo_root)).expect("init security");
+        security.set_mock_home(home);
+        security.add_memory_identity(owner);
+        let recipients = security
+            .gather_all_recipients()
+            .expect("gather recipients without failing closed");
+        assert!(!recipients
+            .iter()
+            .any(|recipient| recipient == &delegated_recipient));
+    }
+}
 
 impl WardenSecurity {
     pub fn encrypt_v2(
@@ -475,76 +646,35 @@ impl WardenSecurity {
         serde_json::from_slice(&ciphertext).ok()
     }
 
-    fn available_recipient_proof_identities(&self) -> Vec<x25519::Identity> {
-        let mut identities = self
-            .master_identities
-            .iter()
-            .chain(self.imported_identities.iter())
-            .cloned()
-            .collect::<Vec<_>>();
-        if let Ok(machine_key) = std::env::var("ARCANE_MACHINE_KEY") {
-            if let Ok(identity) = machine_key.parse::<x25519::Identity>() {
-                if !identities
-                    .iter()
-                    .any(|existing| existing.to_public() == identity.to_public())
-                {
-                    identities.push(identity);
-                }
-            }
-        }
-        identities
-    }
-
-    /// Verify that an authorization envelope carries a real owner-DH proof
-    /// for the exact public filename, recipient, role, and repository-key
-    /// commitment. An identity can verify from either side of the DH pair:
-    /// an owner process has the signer private key, while a machine/team
-    /// process has the delegated recipient private key.
-    fn verify_available_owner_proof(
+    /// Verify the signature over an authorization payload and require its
+    /// signer to be a local owner trust anchor. The DH ciphertext in an owner
+    /// proof only lets a delegated reader recover the payload; it is not used
+    /// as authentication because either DH participant can forge it.
+    fn trusted_owner_signature_matches(
         &self,
         public_path: &Path,
         recipient: &x25519::Recipient,
-        envelope: &RepoRecipientAuthorizationEnvelope,
+        auth: &RepoRecipientAuthorization,
+        owner_proof: &OwnerRecipientAuthorization,
         repo_key: &RepoKey,
+        required_role: Option<&str>,
     ) -> bool {
         let repo_root = self.get_repo_root().ok();
         let home_dirs = self.home_key_dirs_for_repo(repo_root.as_deref());
         let trusted = self.local_recipient_trust_anchors(&home_dirs);
-        let identities = self.available_recipient_proof_identities();
-
-        for owner_proof in &envelope.owner_proofs {
-            if !trusted.contains(&owner_proof.signer) {
-                continue;
-            }
-            let Ok(owner_public) = owner_proof.signer.parse::<x25519::Recipient>() else {
-                continue;
-            };
-            for identity in &identities {
-                let identity_public = identity.to_public();
-                let proof_key = if identity_public == owner_public {
-                    recipient_proof_key(identity, recipient)
-                } else if identity_public == *recipient {
-                    recipient_proof_key(identity, &owner_public)
-                } else {
-                    None
-                };
-                let Some(proof_key) = proof_key else {
-                    continue;
-                };
-                let Ok(plaintext) = self.decrypt_with_repo_key(&proof_key, &owner_proof.ciphertext)
-                else {
-                    continue;
-                };
-                let Ok(auth) = serde_json::from_slice::<RepoRecipientAuthorization>(&plaintext)
-                else {
-                    continue;
-                };
-                if authorization_matches(&auth, public_path, recipient, None, Some(repo_key)) {
-                    return true;
-                }
-            }
+        if !trusted.contains(&owner_proof.signer) {
+            return false;
         }
-        false
+        let Ok(signer) = owner_proof.signer.parse::<x25519::Recipient>() else {
+            return false;
+        };
+        if !authorization_matches(auth, public_path, recipient, required_role, Some(repo_key)) {
+            return false;
+        }
+        let Ok(payload) = serde_json::to_vec(auth) else {
+            return false;
+        };
+        owner_signature_is_valid(&signer, &payload, &owner_proof.signature)
     }
 
     /// Verify a V2 owner-authenticated authorization sidecar written by
@@ -578,7 +708,8 @@ impl WardenSecurity {
         // a canonical `repo.key.age` blob with one encrypted to the owner's
         // public key could choose the plaintext key and forge a V1 sidecar.
         // Existing entries must be explicitly re-authorized; new output is a
-        // V2 envelope with an owner-DH proof.
+        // V2 envelope with an owner signature and a DH-encrypted copy of the
+        // authorization payload.
         let Some(envelope) = serde_json::from_slice::<RepoRecipientAuthorizationEnvelope>(&auth_bytes).ok() else {
             return false;
         };
@@ -591,18 +722,23 @@ impl WardenSecurity {
         let Ok(auth) = serde_json::from_slice::<RepoRecipientAuthorization>(&plaintext) else {
             return false;
         };
-        if !authorization_matches(&auth, public_path, recipient, None, Some(repo_key)) {
-            return false;
-        }
-        self.verify_available_owner_proof(public_path, recipient, &envelope, repo_key)
+        envelope.owner_proofs.iter().any(|owner_proof| {
+            self.trusted_owner_signature_matches(
+                public_path,
+                recipient,
+                &auth,
+                owner_proof,
+                repo_key,
+                None,
+            )
+        })
     }
 
-    /// Verify the owner-DH proof when the local process only has a delegated
-    /// identity. The repo key cannot be its own trust anchor: a contributor
-    /// could otherwise forge both an arbitrary `.age` blob and a proof under
-    /// that chosen value. The owner public recipient is the trust anchor, and
-    /// the proof requires the corresponding owner private key on the writing
-    /// side.
+    /// Verify an owner-signed proof when the local process only has a
+    /// delegated identity. The repo key cannot be its own trust anchor: a
+    /// contributor could otherwise forge both an arbitrary `.age` blob and a
+    /// proof under that chosen value. The owner public recipient is the trust
+    /// anchor, and the signature binds the proof to that owner.
     pub(crate) fn verify_owner_recipient_authorization(
         &self,
         public_path: &Path,
@@ -638,12 +774,13 @@ impl WardenSecurity {
             let Ok(auth) = serde_json::from_slice::<RepoRecipientAuthorization>(&plaintext) else {
                 continue;
             };
-            if authorization_matches(
-                &auth,
+            if self.trusted_owner_signature_matches(
                 public_path,
                 recipient,
+                &auth,
+                &owner_proof,
+                repo_key,
                 Some(required_role),
-                Some(repo_key),
             ) {
                 return true;
             }
@@ -708,10 +845,10 @@ impl WardenSecurity {
         Ok(())
     }
 
-    /// Write an authenticated authorization sidecar for a machine/team public
-    /// recipient. The repo-key proof serves ordinary operator paths; the
-    /// owner-DH proof prevents a contributor from forging a repo key in the
-    /// machine-only ARCANE_MACHINE_KEY path.
+    /// Write a V2 authorization envelope for a machine/team/direct recipient.
+    /// The repo-key ciphertext and DH ciphertext provide confidentiality, but
+    /// the owner signature is the authentication boundary: a delegated
+    /// recipient can derive the DH key, while only the owner can sign.
     pub(crate) fn write_repo_recipient_authorization(
         &self,
         repo_key: &RepoKey,
@@ -748,8 +885,12 @@ impl WardenSecurity {
             let Some(proof_key) = recipient_proof_key(signer, recipient) else {
                 continue;
             };
+            let Some(signature) = owner_signature(signer, &payload) else {
+                continue;
+            };
             owner_proofs.push(OwnerRecipientAuthorization {
                 signer: signer.to_public().to_string(),
+                signature,
                 ciphertext: self.encrypt_with_repo_key(&proof_key, &payload)?,
             });
         }

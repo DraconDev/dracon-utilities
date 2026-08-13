@@ -16,8 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   recipients written by `whitelist_machine` and `add_team_member` retain
   support through versioned `.auth` envelopes: the exact public filename,
   recipient, and repository-key commitment are authenticated, and every V2
-  envelope carries an owner-DH proof. This prevents a forged canonical
-  `repo.key.age` ciphertext from becoming an authorization oracle and supports
+  envelope carries an owner Ed25519 signature bound to the age owner
+  recipient. The DH ciphertext is transport-only; this prevents a delegated
+  recipient from forging an owner proof or a forged canonical `repo.key.age`
+  ciphertext from becoming an authorization oracle, and supports
   machine-only `ARCANE_MACHINE_KEY` discovery. A matching regular `.age`
   delegation is required. `authorize_recipient` now emits the
   same verified recipient-named `.pub`/`.age` pair instead of an unauthenticated

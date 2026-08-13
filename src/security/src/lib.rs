@@ -676,8 +676,8 @@ impl WardenSecurity {
         let public_path = keys_dir.join(format!("{}.pub", recipient));
 
         // Encrypt the repo key for the recipient. The recipient-named pair is
-        // accepted by discovery only with the owner-DH authorization proof
-        // written below; a contributor cannot forge it from public data.
+        // accepted by discovery only with the owner-signed authorization
+        // proof written below; a contributor cannot forge it from public data.
         let recipients: Vec<Box<dyn age::Recipient + Send>> = vec![Box::new(recipient.clone())];
         let encryptor =
             age::Encryptor::with_recipients(recipients).context("failed to create encryptor")?;
