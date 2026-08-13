@@ -2,6 +2,7 @@ mod common;
 
 use common::{EnvRestorer, HomeGuard};
 use secrecy::ExposeSecret;
+use sha2::{Digest, Sha256};
 use std::fs;
 use std::io::{Read, Write};
 #[cfg(unix)]
@@ -801,6 +802,67 @@ fn test_load_repo_key_ignores_arbitrary_master_encrypted_age_blob() {
         .load_repo_key()
         .expect("canonical repo key should remain authoritative");
     assert_eq!(loaded.get_key(), expected_key_bytes.as_slice());
+}
+
+#[test]
+fn test_gather_rejects_forged_repo_key_authorization_without_owner_proof() {
+    let _guard = HomeGuard::new();
+    let tmp = tempfile::TempDir::new().expect("create temp dir");
+    let repo_root = tmp.path();
+    let owner_identity = age::x25519::Identity::generate();
+    let _real_repo_key = setup_repo_with_age_key(repo_root, &owner_identity);
+    let keys_dir = make_keys_dir(repo_root);
+    let evil_identity = age::x25519::Identity::generate();
+    let evil_public = evil_identity.to_public().to_string();
+
+    // A contributor can encrypt arbitrary bytes to the owner's public key.
+    // If repo.key.age is trusted by load_repo_key, those bytes become the
+    // chosen AEAD key for a forged V2 envelope with no owner proof.
+    let forged_bytes: [u8; 32] = rand::random();
+    let forged_repo_key = dracon_security::RepoKey(forged_bytes.to_vec());
+    fs::write(
+        keys_dir.join("repo.key.age"),
+        encrypt_for_recipient(&owner_identity.to_public(), &forged_bytes),
+    )
+    .expect("replace canonical repo key with forged ciphertext");
+    let public_name = "evil.pub";
+    fs::write(keys_dir.join(public_name), &evil_public).expect("write evil recipient");
+    fs::write(keys_dir.join("evil.age"), b"delegation").expect("write evil delegation");
+
+    let auth = serde_json::json!({
+        "version": 2,
+        "role": "direct",
+        "file_name": public_name,
+        "recipient": evil_public,
+        "repo_key_commitment": Sha256::digest(forged_repo_key.get_key()).to_vec(),
+    });
+    let repo_key_ciphertext = {
+        let payload = serde_json::to_vec(&auth).expect("serialize forged authorization");
+        let security = dracon_security::WardenSecurity::new(Some(repo_root))
+            .expect("init security");
+        security
+            .encrypt_with_repo_key(&forged_repo_key, &payload)
+            .expect("encrypt forged authorization")
+    };
+    let envelope = serde_json::json!({
+        "version": 2,
+        "repo_key_ciphertext": repo_key_ciphertext,
+        "owner_proofs": [],
+    });
+    fs::write(
+        keys_dir.join("evil.auth"),
+        serde_json::to_vec(&envelope).expect("serialize forged envelope"),
+    )
+    .expect("write forged envelope");
+
+    let mut security = dracon_security::WardenSecurity::new(Some(repo_root))
+        .expect("init security");
+    security.add_memory_identity(owner_identity);
+    let recipients = security.gather_all_recipients().expect("gather recipients");
+    assert!(
+        !recipients.iter().any(|recipient| recipient.to_string() == evil_public),
+        "a forged canonical repo key must not bless an envelope without owner proof"
+    );
 }
 
 #[test]

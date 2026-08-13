@@ -148,12 +148,11 @@ fn authorization_matches(
     let Some(file_name) = public_path.file_name().and_then(|name| name.to_str()) else {
         return false;
     };
-    matches!(auth.version, 1 | RECIPIENT_AUTH_VERSION)
+    auth.version == RECIPIENT_AUTH_VERSION
         && required_role.is_none_or(|role| auth.role == role)
-        && (auth.version == 1
-            || expected_repo_key.is_some_and(|repo_key| {
-                auth.repo_key_commitment == repo_key_commitment(repo_key)
-            }))
+        && expected_repo_key.is_some_and(|repo_key| {
+            auth.repo_key_commitment == repo_key_commitment(repo_key)
+        })
         && matches!(
             auth.role.as_str(),
             RECIPIENT_AUTH_ROLE_DIRECT
@@ -476,11 +475,84 @@ impl WardenSecurity {
         serde_json::from_slice(&ciphertext).ok()
     }
 
-    /// Verify a repo-key-authenticated authorization sidecar written by
-    /// `whitelist_machine` or `add_team_member`. The sidecar binds the exact
-    /// basename and recipient, so copying it cannot authorize a different
-    /// file or key. The repo key is secret to an authorized operator; a
-    /// contributor who can push repository files cannot forge this proof.
+    fn available_recipient_proof_identities(&self) -> Vec<x25519::Identity> {
+        let mut identities = self
+            .master_identities
+            .iter()
+            .chain(self.imported_identities.iter())
+            .cloned()
+            .collect::<Vec<_>>();
+        if let Ok(machine_key) = std::env::var("ARCANE_MACHINE_KEY") {
+            if let Ok(identity) = machine_key.parse::<x25519::Identity>() {
+                if !identities
+                    .iter()
+                    .any(|existing| existing.to_public() == identity.to_public())
+                {
+                    identities.push(identity);
+                }
+            }
+        }
+        identities
+    }
+
+    /// Verify that an authorization envelope carries a real owner-DH proof
+    /// for the exact public filename, recipient, role, and repository-key
+    /// commitment. An identity can verify from either side of the DH pair:
+    /// an owner process has the signer private key, while a machine/team
+    /// process has the delegated recipient private key.
+    fn verify_available_owner_proof(
+        &self,
+        public_path: &Path,
+        recipient: &x25519::Recipient,
+        envelope: &RepoRecipientAuthorizationEnvelope,
+        repo_key: &RepoKey,
+    ) -> bool {
+        let repo_root = self.get_repo_root().ok();
+        let home_dirs = self.home_key_dirs_for_repo(repo_root.as_deref());
+        let trusted = self.local_recipient_trust_anchors(&home_dirs);
+        let identities = self.available_recipient_proof_identities();
+
+        for owner_proof in &envelope.owner_proofs {
+            if !trusted.contains(&owner_proof.signer) {
+                continue;
+            }
+            let Ok(owner_public) = owner_proof.signer.parse::<x25519::Recipient>() else {
+                continue;
+            };
+            for identity in &identities {
+                let identity_public = identity.to_public();
+                let proof_key = if identity_public == owner_public {
+                    recipient_proof_key(identity, recipient)
+                } else if identity_public == *recipient {
+                    recipient_proof_key(identity, &owner_public)
+                } else {
+                    None
+                };
+                let Some(proof_key) = proof_key else {
+                    continue;
+                };
+                let Ok(plaintext) = self.decrypt_with_repo_key(&proof_key, &owner_proof.ciphertext)
+                else {
+                    continue;
+                };
+                let Ok(auth) = serde_json::from_slice::<RepoRecipientAuthorization>(&plaintext)
+                else {
+                    continue;
+                };
+                if authorization_matches(&auth, public_path, recipient, None, Some(repo_key)) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    /// Verify a V2 owner-authenticated authorization sidecar written by
+    /// `whitelist_machine`, `add_team_member`, or `authorize_recipient`. The
+    /// sidecar binds the exact basename, recipient, and repository-key
+    /// commitment, so copying it cannot authorize a different file or key.
+    /// V1 sidecars are rejected because their repo-key-only proof could be
+    /// forged by replacing an unauthenticated canonical repo-key ciphertext.
     pub(crate) fn verify_repo_recipient_authorization(
         &self,
         public_path: &Path,
@@ -501,17 +573,12 @@ impl WardenSecurity {
             return false;
         }
 
-        // Accept the pre-envelope proof format only for already-issued files;
-        // new writer output always includes the owner proof needed by
-        // machine-only ARCANE_MACHINE_KEY readers.
-        if let Ok(plaintext) = self.decrypt_with_repo_key(repo_key, &auth_bytes) {
-            if let Ok(auth) = serde_json::from_slice::<RepoRecipientAuthorization>(&plaintext) {
-                if authorization_matches(&auth, public_path, recipient, None, Some(repo_key)) {
-                    return true;
-                }
-            }
-        }
-
+        // Pre-envelope V1 sidecars are deliberately rejected. They bind only
+        // to the repository-key ciphertext, so a contributor who can replace
+        // a canonical `repo.key.age` blob with one encrypted to the owner's
+        // public key could choose the plaintext key and forge a V1 sidecar.
+        // Existing entries must be explicitly re-authorized; new output is a
+        // V2 envelope with an owner-DH proof.
         let Some(envelope) = serde_json::from_slice::<RepoRecipientAuthorizationEnvelope>(&auth_bytes).ok() else {
             return false;
         };
@@ -524,7 +591,10 @@ impl WardenSecurity {
         let Ok(auth) = serde_json::from_slice::<RepoRecipientAuthorization>(&plaintext) else {
             return false;
         };
-        authorization_matches(&auth, public_path, recipient, None, Some(repo_key))
+        if !authorization_matches(&auth, public_path, recipient, None, Some(repo_key)) {
+            return false;
+        }
+        self.verify_available_owner_proof(public_path, recipient, &envelope, repo_key)
     }
 
     /// Verify the owner-DH proof when the local process only has a delegated
