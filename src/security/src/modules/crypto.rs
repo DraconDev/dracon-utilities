@@ -6,16 +6,29 @@ use aes_gcm::{
 };
 use age::x25519;
 use anyhow::{Context, Result};
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
 use std::io::{Read, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::RepoKey;
 use crate::WardenSecurity;
 
 const HEADER_V2_MAGIC: &[u8] = b"age-encryption.org/v1";
+const RECIPIENT_AUTH_VERSION: u8 = 1;
+const RECIPIENT_AUTH_ROLE_MACHINE: &str = "machine";
+const RECIPIENT_AUTH_ROLE_TEAM: &str = "team";
+const MAX_RECIPIENT_AUTH_BYTES: usize = 4096;
+
+#[derive(Debug, Deserialize, Serialize)]
+struct RepoRecipientAuthorization {
+    version: u8,
+    role: String,
+    file_name: String,
+    recipient: String,
+}
 
 /// Mirrors `is_owner_pubkey_filename` in the warden binary (main.rs):
 /// the canonical mesh files written by keygen/publish are `owner_*.pub`.
@@ -33,6 +46,10 @@ fn is_owner_pubkey_filename(path: &Path) -> bool {
 fn is_canonical_repo_recipient_filename(path: &Path) -> bool {
     is_owner_pubkey_filename(path)
         || path.file_name().and_then(|name| name.to_str()) == Some("master.pub")
+}
+
+fn recipient_authorization_path(public_path: &Path) -> PathBuf {
+    public_path.with_extension("auth")
 }
 
 fn parse_public_recipient_lines(content: &str) -> Vec<x25519::Recipient> {
