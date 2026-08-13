@@ -277,8 +277,10 @@ enum Command {
     /// Generate a new age keypair for this machine.
     ///
     /// Creates ~/dracon/data/keys/`machine_<hostname>`.age (secret) and
-    /// ~/dracon/data/keys/`owner_<hostname>`.pub (public). Also publishes
-    /// the public key to the current repo's .dracon/data/keys/ directory.
+    /// the historical mesh file ~/dracon/data/keys/`owner_<hostname>`.pub
+    /// (public, explicitly marked as a machine recipient). Also publishes
+    /// the public key to the current repo's .dracon/data/keys/ directory;
+    /// the marker prevents it from becoming an owner-signature authority.
     /// Fails if either file already exists to prevent accidental overwrite.
     Keygen,
     /// Install git hooks globally for warden encryption enforcement.
@@ -898,10 +900,9 @@ fn resolve_local_pubkey_path() -> Option<PathBuf> {
 
     // Prefer newest valid owner pubkey; break ties by path for determinism.
     // This is only the file warden publishes to repo `.dracon/data/keys/`;
-    // it is not the owner private key. The current layout has legacy names
-    // such as `owner_nixos.pub`, which is actually the public half of the
-    // machine_nixos identity, so docs must describe the ambiguity instead of
-    // treating this file as a dedicated main key.
+    // it is not the owner private key. The historical keygen layout uses
+    // `owner_<hostname>.pub` for a machine recipient; those files carry the
+    // `dracon-warden role: machine` marker and are never owner signers.
     // Keys in ~/.dracon/data/keys/ sort before legacy dirs due to path order,
     // so when mtimes are equal the canonical location wins.
     let mut owners = owner_candidates;
@@ -1373,7 +1374,9 @@ pub(crate) fn run_keygen() -> Result<()> {
                     pubkey_path.display()
                 )
             })?
-            .write_all(format!("{}\n", recipient).as_bytes())
+            .write_all(
+                format!("{}\n# dracon-warden role: machine\n", recipient).as_bytes(),
+            )
             .with_context(|| format!("failed to write {}", pubkey_path.display()))?;
     }
     #[cfg(not(unix))]
@@ -1389,7 +1392,7 @@ pub(crate) fn run_keygen() -> Result<()> {
                     pubkey_path.display()
                 )
             })?;
-        f.write_all(format!("{}\n", recipient).as_bytes())
+        f.write_all(format!("{}\n# dracon-warden role: machine\n", recipient).as_bytes())
             .with_context(|| format!("failed to write {}", pubkey_path.display()))?;
     }
 
@@ -1445,7 +1448,7 @@ fn refuse_dedicated_master_overwrite(home: &Path) -> Result<()> {
         if protected.exists() {
             anyhow::bail!(
                 "refusing to run dracon-warden keygen while the dedicated master key exists at {}; \
-                 keygen only creates machine_<hostname>.age / owner_<hostname>.pub and must never \
+                 keygen only creates machine_<hostname>.age / marked owner_<hostname>.pub and must never \
                  overwrite the master recipient; use the explicit master-key rotation procedure instead",
                 protected.display()
             );

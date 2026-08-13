@@ -29,7 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   directories are permissive only when they do not physically overlap the
   repository key paths; repository-root and symlink overlap is fail-closed.
   Both `.dracon/data/keys` and legacy `.git/arcane/keys` are covered, with
-  regressions for canonical attackers, secret/oversized/multiline files,
+  owner-signature verification restricted to explicit owner/master anchors;
+  historical keygen machine files are marked and excluded from that signer
+  set while remaining valid HOME encryption recipients. Regressions cover a
+  delegated machine forging an authorization, canonical attackers, secret/oversized/multiline files,
   missing/tampered/replayed proofs, missing delegation files, direct-recipient
   migration, forged canonical repo-key authorization, arbitrary
   master-encrypted age blobs, machine-only discovery, and HOME overlap.

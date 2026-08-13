@@ -206,12 +206,14 @@ owner_key = "~/.dracon/keys/owner.age"
 ~/.dracon/master.age           — Sovereign master key  
 ~/.dracon/keys/*.age           — Additional identities
 ~/.dracon/data/keys/machine_*.age — Machine-level secret keys
-~/.dracon/data/keys/owner_*.pub  — Local owner recipient trust anchors
+~/.dracon/data/keys/owner_*.pub  — Owner anchors or marked machine mesh recipients
 
 Repository `.dracon/data/keys/` and legacy `.git/arcane/keys/` files are
 not trusted by filename alone. `gather_all_recipients` accepts canonical
 `owner_*.pub`/`master.pub` candidates only when their single valid age
-recipient matches a local owner trust anchor. `whitelist_machine` and
+recipient matches a local owner trust anchor. The historical keygen
+`owner_<hostname>.pub` output carries a machine-role marker and is accepted
+for HOME encryption but never as an owner-signature authority. `whitelist_machine` and
 `add_team_member` write machine/team `.pub` files with a versioned `.auth`
 envelope bound to the exact filename, recipient, and repository-key
 commitment; it also carries an owner signature bound to the age owner
@@ -238,8 +240,8 @@ new owner-signature envelope; legacy repo-key-only sidecars must be reissued.
 dracon-warden keygen
 
 # Keypair saved to:
-# - ~/.dracon/keys/machine_<hostname>.age (private)
-# - ~/.dracon/keys/machine_<hostname>.age.pub (public)
+# - ~/.dracon/data/keys/machine_<hostname>.age (private)
+# - ~/.dracon/data/keys/owner_<hostname>.pub (public, marked machine recipient)
 ```
 
 ### Team Keys

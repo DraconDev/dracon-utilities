@@ -1689,6 +1689,11 @@ watch_roots = ["/tmp/test"]
             "pubkey should be created at {}",
             pubkey_path.display()
         );
+        let public = std::fs::read_to_string(&pubkey_path).expect("read generated pubkey");
+        assert!(
+            public.contains("# dracon-warden role: machine"),
+            "generated machine recipient must not be treated as an owner signer"
+        );
     }
 
     #[test]

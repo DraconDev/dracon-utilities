@@ -28,6 +28,11 @@ const RECIPIENT_AUTH_ROLE_DIRECT: &str = "direct";
 const RECIPIENT_AUTH_ROLE_MACHINE: &str = "machine";
 const RECIPIENT_AUTH_ROLE_TEAM: &str = "team";
 const MAX_RECIPIENT_AUTH_BYTES: usize = 4096;
+// `keygen` keeps the historical `owner_<hostname>.pub` filename for
+// repository mesh compatibility, but marks its machine recipient explicitly.
+// Such a delegated machine key may encrypt and decrypt; it must never be
+// accepted as an owner signature authority.
+const MACHINE_RECIPIENT_MARKER: &str = "# dracon-warden role: machine";
 
 #[derive(Debug, Deserialize, Serialize)]
 struct RepoRecipientAuthorization {
@@ -242,6 +247,9 @@ static WARNED_SUSPICIOUS_FILE: AtomicBool = AtomicBool::new(false);
 mod authorization_tests {
     use super::*;
     use std::fs;
+    use std::sync::Mutex;
+
+    static TEST_ENV_LOCK: Mutex<()> = Mutex::new(());
 
     fn encrypt_for_age_recipient(
         recipient: &x25519::Recipient,
@@ -348,6 +356,126 @@ mod authorization_tests {
         assert!(!recipients
             .iter()
             .any(|recipient| recipient == &delegated_recipient));
+    }
+
+    #[test]
+    fn delegated_machine_identity_cannot_authorize_new_recipient() {
+        let _env_lock = TEST_ENV_LOCK.lock().expect("lock test environment");
+        let tmp = tempfile::tempdir().expect("create temp directory");
+        let repo_root = tmp.path().join("repo");
+        let home = tmp.path().join("home");
+        let keys_dir = repo_root.join(".git/arcane/keys");
+        let home_keys_dir = home.join(".dracon/data/keys");
+        fs::create_dir_all(&keys_dir).expect("create repository keys");
+        fs::create_dir_all(&home_keys_dir).expect("create home keys");
+
+        let owner = x25519::Identity::generate();
+        let machine = x25519::Identity::generate();
+        let evil = x25519::Identity::generate();
+        let owner_recipient = owner.to_public();
+        let machine_recipient = machine.to_public();
+        let repo_key_bytes: [u8; 32] = rand::random();
+        fs::write(
+            home_keys_dir.join("owner_operator.pub"),
+            owner_recipient.to_string(),
+        )
+        .expect("write owner trust anchor");
+        // This is the historical keygen layout that caused the bypass:
+        // the delegated machine recipient was named owner_<hostname>.pub.
+        // The role marker is emitted by keygen and must keep it out of the
+        // owner-signature trust set while preserving HOME encryption support.
+        fs::write(
+            home_keys_dir.join("owner_builder.pub"),
+            format!("{}\n{}\n", machine_recipient, MACHINE_RECIPIENT_MARKER),
+        )
+        .expect("write marked machine recipient");
+        fs::write(home_keys_dir.join("machine_builder.age"), b"machine identity")
+            .expect("write machine identity marker");
+        // A machine-only deployment may have only the old unmarked public
+        // file plus ARCANE_MACHINE_KEY; the active machine recipient is
+        // excluded independently of filename/marker heuristics.
+        fs::write(
+            home_keys_dir.join("owner_env_machine.pub"),
+            machine_recipient.to_string(),
+        )
+        .expect("write unmarked machine recipient");
+        fs::write(
+            keys_dir.join("repo.key.age"),
+            encrypt_for_age_recipient(&owner_recipient, &repo_key_bytes),
+        )
+        .expect("write repository key");
+        let mut owner_security = WardenSecurity::new(Some(&repo_root)).expect("init owner security");
+        owner_security.master_identities.clear();
+        owner_security.set_mock_home(home.clone());
+        owner_security.add_memory_identity(owner.clone());
+        owner_security
+            .whitelist_machine(&machine_recipient.to_string())
+            .expect("create valid machine-only delegation");
+        fs::write(keys_dir.join("evil.pub"), evil.to_public().to_string())
+            .expect("write attacker recipient");
+        fs::write(keys_dir.join("evil.age"), b"delegation")
+            .expect("write attacker delegation marker");
+
+        let auth = RepoRecipientAuthorization {
+            version: RECIPIENT_AUTH_VERSION,
+            role: RECIPIENT_AUTH_ROLE_DIRECT.to_string(),
+            file_name: "evil.pub".to_string(),
+            recipient: evil.to_public().to_string(),
+            repo_key_commitment: repo_key_commitment(&RepoKey(repo_key_bytes.to_vec())),
+        };
+        let payload = serde_json::to_vec(&auth).expect("serialize authorization");
+        let repo_key = RepoKey(repo_key_bytes.to_vec());
+        let repo_key_ciphertext = {
+            let security = WardenSecurity::new(Some(&repo_root)).expect("init security");
+            security
+                .encrypt_with_repo_key(&repo_key, &payload)
+                .expect("encrypt authorization payload")
+        };
+        let machine_proof_key = recipient_proof_key(&machine, &machine_recipient)
+            .expect("derive machine proof transport key");
+        let machine_proof_ciphertext = {
+            let security = WardenSecurity::new(Some(&repo_root)).expect("init security");
+            security
+                .encrypt_with_repo_key(&machine_proof_key, &payload)
+                .expect("encrypt machine proof payload")
+        };
+        let envelope = RepoRecipientAuthorizationEnvelope {
+            version: RECIPIENT_AUTH_VERSION,
+            repo_key_ciphertext,
+            owner_proofs: vec![OwnerRecipientAuthorization {
+                signer: machine_recipient.to_string(),
+                signature: owner_signature(&machine, &payload)
+                    .expect("derive delegated machine signature"),
+                ciphertext: machine_proof_ciphertext,
+            }],
+        };
+        fs::write(
+            keys_dir.join("evil.auth"),
+            serde_json::to_vec(&envelope).expect("serialize machine-forged envelope"),
+        )
+        .expect("write machine-forged envelope");
+
+        let previous_machine_env = std::env::var("ARCANE_MACHINE_KEY").ok();
+        std::env::set_var(
+            "ARCANE_MACHINE_KEY",
+            machine.to_string().expose_secret(),
+        );
+        let mut machine_security =
+            WardenSecurity::new(Some(&repo_root)).expect("init machine-only security");
+        machine_security.master_identities.clear();
+        machine_security.imported_identities.clear();
+        machine_security.set_mock_home(home);
+        let recipients = machine_security
+            .gather_all_recipients()
+            .expect("gather recipients without failing closed");
+        if let Some(previous) = previous_machine_env {
+            std::env::set_var("ARCANE_MACHINE_KEY", previous);
+        } else {
+            std::env::remove_var("ARCANE_MACHINE_KEY");
+        }
+        assert!(!recipients
+            .iter()
+            .any(|recipient| recipient == &evil.to_public()));
     }
 }
 
@@ -631,6 +759,171 @@ impl WardenSecurity {
         trusted
     }
 
+    fn active_machine_recipient(&self) -> Option<String> {
+        let identity = std::env::var("ARCANE_MACHINE_KEY")
+            .ok()?
+            .parse::<x25519::Identity>()
+            .ok()?;
+        Some(identity.to_public().to_string())
+    }
+
+    /// Find recipients already represented by a repository delegation. A
+    /// delegated user's private identity can otherwise appear in the local
+    /// master key ring and accidentally become an owner signer on that same
+    /// repository. Excluding every `.pub` + `.age` pair is fail-closed and
+    /// does not require trusting its `.auth` contents.
+    fn delegated_repo_recipients(&self) -> HashSet<String> {
+        let Some(repo_root) = self.get_repo_root().ok() else {
+            return HashSet::new();
+        };
+        let mut delegated = HashSet::new();
+        for keys_dir in [
+            repo_root.join(".dracon/data/keys"),
+            repo_root.join(".git/arcane/keys"),
+        ] {
+            let Ok(dir_metadata) = fs::symlink_metadata(&keys_dir) else {
+                continue;
+            };
+            if !dir_metadata.file_type().is_dir() {
+                continue;
+            }
+            let Ok(entries) = fs::read_dir(keys_dir) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                let Ok(metadata) = fs::symlink_metadata(&path) else {
+                    continue;
+                };
+                if !metadata.file_type().is_file()
+                    || path.extension().and_then(|ext| ext.to_str()) != Some("pub")
+                {
+                    continue;
+                }
+                let age_path = path.with_extension("age");
+                if !matches!(
+                    fs::symlink_metadata(age_path),
+                    Ok(metadata) if metadata.file_type().is_file()
+                ) {
+                    continue;
+                }
+                let Ok(content) = fs::read_to_string(&path) else {
+                    continue;
+                };
+                if let Some(recipient) = parse_single_repo_recipient(&content) {
+                    delegated.insert(recipient.to_string());
+                }
+            }
+        }
+        delegated
+    }
+
+    /// Return only explicit owner/master public recipients that may validate
+    /// an authorization signature. This is deliberately narrower than
+    /// `local_recipient_trust_anchors`: HOME remains a permissive encryption
+    /// domain, but a machine/team/delegated recipient must never become an
+    /// owner merely because its public key is present in HOME. The active
+    /// `ARCANE_MACHINE_KEY` recipient is removed even for legacy unmarked
+    /// keygen files.
+    fn local_owner_trust_anchors(&self, home_key_dirs: &[PathBuf]) -> HashSet<String> {
+        let delegated_recipients = self.delegated_repo_recipients();
+        let mut trusted = self
+            .master_identities
+            .iter()
+            .map(|identity| identity.to_public().to_string())
+            .filter(|recipient| !delegated_recipients.contains(recipient))
+            .collect::<HashSet<_>>();
+
+        for keys_dir in home_key_dirs {
+            let Ok(dir_metadata) = fs::symlink_metadata(keys_dir) else {
+                continue;
+            };
+            if !dir_metadata.file_type().is_dir() {
+                continue;
+            }
+            let mut machine_stems = HashSet::new();
+            let mut machine_recipients = HashSet::new();
+            if let Ok(entries) = fs::read_dir(keys_dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+                        continue;
+                    };
+                    let Some(stem) = name
+                        .strip_prefix("machine_")
+                        .and_then(|stem| stem.strip_suffix(".age"))
+                    else {
+                        continue;
+                    };
+                    machine_stems.insert(stem.to_owned());
+                    let Ok(content) = fs::read_to_string(path) else {
+                        continue;
+                    };
+                    if let Some(identity) = content
+                        .lines()
+                        .map(str::trim)
+                        .filter(|line| !line.is_empty() && !line.starts_with('#'))
+                        .find_map(|line| line.parse::<x25519::Identity>().ok())
+                    {
+                        machine_recipients.insert(identity.to_public().to_string());
+                    }
+                }
+            }
+
+            let Ok(entries) = fs::read_dir(keys_dir) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                let Ok(metadata) = fs::symlink_metadata(&path) else {
+                    continue;
+                };
+                if !metadata.file_type().is_file()
+                    || !is_canonical_repo_recipient_filename(&path)
+                {
+                    continue;
+                }
+                let Ok(content) = fs::read_to_string(&path) else {
+                    continue;
+                };
+                // New keygen output is explicitly marked. The stem check
+                // also excludes pre-marker keygen output when its paired
+                // machine private file is still present.
+                let is_marked_machine = content
+                    .lines()
+                    .any(|line| line.trim() == MACHINE_RECIPIENT_MARKER);
+                let is_legacy_machine = path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .and_then(|name| name.strip_prefix("owner_"))
+                    .and_then(|name| name.strip_suffix(".pub"))
+                    .is_some_and(|stem| machine_stems.contains(stem));
+                if is_marked_machine || is_legacy_machine {
+                    continue;
+                }
+                if content.len() > 256
+                    || content.contains(concat!("AGE", "-", "SECRET", "-", "KEY", "-"))
+                {
+                    continue;
+                }
+                let Some(recipient) = parse_single_repo_recipient(&content) else {
+                    continue;
+                };
+                if machine_recipients.contains(&recipient.to_string()) {
+                    continue;
+                }
+                let recipient_string = recipient.to_string();
+                if !delegated_recipients.contains(&recipient_string) {
+                    trusted.insert(recipient_string);
+                }
+            }
+        }
+        if let Some(machine_recipient) = self.active_machine_recipient() {
+            trusted.remove(&machine_recipient);
+        }
+        trusted
+    }
+
     fn read_authorization_envelope(
         &self,
         public_path: &Path,
@@ -662,7 +955,7 @@ impl WardenSecurity {
     ) -> bool {
         let repo_root = self.get_repo_root().ok();
         let home_dirs = self.home_key_dirs_for_repo(repo_root.as_deref());
-        let trusted = self.local_recipient_trust_anchors(&home_dirs);
+        let trusted = self.local_owner_trust_anchors(&home_dirs);
         if !trusted.contains(&owner_proof.signer) {
             return false;
         }
@@ -756,7 +1049,7 @@ impl WardenSecurity {
         }
         let repo_root = self.get_repo_root().ok();
         let home_dirs = self.home_key_dirs_for_repo(repo_root.as_deref());
-        let trusted = self.local_recipient_trust_anchors(&home_dirs);
+        let trusted = self.local_owner_trust_anchors(&home_dirs);
 
         for owner_proof in envelope.owner_proofs {
             if !trusted.contains(&owner_proof.signer) {
@@ -765,6 +1058,11 @@ impl WardenSecurity {
             let Ok(owner_public) = owner_proof.signer.parse::<x25519::Recipient>() else {
                 continue;
             };
+            // The delegated identity is never an owner signer, even if an
+            // old HOME file incorrectly labels its public key as owner.
+            if owner_public == delegated_identity.to_public() {
+                continue;
+            }
             let Some(proof_key) = recipient_proof_key(delegated_identity, &owner_public) else {
                 continue;
             };
