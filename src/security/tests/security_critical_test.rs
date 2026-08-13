@@ -618,6 +618,11 @@ fn test_list_authorized_recipients_rejects_symlink_aliases() {
     fs::create_dir_all(&repo_owner_dir).expect("create owner directory");
     let owner_path = repo_owner_dir.join("owner_good.pub");
     fs::write(&owner_path, master_identity.to_public().to_string()).expect("write owner key");
+    fs::write(
+        repo_owner_dir.join("trusted-alias.pub"),
+        master_identity.to_public().to_string(),
+    )
+    .expect("write noncanonical owner alias");
     std::os::unix::fs::symlink(&owner_path, repo_owner_dir.join("evil.pub"))
         .expect("write symlink alias");
 
@@ -628,6 +633,7 @@ fn test_list_authorized_recipients_rejects_symlink_aliases() {
         .list_authorized_recipients()
         .expect("list authorized recipients");
     assert!(listed.iter().any(|(name, _)| name == "owner_good"));
+    assert!(!listed.iter().any(|(name, _)| name == "trusted-alias"));
     assert!(!listed.iter().any(|(name, _)| name == "evil"));
 }
 

@@ -335,7 +335,16 @@ impl WardenSecurity {
                     && repo_authorization_key.is_some_and(|key| {
                         self.verify_repo_recipient_authorization(&path, &recipient, key)
                     });
-                if !local_owner && !authenticated_machine_or_team {
+                // Canonical names are reserved for owner/master trust
+                // anchors. Noncanonical names are accepted only through an
+                // authenticated delegated/direct proof; a trusted owner
+                // recipient copied into `evil.pub` is not a valid exception.
+                let accepted = if canonical_name {
+                    local_owner
+                } else {
+                    authenticated_machine_or_team
+                };
+                if !accepted {
                     if !canonical_name {
                         warn_once(
                             &WARNED_NON_OWNER_REPO_FILE,
@@ -472,7 +481,7 @@ impl WardenSecurity {
     /// basename and recipient, so copying it cannot authorize a different
     /// file or key. The repo key is secret to an authorized operator; a
     /// contributor who can push repository files cannot forge this proof.
-    fn verify_repo_recipient_authorization(
+    pub(crate) fn verify_repo_recipient_authorization(
         &self,
         public_path: &Path,
         recipient: &x25519::Recipient,

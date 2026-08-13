@@ -348,6 +348,7 @@ impl WardenSecurity {
             .map(|recipient| recipient.to_string())
             .collect::<std::collections::HashSet<_>>();
         let repo_root = self.get_repo_root()?;
+        let repo_key = self.load_repo_key().ok();
         let mut recipients = Vec::new();
         let mut seen = std::collections::HashSet::new();
 
@@ -378,23 +379,37 @@ impl WardenSecurity {
                 if ext != "pub" && ext != "key" {
                     continue;
                 }
-                let Ok(content) = fs::read_to_string(&path) else {
+                let Some(recipient) = crate::modules::crypto::parse_single_repo_recipient(
+                    &fs::read_to_string(&path).unwrap_or_default(),
+                ) else {
                     continue;
                 };
-                let name = path
-                    .file_stem()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("unknown")
-                    .to_string();
-                for line in content.lines() {
-                    let line = line.trim();
-                    let Ok(recipient) = line.parse::<x25519::Recipient>() else {
-                        continue;
-                    };
-                    let recipient = recipient.to_string();
-                    if authorized.contains(&recipient) && seen.insert(recipient.clone()) {
-                        recipients.push((name.clone(), recipient));
-                    }
+                let recipient_string = recipient.to_string();
+                if !authorized.contains(&recipient_string) {
+                    continue;
+                }
+                let canonical = path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .map(|name| {
+                        (name.starts_with("owner_") && name.ends_with(".pub"))
+                            || name == "master.pub"
+                    })
+                    .unwrap_or(false);
+                let delegated = repo_key.as_ref().is_some_and(|key| {
+                    path.with_extension("age")
+                        .symlink_metadata()
+                        .map(|metadata| metadata.file_type().is_file())
+                        .unwrap_or(false)
+                        && self.verify_repo_recipient_authorization(&path, &recipient, key)
+                });
+                if (canonical || delegated) && seen.insert(recipient_string.clone()) {
+                    let name = path
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("unknown")
+                        .to_string();
+                    recipients.push((name, recipient_string));
                 }
             }
         }
