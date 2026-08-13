@@ -374,6 +374,14 @@ impl WardenSecurity {
     }
 
     pub fn list_team_members(&self) -> Result<Vec<String>> {
+        // Only report delegated files that the same gather path accepts. This
+        // prevents a contributor-added `.age` filename from appearing as an
+        // authorized team member when it cannot receive future encryption.
+        let authorized_names = self
+            .list_authorized_recipients()?
+            .into_iter()
+            .map(|(name, _)| name)
+            .collect::<std::collections::HashSet<_>>();
         let repo_root = self.get_repo_root()?;
         let keys_dir = repo_root.join(".git").join("arcane").join("keys");
 
@@ -387,7 +395,8 @@ impl WardenSecurity {
             let path = entry.path();
             if path.extension().and_then(|s| s.to_str()) == Some("age") {
                 if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
-                    if !name.starts_with("machine:")
+                    if authorized_names.contains(name)
+                        && !name.starts_with("machine:")
                         && !name.starts_with("team:")
                         && name != "repo"
                         && name != "owner"
