@@ -573,6 +573,28 @@ fn test_load_repo_key_master_identity_success() {
 }
 
 #[test]
+fn test_load_repo_key_ignores_arbitrary_master_encrypted_age_blob() {
+    let tmp = tempfile::TempDir::new().expect("temp dir");
+    let repo_root = tmp.path();
+    let master_identity = age::x25519::Identity::generate();
+    let expected_key_bytes = setup_repo_with_age_key(repo_root, &master_identity);
+
+    // A contributor who knows the public owner recipient can create an age
+    // blob decryptable by the master, but it is not a repository-key source.
+    let attacker_key: [u8; 32] = rand::random();
+    let attacker_blob = encrypt_for_recipient(&master_identity.to_public(), &attacker_key);
+    fs::write(make_keys_dir(repo_root).join("attacker.age"), attacker_blob)
+        .expect("write attacker blob");
+
+    let (mut security, _guard) = init_security_with_repo(repo_root);
+    security.add_memory_identity(master_identity);
+    let loaded = security
+        .load_repo_key()
+        .expect("canonical repo key should remain authoritative");
+    assert_eq!(loaded.get_key(), expected_key_bytes.as_slice());
+}
+
+#[test]
 #[ignore]
 fn test_load_repo_key_machine_key_env_var() {
     let tmp = tempfile::TempDir::new().expect("temp dir");

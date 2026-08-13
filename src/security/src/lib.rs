@@ -744,11 +744,33 @@ impl WardenSecurity {
     /// Revoke a recipient's access to this repo by removing their key files
     /// List all authorized recipients in the current repository
     /// List all team members (aliases)
+    ///
+    /// Direct operator access uses the canonical repo-key name or the
+    /// recipient-named delegation emitted by `authorize_recipient`. Do not
+    /// scan every `.age` file: a contributor could otherwise add an age blob
+    /// encrypted to the owner's public key, make it decrypt to an arbitrary
+    /// 32-byte value, and potentially make it the HMAC/AEAD trust key for a
+    /// forged recipient authorization sidecar.
+    fn is_direct_repo_key_candidate(
+        path: &Path,
+        identity: &x25519::Identity,
+    ) -> bool {
+        let Some(filename) = path.file_name().and_then(|name| name.to_str()) else {
+            return false;
+        };
+        filename == "repo.key.age"
+            || filename == "repo.age"
+            || filename == "owner.age"
+            || filename == format!("{}.age", identity.to_public())
+    }
+
     fn try_decrypt_directory(&self, dir: &Path, identity: &x25519::Identity) -> Result<RepoKey> {
         for entry in fs::read_dir(dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().and_then(|s| s.to_str()) == Some("age") {
+            if path.extension().and_then(|s| s.to_str()) == Some("age")
+                && Self::is_direct_repo_key_candidate(&path, identity)
+            {
                 if let Ok(repo_key) = self.try_decrypt_key_file(&path, identity) {
                     return Ok(repo_key);
                 }
