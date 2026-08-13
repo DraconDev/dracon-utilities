@@ -850,6 +850,34 @@ impl WardenSecurity {
     /// The repo-key ciphertext and DH ciphertext provide confidentiality, but
     /// the owner signature is the authentication boundary: a delegated
     /// recipient can derive the DH key, while only the owner can sign.
+    /// Ensure an authorization sidecar uses the current V2 owner-signature
+    /// format. Returns `false` when the existing sidecar is already current,
+    /// and upgrades a legacy/tampered regular sidecar when the caller is an
+    /// explicit owner authorization operation.
+    pub(crate) fn ensure_repo_recipient_authorization(
+        &self,
+        repo_key: &RepoKey,
+        public_path: &Path,
+        role: &str,
+        recipient: &x25519::Recipient,
+    ) -> Result<bool> {
+        if self.verify_repo_recipient_authorization(public_path, recipient, repo_key) {
+            return Ok(false);
+        }
+        let auth_path = recipient_authorization_path(public_path);
+        match fs::symlink_metadata(&auth_path) {
+            Ok(metadata) if metadata.file_type().is_file() => fs::remove_file(&auth_path)?,
+            Ok(_) => anyhow::bail!(
+                "refusing to replace non-regular recipient authorization {}",
+                auth_path.display()
+            ),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.into()),
+        }
+        self.write_repo_recipient_authorization(repo_key, public_path, role, recipient)?;
+        Ok(true)
+    }
+
     pub(crate) fn write_repo_recipient_authorization(
         &self,
         repo_key: &RepoKey,

@@ -167,10 +167,8 @@ impl WardenSecurity {
                 anyhow::bail!("existing team public key must be a regular file")
             }
             let existing = fs::read_to_string(&pub_key_path).unwrap_or_default();
-            if existing.trim() == recipient.to_string()
-                && !pub_key_path.with_extension("auth").exists()
-            {
-                self.write_repo_recipient_authorization(
+            if existing.trim() == recipient.to_string() {
+                self.ensure_repo_recipient_authorization(
                     &repo_key,
                     &pub_key_path,
                     "team",
@@ -185,8 +183,8 @@ impl WardenSecurity {
         self.encrypt_and_save_key(&repo_key, &recipient, &key_path)?;
 
         // The public file is contributor-visible, so its basename is not an
-        // authorization signal. Store a repo-key-authenticated sidecar that
-        // binds this exact team recipient to the authorization operation.
+        // authorization signal. Store an owner-signed sidecar that binds this
+        // exact team recipient to the authorization operation.
         self.write_repo_public_recipient(&pub_key_path, &recipient)?;
         self.write_repo_recipient_authorization(
             &repo_key,

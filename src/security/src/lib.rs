@@ -674,6 +674,41 @@ impl WardenSecurity {
 
         let output_path = keys_dir.join(format!("{}.age", recipient));
         let public_path = keys_dir.join(format!("{}.pub", recipient));
+        let output_exists = match fs::symlink_metadata(&output_path) {
+            Ok(metadata) if metadata.file_type().is_file() => true,
+            Ok(_) => anyhow::bail!("refusing to overwrite non-regular recipient delegation"),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
+            Err(error) => return Err(error.into()),
+        };
+        let public_exists = match fs::symlink_metadata(&public_path) {
+            Ok(metadata) if metadata.file_type().is_file() => {
+                let existing = fs::read_to_string(&public_path)?;
+                if existing.trim() != recipient.to_string() {
+                    anyhow::bail!("recipient public key already names a different recipient")
+                }
+                true
+            }
+            Ok(_) => anyhow::bail!("refusing to overwrite non-regular recipient public key"),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
+            Err(error) => return Err(error.into()),
+        };
+
+        // An explicit owner reauthorization upgrades a legacy or old-V2
+        // sidecar without replacing the delegated age ciphertext. This keeps
+        // existing direct recipients usable after the V2 owner-signature
+        // format change while refusing ambiguous partial pairs.
+        if output_exists {
+            if !public_exists {
+                anyhow::bail!("existing recipient delegation has no public pair")
+            }
+            self.ensure_repo_recipient_authorization(
+                &repo_key,
+                &public_path,
+                "direct",
+                recipient,
+            )?;
+            return Ok(());
+        }
 
         // Encrypt the repo key for the recipient. The recipient-named pair is
         // accepted by discovery only with the owner-signed authorization
@@ -704,8 +739,10 @@ impl WardenSecurity {
                 .open(&output_path)?
                 .write_all(&encrypted)?;
         }
-        self.write_repo_public_recipient(&public_path, recipient)?;
-        self.write_repo_recipient_authorization(
+        if !public_exists {
+            self.write_repo_public_recipient(&public_path, recipient)?;
+        }
+        self.ensure_repo_recipient_authorization(
             &repo_key,
             &public_path,
             "direct",
