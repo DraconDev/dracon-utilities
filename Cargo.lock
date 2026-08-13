@@ -911,6 +911,7 @@ dependencies = [
  "tempfile",
  "uuid",
  "walkdir",
+ "x25519-dalek",
  "zeroize",
 ]
 
