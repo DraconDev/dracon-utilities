@@ -2422,6 +2422,35 @@ API_KEY=secret"#;
         );
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn test_gather_all_recipients_rejects_symlinked_repo_recipient_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        let home = tmp.path().join("home");
+        let repo = tmp.path().join("repo");
+        let repo_keys = repo.join(".dracon/data/keys");
+        fs::create_dir_all(&repo_keys).unwrap();
+
+        let evil = x25519::Identity::generate();
+        let owner = x25519::Identity::generate();
+        let outside = tmp.path().join("evil.pub");
+        fs::write(&outside, evil.to_public().to_string()).unwrap();
+        std::os::unix::fs::symlink(&outside, repo_keys.join("owner_evil.pub")).unwrap();
+
+        let mut security = WardenSecurity::new(Some(&repo)).unwrap();
+        security.set_mock_home(home);
+        security.master_identities.clear();
+        security.master_identities.push(owner);
+
+        let recipients = security.gather_all_recipients().unwrap();
+        assert!(
+            !recipients
+                .iter()
+                .any(|recipient| recipient.to_string() == evil.to_public().to_string()),
+            "a symlinked repository recipient file must be rejected"
+        );
+    }
+
     #[test]
     fn test_encrypt_v2_decrypt_v2_roundtrip() {
         let security = test_security_with_identity();
