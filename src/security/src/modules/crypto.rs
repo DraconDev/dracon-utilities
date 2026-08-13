@@ -238,6 +238,7 @@ static WARNED_UNTRUSTED_REPO_FILE: AtomicBool = AtomicBool::new(false);
 static WARNED_SUSPICIOUS_FILE: AtomicBool = AtomicBool::new(false);
 
 #[cfg(test)]
+#[allow(clippy::items_after_test_module)]
 mod authorization_tests {
     use super::*;
     use std::fs;
