@@ -212,16 +212,21 @@ Repository `.dracon/data/keys/` and legacy `.git/arcane/keys/` files are
 not trusted by filename alone. `gather_all_recipients` accepts canonical
 `owner_*.pub`/`master.pub` candidates only when their single valid age
 recipient matches a local owner trust anchor. `whitelist_machine` and
-`add_team_member` write machine/team `.pub` files with a repo-key-encrypted
-`.auth` sidecar bound to the exact filename and recipient; the matching `.age`
-delegation must also exist before those recipients are included. Arbitrary
+`add_team_member` write machine/team `.pub` files with a versioned `.auth`
+envelope bound to the exact filename, recipient, and repository-key
+commitment; it also carries an owner-DH proof so machine-only
+`ARCANE_MACHINE_KEY` discovery cannot bless an attacker-chosen repo key. The
+matching `.age` delegation must also exist before those recipients are
+included. `authorize_recipient` uses the same owner-authenticated proof for
+recipient-named `.pub`/`.age` pairs. Arbitrary
 contributor-added files, missing/tampered proofs, and symlinked repository key
 directories are rejected. HOME key files remain operator-trusted only when
 the HOME key directory does not overlap the repository's physical key paths.
 Existing machine/team files created before authenticated sidecars must be
 explicitly re-authorized through the same API (same recipient and alias) before
 they participate in future encryption; the API adds the missing proof in place
-without silently trusting the legacy pair.
+without silently trusting the legacy pair. Machine-only consumers require the
+new owner-DH envelope; legacy repo-key-only sidecars must be reissued.
 ```
 
 ### Key Generation
@@ -249,8 +254,8 @@ Team keys allow multiple users to access the same encrypted secrets:
 The `.auth` proof is deliberately repository-key authenticated. A contributor
 may propose or push a `.pub` file, but cannot authorize a new recipient merely
 by choosing an alias. Legacy `.pub`/`.age` pairs without a proof must be explicitly re-authorized
-by the operator with the same recipient and alias; the API adds the proof in
-place after repository-key access is established.
+by the operator with the same recipient and alias; the API adds the owner-
+authenticated proof in place after repository-key access is established.
 
 ## How It Works
 

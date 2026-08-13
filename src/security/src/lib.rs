@@ -668,8 +668,11 @@ impl WardenSecurity {
         std::fs::create_dir_all(&keys_dir)?;
 
         let output_path = keys_dir.join(format!("{}.age", recipient));
+        let public_path = keys_dir.join(format!("{}.pub", recipient));
 
-        // Encrypt the repo key for the recipient
+        // Encrypt the repo key for the recipient. The recipient-named pair is
+        // accepted by discovery only with the owner-DH authorization proof
+        // written below; a contributor cannot forge it from public data.
         let recipients: Vec<Box<dyn age::Recipient + Send>> = vec![Box::new(recipient.clone())];
         let encryptor =
             age::Encryptor::with_recipients(recipients).context("failed to create encryptor")?;
@@ -679,7 +682,40 @@ impl WardenSecurity {
         writer.write_all(&repo_key.0)?;
         writer.finish()?;
 
-        std::fs::write(&output_path, &encrypted)?;
+        #[cfg(unix)]
+        {
+            fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(0o600)
+                .open(&output_path)?
+                .write_all(&encrypted)?;
+            fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(0o644)
+                .open(&public_path)?
+                .write_all(recipient.to_string().as_bytes())?;
+        }
+        #[cfg(not(unix))]
+        {
+            fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&output_path)?
+                .write_all(&encrypted)?;
+            fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&public_path)?
+                .write_all(recipient.to_string().as_bytes())?;
+        }
+        self.write_repo_recipient_authorization(
+            &repo_key,
+            &public_path,
+            "direct",
+            recipient,
+        )?;
         Ok(())
     }
 
@@ -802,19 +838,64 @@ impl WardenSecurity {
     }
 
     fn try_decrypt_directory(&self, dir: &Path, identity: &x25519::Identity) -> Result<RepoKey> {
+        let dir_metadata = fs::symlink_metadata(dir)?;
+        if dir_metadata.file_type().is_symlink() {
+            return Err(anyhow::anyhow!(
+                "repository key directory must not be a symlink"
+            ));
+        }
+        let identity_recipient = identity.to_public();
         for entry in fs::read_dir(dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().and_then(|s| s.to_str()) == Some("age")
-                && Self::is_direct_repo_key_candidate(&path, identity)
+            let metadata = fs::symlink_metadata(&path)?;
+            if !metadata.file_type().is_file()
+                || path.extension().and_then(|s| s.to_str()) != Some("age")
+                || !Self::is_direct_repo_key_candidate(&path, identity)
             {
-                if let Ok(repo_key) = self.try_decrypt_key_file(&path, identity) {
-                    return Ok(repo_key);
-                }
+                continue;
             }
+            let is_recipient_named = path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .map(|name| name == format!("{}.age", identity_recipient))
+                .unwrap_or(false);
+            let Ok(repo_key) = self.try_decrypt_key_file(&path, identity) else {
+                continue;
+            };
+            if !is_recipient_named {
+                return Ok(repo_key);
+            }
+
+            let pub_path = path.with_extension("pub");
+            if !matches!(
+                fs::symlink_metadata(&pub_path),
+                Ok(metadata) if metadata.file_type().is_file()
+            ) {
+                continue;
+            }
+            let Ok(public_content) = fs::read_to_string(&pub_path) else {
+                continue;
+            };
+            let Some(recipient) = modules::crypto::parse_single_repo_recipient(&public_content)
+            else {
+                continue;
+            };
+            if recipient != identity_recipient
+                || !self.verify_owner_recipient_authorization(
+                    &pub_path,
+                    &recipient,
+                    identity,
+                    &repo_key,
+                    "direct",
+                )
+            {
+                continue;
+            }
+            return Ok(repo_key);
         }
         Err(anyhow::anyhow!(
-            "No matching key found in directory for this identity"
+            "No authenticated matching key found in directory for this identity"
         ))
     }
 

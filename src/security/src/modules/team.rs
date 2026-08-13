@@ -340,32 +340,43 @@ impl WardenSecurity {
         ];
 
         for dir in search_paths {
-            if dir.exists() {
-                if let Ok(entries) = fs::read_dir(dir) {
-                    for entry in entries.flatten() {
-                        let path = entry.path();
-                        let ext = path.extension().and_then(|s| s.to_str()).unwrap_or("");
-                        if ext == "pub" || ext == "key" {
-                            if let Ok(content) = fs::read_to_string(&path) {
-                                let name = path
-                                    .file_stem()
-                                    .and_then(|s| s.to_str())
-                                    .unwrap_or("unknown")
-                                    .to_string();
-                                for line in content.lines() {
-                                    let line = line.trim();
-                                    let Ok(recipient) = line.parse::<x25519::Recipient>() else {
-                                        continue;
-                                    };
-                                    let recipient = recipient.to_string();
-                                    if authorized.contains(&recipient)
-                                        && seen.insert(recipient.clone())
-                                    {
-                                        recipients.push((name.clone(), recipient));
-                                    }
-                                }
-                            }
-                        }
+            if !matches!(
+                fs::symlink_metadata(&dir),
+                Ok(metadata) if metadata.file_type().is_dir()
+            ) {
+                continue;
+            }
+            let Ok(entries) = fs::read_dir(dir) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if !matches!(
+                    fs::symlink_metadata(&path),
+                    Ok(metadata) if metadata.file_type().is_file()
+                ) {
+                    continue;
+                }
+                let ext = path.extension().and_then(|s| s.to_str()).unwrap_or("");
+                if ext != "pub" && ext != "key" {
+                    continue;
+                }
+                let Ok(content) = fs::read_to_string(&path) else {
+                    continue;
+                };
+                let name = path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("unknown")
+                    .to_string();
+                for line in content.lines() {
+                    let line = line.trim();
+                    let Ok(recipient) = line.parse::<x25519::Recipient>() else {
+                        continue;
+                    };
+                    let recipient = recipient.to_string();
+                    if authorized.contains(&recipient) && seen.insert(recipient.clone()) {
+                        recipients.push((name.clone(), recipient));
                     }
                 }
             }
@@ -385,7 +396,10 @@ impl WardenSecurity {
         let repo_root = self.get_repo_root()?;
         let keys_dir = repo_root.join(".git").join("arcane").join("keys");
 
-        if !keys_dir.exists() {
+        if !matches!(
+            fs::symlink_metadata(&keys_dir),
+            Ok(metadata) if metadata.file_type().is_dir()
+        ) {
             return Ok(Vec::new());
         }
 
@@ -393,6 +407,12 @@ impl WardenSecurity {
         for entry in fs::read_dir(keys_dir)? {
             let entry = entry?;
             let path = entry.path();
+            if !matches!(
+                fs::symlink_metadata(&path),
+                Ok(metadata) if metadata.file_type().is_file()
+            ) {
+                continue;
+            }
             if path.extension().and_then(|s| s.to_str()) == Some("age") {
                 if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
                     if authorized_names.contains(name)

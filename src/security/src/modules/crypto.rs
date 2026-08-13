@@ -21,6 +21,7 @@ use crate::WardenSecurity;
 
 const HEADER_V2_MAGIC: &[u8] = b"age-encryption.org/v1";
 const RECIPIENT_AUTH_VERSION: u8 = 2;
+const RECIPIENT_AUTH_ROLE_DIRECT: &str = "direct";
 const RECIPIENT_AUTH_ROLE_MACHINE: &str = "machine";
 const RECIPIENT_AUTH_ROLE_TEAM: &str = "team";
 const MAX_RECIPIENT_AUTH_BYTES: usize = 4096;
@@ -128,6 +129,9 @@ fn recipient_proof_key(
     let secret = StaticSecret::from(identity_bytes);
     let public = PublicKey::from(recipient_bytes);
     let shared = secret.diffie_hellman(&public);
+    if shared.as_bytes().iter().all(|byte| *byte == 0) {
+        return None;
+    }
     let mut hasher = Sha256::new();
     hasher.update(b"dracon-warden recipient authorization v1");
     hasher.update(shared.as_bytes());
@@ -145,14 +149,16 @@ fn authorization_matches(
         return false;
     };
     matches!(auth.version, 1 | RECIPIENT_AUTH_VERSION)
-        && required_role.map_or(true, |role| auth.role == role)
+        && required_role.is_none_or(|role| auth.role == role)
         && (auth.version == 1
             || expected_repo_key.is_some_and(|repo_key| {
                 auth.repo_key_commitment == repo_key_commitment(repo_key)
             }))
         && matches!(
             auth.role.as_str(),
-            RECIPIENT_AUTH_ROLE_MACHINE | RECIPIENT_AUTH_ROLE_TEAM
+            RECIPIENT_AUTH_ROLE_DIRECT
+                | RECIPIENT_AUTH_ROLE_MACHINE
+                | RECIPIENT_AUTH_ROLE_TEAM
         )
         && auth.file_name == file_name
         && auth.recipient == recipient.to_string()
@@ -473,6 +479,12 @@ impl WardenSecurity {
         repo_key: &RepoKey,
     ) -> bool {
         let auth_path = recipient_authorization_path(public_path);
+        let Ok(auth_metadata) = fs::symlink_metadata(&auth_path) else {
+            return false;
+        };
+        if !auth_metadata.file_type().is_file() {
+            return false;
+        }
         let Ok(auth_bytes) = fs::read(&auth_path) else {
             return false;
         };
@@ -506,18 +518,19 @@ impl WardenSecurity {
         authorization_matches(&auth, public_path, recipient, None, Some(repo_key))
     }
 
-    /// Verify the owner-DH proof when the local process only has a machine
-    /// identity (the `ARCANE_MACHINE_KEY` path). The repo key cannot be used
-    /// as its own trust anchor: a contributor could otherwise forge both an
-    /// arbitrary machine `.age` blob and a proof encrypted under that chosen
-    /// value. The owner public recipient is the trust anchor, and the proof
-    /// requires the corresponding owner private key on the authorizing side.
-    pub(crate) fn verify_machine_recipient_authorization(
+    /// Verify the owner-DH proof when the local process only has a delegated
+    /// identity. The repo key cannot be its own trust anchor: a contributor
+    /// could otherwise forge both an arbitrary `.age` blob and a proof under
+    /// that chosen value. The owner public recipient is the trust anchor, and
+    /// the proof requires the corresponding owner private key on the writing
+    /// side.
+    pub(crate) fn verify_owner_recipient_authorization(
         &self,
         public_path: &Path,
         recipient: &x25519::Recipient,
-        machine_identity: &x25519::Identity,
+        delegated_identity: &x25519::Identity,
         repo_key: &RepoKey,
+        required_role: &str,
     ) -> bool {
         let Some(envelope) = self.read_authorization_envelope(public_path) else {
             return false;
@@ -536,7 +549,7 @@ impl WardenSecurity {
             let Ok(owner_public) = owner_proof.signer.parse::<x25519::Recipient>() else {
                 continue;
             };
-            let Some(proof_key) = recipient_proof_key(machine_identity, &owner_public) else {
+            let Some(proof_key) = recipient_proof_key(delegated_identity, &owner_public) else {
                 continue;
             };
             let Ok(plaintext) = self.decrypt_with_repo_key(&proof_key, &owner_proof.ciphertext)
@@ -550,13 +563,29 @@ impl WardenSecurity {
                 &auth,
                 public_path,
                 recipient,
-                Some(RECIPIENT_AUTH_ROLE_MACHINE),
+                Some(required_role),
                 Some(repo_key),
             ) {
                 return true;
             }
         }
         false
+    }
+
+    pub(crate) fn verify_machine_recipient_authorization(
+        &self,
+        public_path: &Path,
+        recipient: &x25519::Recipient,
+        machine_identity: &x25519::Identity,
+        repo_key: &RepoKey,
+    ) -> bool {
+        self.verify_owner_recipient_authorization(
+            public_path,
+            recipient,
+            machine_identity,
+            repo_key,
+            RECIPIENT_AUTH_ROLE_MACHINE,
+        )
     }
 
     /// Write an authenticated authorization sidecar for a machine/team public
@@ -570,7 +599,12 @@ impl WardenSecurity {
         role: &str,
         recipient: &x25519::Recipient,
     ) -> Result<()> {
-        if !matches!(role, RECIPIENT_AUTH_ROLE_MACHINE | RECIPIENT_AUTH_ROLE_TEAM) {
+        if !matches!(
+            role,
+            RECIPIENT_AUTH_ROLE_DIRECT
+                | RECIPIENT_AUTH_ROLE_MACHINE
+                | RECIPIENT_AUTH_ROLE_TEAM
+        ) {
             anyhow::bail!("invalid repository recipient authorization role")
         }
         if self.master_identities.is_empty() {

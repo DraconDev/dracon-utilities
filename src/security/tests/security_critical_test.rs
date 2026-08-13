@@ -606,6 +606,90 @@ fn test_load_repo_key_master_identity_success() {
     assert_eq!(loaded.get_key(), expected_key_bytes.as_slice());
 }
 
+#[cfg(unix)]
+#[test]
+fn test_list_authorized_recipients_rejects_symlink_aliases() {
+    let _guard = HomeGuard::new();
+    let tmp = tempfile::TempDir::new().expect("temp dir");
+    let repo_root = tmp.path();
+    let master_identity = age::x25519::Identity::generate();
+    let _repo_key = setup_repo_with_age_key(repo_root, &master_identity);
+    let repo_owner_dir = repo_root.join(".dracon/data/keys");
+    fs::create_dir_all(&repo_owner_dir).expect("create owner directory");
+    let owner_path = repo_owner_dir.join("owner_good.pub");
+    fs::write(&owner_path, master_identity.to_public().to_string()).expect("write owner key");
+    std::os::unix::fs::symlink(&owner_path, repo_owner_dir.join("evil.pub"))
+        .expect("write symlink alias");
+
+    let mut security = dracon_security::WardenSecurity::new(Some(repo_root))
+        .expect("init security");
+    security.add_memory_identity(master_identity);
+    let listed = security
+        .list_authorized_recipients()
+        .expect("list authorized recipients");
+    assert!(listed.iter().any(|(name, _)| name == "owner_good"));
+    assert!(!listed.iter().any(|(name, _)| name == "evil"));
+}
+
+#[test]
+fn test_authorize_recipient_writes_verified_direct_pair() {
+    let _guard = HomeGuard::new();
+    let tmp = tempfile::TempDir::new().expect("temp dir");
+    let repo_root = tmp.path();
+    let home = std::env::var("HOME").map(std::path::PathBuf::from).unwrap();
+    let home_keys = home.join(".dracon/data/keys");
+    fs::create_dir_all(&home_keys).expect("create owner trust anchors");
+
+    let owner_identity = age::x25519::Identity::generate();
+    let repo_key = setup_repo_with_age_key(repo_root, &owner_identity);
+    fs::write(
+        home_keys.join("owner_operator.pub"),
+        owner_identity.to_public().to_string(),
+    )
+    .expect("write owner trust anchor");
+
+    let recipient_identity = age::x25519::Identity::generate();
+    let mut owner_security = dracon_security::WardenSecurity::new(Some(repo_root))
+        .expect("init owner security");
+    owner_security.add_memory_identity(owner_identity.clone());
+    owner_security
+        .authorize_recipient(&recipient_identity.to_public())
+        .expect("authorize direct recipient");
+
+    let keys_dir = make_keys_dir(repo_root);
+    let direct_age = keys_dir.join(format!("{}.age", recipient_identity.to_public()));
+    let direct_pub = direct_age.with_extension("pub");
+    let direct_auth = direct_age.with_extension("auth");
+    assert!(direct_age.is_file() && direct_pub.is_file() && direct_auth.is_file());
+
+    let mut recipient_security = dracon_security::WardenSecurity::new(Some(repo_root))
+        .expect("init recipient security");
+    recipient_security.add_memory_identity(recipient_identity);
+    let loaded = recipient_security
+        .load_repo_key()
+        .expect("recipient should load verified direct delegation");
+    assert_eq!(loaded.get_key(), repo_key.as_slice());
+
+    // A contributor-chosen owner-named blob without the owner proof is not a
+    // fallback source, even when the owner private identity can decrypt it.
+    let attacker_key: [u8; 32] = rand::random();
+    let owner_age = keys_dir.join(format!("{}.age", owner_identity.to_public()));
+    fs::write(
+        &owner_age,
+        encrypt_for_recipient(&owner_identity.to_public(), &attacker_key),
+    )
+    .expect("write owner-named attacker blob");
+    fs::write(
+        owner_age.with_extension("pub"),
+        owner_identity.to_public().to_string(),
+    )
+    .expect("write owner-named public recipient");
+    let loaded = owner_security
+        .load_repo_key()
+        .expect("canonical repo key should remain usable");
+    assert_eq!(loaded.get_key(), repo_key.as_slice());
+}
+
 #[test]
 fn test_machine_only_repo_key_requires_owner_authenticated_proof() {
     let _guard = HomeGuard::new();
