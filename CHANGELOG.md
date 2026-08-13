@@ -10,15 +10,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **Repository recipient files are now authorization-checked, not merely
-  name-checked**: `gather_all_recipients` still supports the canonical
-  `owner_*.pub`/`master.pub` repository candidates, but accepts them only when
-  they contain exactly one valid age recipient that matches a local owner
-  trust anchor. A contributor can no longer add `owner_evil.pub` and silently
-  grant that key access to future encryptions. Both `.dracon/data/keys` and
-  legacy `.git/arcane/keys` are covered; HOME key files remain the operator's
-  explicit trust domain. Regression coverage includes attacker-controlled
-  canonical names in both repository paths, secret-material and oversized
-  canonical files, and the HOME compatibility path.
+  name-checked**: `gather_all_recipients` accepts canonical
+  `owner_*.pub`/`master.pub` candidates only when they contain exactly one
+  valid age recipient matching a local owner trust anchor. Machine/team
+  recipients written by `whitelist_machine` and `add_team_member` retain
+  support through repo-key-authenticated `.auth` sidecars bound to the exact
+  public filename and recipient, with a matching `.age` delegation required.
+  A contributor can no longer add `owner_evil.pub` or an arbitrary delegated
+  file and silently grant that key access to future encryptions. HOME key
+  directories are permissive only when they do not physically overlap the
+  repository key paths; repository-root and symlink overlap is fail-closed.
+  Both `.dracon/data/keys` and legacy `.git/arcane/keys` are covered, with
+  regressions for canonical attackers, secret/oversized/multiline files,
+  missing/tampered proofs, missing delegation files, and HOME overlap.
 
 - **Team key creation is now private and race-safe**: `create_team` uses
   exclusive file creation with mode `0600` on Unix, matching invite

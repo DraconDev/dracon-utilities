@@ -2370,6 +2370,36 @@ API_KEY=secret"#;
         );
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn test_gather_all_recipients_rejects_symlinked_repo_key_directory() {
+        let tmp = tempfile::tempdir().unwrap();
+        let home = tmp.path().join("home");
+        let repo = tmp.path().join("repo");
+        let home_keys = home.join(".dracon/data/keys");
+        let repo_data = repo.join(".dracon/data");
+        fs::create_dir_all(&home_keys).unwrap();
+        fs::create_dir_all(&repo_data).unwrap();
+
+        let evil = x25519::Identity::generate();
+        let owner = x25519::Identity::generate();
+        fs::write(home_keys.join("owner_evil.pub"), evil.to_public().to_string()).unwrap();
+        std::os::unix::fs::symlink(&home_keys, repo_data.join("keys")).unwrap();
+
+        let mut security = WardenSecurity::new(Some(&repo)).unwrap();
+        security.set_mock_home(home);
+        security.master_identities.clear();
+        security.master_identities.push(owner);
+
+        let recipients = security.gather_all_recipients().unwrap();
+        assert!(
+            !recipients
+                .iter()
+                .any(|recipient| recipient.to_string() == evil.to_public().to_string()),
+            "a repository key-directory symlink must not re-enable permissive HOME loading"
+        );
+    }
+
     #[test]
     fn test_encrypt_v2_decrypt_v2_roundtrip() {
         let security = test_security_with_identity();

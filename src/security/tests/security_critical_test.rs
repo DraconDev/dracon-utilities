@@ -448,6 +448,10 @@ fn test_machine_and_team_recipients_require_authenticated_sidecars() {
         .collect::<String>();
     let machine_pub_path = keys_dir.join(format!("machine:{}.pub", machine_safe_name));
     let team_pub_path = keys_dir.join("build-team.pub");
+    let team_age_path = team_pub_path.with_extension("age");
+    let team_auth_path = team_pub_path.with_extension("auth");
+    let team_age = fs::read(&team_age_path).expect("read team authorization");
+    let team_auth = fs::read(&team_auth_path).expect("read team proof");
     assert!(
         machine_pub_path.with_extension("auth").exists(),
         "machine authorization must write an authenticated sidecar"
@@ -460,6 +464,27 @@ fn test_machine_and_team_recipients_require_authenticated_sidecars() {
     let recipients = security.gather_all_recipients().expect("gather authorized");
     assert!(recipients.iter().any(|r| r.to_string() == machine_public));
     assert!(recipients.iter().any(|r| r.to_string() == team_public));
+
+    // The proof is not sufficient without the corresponding delegated age
+    // key, and tampering or adding a second recipient invalidates the file.
+    fs::remove_file(&team_age_path).expect("remove team age key");
+    let recipients = security.gather_all_recipients().expect("gather missing age");
+    assert!(!recipients.iter().any(|r| r.to_string() == team_public));
+    fs::write(&team_age_path, &team_age).expect("restore team age key");
+
+    let mut tampered_auth = team_auth.clone();
+    tampered_auth[0] ^= 1;
+    fs::write(&team_auth_path, tampered_auth).expect("tamper team proof");
+    let recipients = security.gather_all_recipients().expect("gather tampered proof");
+    assert!(!recipients.iter().any(|r| r.to_string() == team_public));
+    fs::write(&team_auth_path, &team_auth).expect("restore team proof");
+
+    let other = age::x25519::Identity::generate();
+    fs::write(&team_pub_path, format!("{}\n{}\n", team_public, other.to_public()))
+        .expect("write multiline team recipient");
+    let recipients = security.gather_all_recipients().expect("gather multiline recipient");
+    assert!(!recipients.iter().any(|r| r.to_string() == team_public));
+    fs::write(&team_pub_path, &team_public).expect("restore team recipient");
 
     // Removing the proof must revoke the recipient from future encryption,
     // even though the contributor-visible .pub and .age files remain.

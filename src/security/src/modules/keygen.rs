@@ -160,6 +160,28 @@ impl WardenSecurity {
         let machine_file = keys_dir.join(format!("machine:{}.age", safe_name));
         let pub_file = keys_dir.join(format!("machine:{}.pub", safe_name));
 
+        // Legacy machine entries predate the authenticated sidecar. An
+        // operator who explicitly re-authorizes the same recipient can add
+        // the proof in place; arbitrary existing files are never trusted
+        // automatically.
+        if machine_file.exists() {
+            let existing = fs::read_to_string(&pub_file).unwrap_or_default();
+            if existing.trim() == recipient.to_string()
+                && !pub_file.with_extension("auth").exists()
+            {
+                self.write_repo_recipient_authorization(
+                    &repo_key,
+                    &pub_file,
+                    "machine",
+                    &recipient,
+                )?;
+                return Ok(());
+            }
+            return Err(anyhow::anyhow!(
+                "machine authorization already exists; refuse to overwrite it"
+            ));
+        }
+
         self.encrypt_and_save_key(&repo_key, &recipient, &machine_file)?;
 
         // The public file is contributor-visible, so its basename is not an

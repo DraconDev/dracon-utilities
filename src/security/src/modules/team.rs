@@ -145,6 +145,22 @@ impl WardenSecurity {
         let pub_key_path = keys_dir.join(format!("{}.pub", alias));
 
         if key_path.exists() {
+            // Legacy team entries predate the authenticated sidecar. An
+            // operator who explicitly re-authorizes the same recipient can
+            // add the proof in place; arbitrary existing files are never
+            // trusted automatically.
+            let existing = fs::read_to_string(&pub_key_path).unwrap_or_default();
+            if existing.trim() == recipient.to_string()
+                && !pub_key_path.with_extension("auth").exists()
+            {
+                self.write_repo_recipient_authorization(
+                    &repo_key,
+                    &pub_key_path,
+                    "team",
+                    &recipient,
+                )?;
+                return Ok(());
+            }
             return Err(anyhow::anyhow!("Member '{}' already exists", alias));
         }
 
@@ -306,6 +322,14 @@ impl WardenSecurity {
     }
 
     pub fn list_authorized_recipients(&self) -> Result<Vec<(String, String)>> {
+        // Reuse the same trust classifier as encryption. A listing must not
+        // present contributor-added files as authorized when gather would
+        // correctly reject them.
+        let authorized = self
+            .gather_all_recipients()?
+            .into_iter()
+            .map(|recipient| recipient.to_string())
+            .collect::<std::collections::HashSet<_>>();
         let repo_root = self.get_repo_root()?;
         let mut recipients = Vec::new();
         let mut seen = std::collections::HashSet::new();
@@ -330,11 +354,14 @@ impl WardenSecurity {
                                     .to_string();
                                 for line in content.lines() {
                                     let line = line.trim();
-                                    if !line.is_empty()
-                                        && !line.starts_with('#')
-                                        && seen.insert(line.to_string())
+                                    let Ok(recipient) = line.parse::<x25519::Recipient>() else {
+                                        continue;
+                                    };
+                                    let recipient = recipient.to_string();
+                                    if authorized.contains(&recipient)
+                                        && seen.insert(recipient.clone())
                                     {
-                                        recipients.push((name.clone(), line.to_string()));
+                                        recipients.push((name.clone(), recipient));
                                     }
                                 }
                             }

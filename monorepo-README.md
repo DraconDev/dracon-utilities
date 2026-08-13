@@ -209,10 +209,19 @@ owner_key = "~/.dracon/keys/owner.age"
 ~/.dracon/data/keys/owner_*.pub  — Local owner recipient trust anchors
 
 Repository `.dracon/data/keys/` and legacy `.git/arcane/keys/` files are
-not trusted by filename alone: `gather_all_recipients` accepts only canonical
-`owner_*.pub`/`master.pub` candidates whose single valid age recipient matches
-a local owner trust anchor. HOME key files remain operator-trusted for
-compatibility.
+not trusted by filename alone. `gather_all_recipients` accepts canonical
+`owner_*.pub`/`master.pub` candidates only when their single valid age
+recipient matches a local owner trust anchor. `whitelist_machine` and
+`add_team_member` write machine/team `.pub` files with a repo-key-encrypted
+`.auth` sidecar bound to the exact filename and recipient; the matching `.age`
+delegation must also exist before those recipients are included. Arbitrary
+contributor-added files, missing/tampered proofs, and symlinked repository key
+directories are rejected. HOME key files remain operator-trusted only when
+the HOME key directory does not overlap the repository's physical key paths.
+Existing machine/team files created before authenticated sidecars must be
+explicitly re-authorized through the same API (same recipient and alias) before
+they participate in future encryption; the API adds the missing proof in place
+without silently trusting the legacy pair.
 ```
 
 ### Key Generation
@@ -231,9 +240,17 @@ dracon-warden keygen
 Team keys allow multiple users to access the same encrypted secrets:
 
 1. Each user generates their own keypair
-2. Public keys are added to the repo's team keys list
-3. Secrets are encrypted to all team keys
-4. Any team member can decrypt secrets
+2. An operator with the repository key runs the team-member authorization API
+3. The API writes the public recipient, encrypted delegation, and authenticated
+   `.auth` proof; all three files must remain present
+4. Secrets are encrypted to all verified team keys
+5. Any authorized team member can decrypt secrets
+
+The `.auth` proof is deliberately repository-key authenticated. A contributor
+may propose or push a `.pub` file, but cannot authorize a new recipient merely
+by choosing an alias. Legacy `.pub`/`.age` pairs without a proof must be explicitly re-authorized
+by the operator with the same recipient and alias; the API adds the proof in
+place after repository-key access is established.
 
 ## How It Works
 
