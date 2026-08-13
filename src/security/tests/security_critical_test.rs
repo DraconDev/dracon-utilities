@@ -641,7 +641,8 @@ fn test_machine_only_repo_key_requires_owner_authenticated_proof() {
     let machine_age_path = keys_dir.join(format!("machine:{}.age", safe_name));
     let original_machine_age = fs::read(&machine_age_path).expect("read machine delegation");
 
-    let _machine_env = EnvRestorer::new(
+    let previous_machine_env = std::env::var("ARCANE_MACHINE_KEY").ok();
+    std::env::set_var(
         "ARCANE_MACHINE_KEY",
         machine_identity.to_string().expose_secret(),
     );
@@ -683,6 +684,11 @@ fn test_machine_only_repo_key_requires_owner_authenticated_proof() {
         machine_security.load_repo_key().is_ok(),
         "the valid authorized delegation remains usable"
     );
+    if let Some(previous) = previous_machine_env {
+        std::env::set_var("ARCANE_MACHINE_KEY", previous);
+    } else {
+        std::env::remove_var("ARCANE_MACHINE_KEY");
+    }
 }
 
 #[test]
