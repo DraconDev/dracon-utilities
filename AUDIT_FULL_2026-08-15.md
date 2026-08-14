@@ -54,6 +54,10 @@ All checks completed successfully:
 - `./scripts/test_release.sh` — 8 dispatcher checks passed
 - `./install.sh --dry-run --no-restart --binaries-only`
 - `nix flake check --no-build`
+- `nix build .#dracon-sync --no-link` — the first package build exposed a
+  read-only copied nested-checkout replacement; the flake now makes the
+  copied tree writable before installing the pinned standalone sources, and
+  the package build passes.
 - YAML parse of `.github/workflows/ci.yml`
 - `git diff --check` in the parent and all nested repositories
 
