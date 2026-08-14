@@ -28,13 +28,21 @@ else
   echo "PASS: No blocking TODO comments"
 fi
 
-# Invariant 3: GitHub feature-façade scaffold remains self-consistent
-echo "--- Invariant 3: Feature façade scaffold self-test ---"
-if ! python3 scripts/scaffold_feature_repos.py --self-test 2>&1; then
-  echo "FAIL: scripts/scaffold_feature_repos.py --self-test failed"
+# Invariant 3: the meta workspace has all nested utility repositories
+echo "--- Invariant 3: Nested utility repositories ---"
+missing=0
+for utility in dracon-sync dracon-system dracon-warden; do
+  if [[ -f "$utility/Cargo.toml" && -d "$utility/.git" ]]; then
+    echo "PASS: $utility nested repository present"
+  else
+    echo "FAIL: $utility nested repository is missing"
+    missing=$((missing + 1))
+  fi
+done
+if [[ "$missing" -ne 0 ]]; then
   failures=$((failures + 1))
 else
-  echo "PASS: Feature façade scaffold self-test"
+  echo "PASS: all nested utility repositories present"
 fi
 
 # Invariant 4: Core unit tests pass

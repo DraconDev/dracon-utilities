@@ -69,21 +69,28 @@ log() {
     fi
 }
 
-# Check for required dracon-libs sibling directory
-DRACON_LIBS="../dracon-libs"
-if [ ! -d "$DRACON_LIBS" ]; then
-    echo "ERROR: dracon-libs not found at ../dracon-libs"
-    echo ""
-    echo "This project requires dracon-libs as a sibling directory:"
-    echo "  git clone https://github.com/DraconDev/dracon-libs.git ../dracon-libs"
-    echo ""
+# Check prerequisites
+for cmd in cargo; do
+    if ! command -v "$cmd" &> /dev/null; then
+        echo "ERROR: Required command '$cmd' not found"
+        exit 1
+    fi
+done
+
+if [ "$BINARIES_ONLY" != true ] && ! command -v systemctl &> /dev/null; then
+    echo "ERROR: Required command 'systemctl' not found"
+    echo "Use --binaries-only when installing on a system without user systemd."
     exit 1
 fi
 
-# Check prerequisites
-for cmd in cargo systemctl; do
-    if ! command -v "$cmd" &> /dev/null; then
-        echo "ERROR: Required command '$cmd' not found"
+# The parent repository is a meta workspace; utility source lives in nested
+# standalone repositories.  Check their manifests before starting a build so
+# a fresh checkout gets an actionable error instead of Cargo's path error.
+for utility in dracon-sync dracon-system dracon-warden; do
+    if [ ! -f "$utility/Cargo.toml" ]; then
+        echo "ERROR: nested repository '$utility' is missing"
+        echo "Clone the standalone utility repositories under this directory;"
+        echo "see AGENTS.md for their canonical remote names."
         exit 1
     fi
 done

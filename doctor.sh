@@ -43,9 +43,10 @@ check "Bash version >= 4.0" "[[ \${BASH_VERSINFO[0]} -ge 4 ]]"
 
 echo ""
 echo "📁 Directory Structure"
-check "dracon-libs sibling directory" "[ -d ../dracon-libs ]"
-check "dracon-libs/services/crates/ exists" "[ -d ../dracon-libs/services/crates ]" false
-check "dracon-libs/tools/sync/dracon-git/ exists" "[ -d ../dracon-libs/tools/sync/dracon-git ]" false
+check "workspace manifest" "[ -f Cargo.toml ]"
+for utility in dracon-sync dracon-system dracon-warden; do
+    check "$utility nested repository" "[ -d \"$utility/.git\" ] && [ -f \"$utility/Cargo.toml\" ]"
+done
 
 echo ""
 echo "🔧 Binaries"
