@@ -205,8 +205,16 @@ These are the same 5 from the original goal question set
 
 ## Blocked on the operator
 
-The goal is not complete. The script is in place and the dry-run
-validates the flow, but the actual release cut requires:
+Historical status note (2026-08-14): the release flow described here has
+since been exercised and extended. `dracon-sync/scripts/release.sh` now runs
+the full workspace gates and verifies the packaged artifact with
+`dracon-sync/scripts/verify-install.sh` before tagging. The remaining items
+below are the original operator prerequisites for a real release cut, not
+missing implementation in the script.
+
+The goal was not complete at the time this document was written. The script
+was in place and the dry-run validated the flow, but the actual release cut
+required:
 
 - Target version (Q1)
 - Tag-signing decision (Q2) — script defaults to unsigned

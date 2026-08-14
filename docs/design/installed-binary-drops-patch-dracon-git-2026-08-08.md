@@ -89,8 +89,13 @@ workspace (published manifest must contain `[patch.crates-io]`).
    2026-08-08. The workspace now depends on `dracon-git = "94.7.2"`
    directly, with no `[patch.crates-io]` workaround or git-source
    allowlist. This closes the published-binary dependency gap.
-2. **Still recommended**: harden `scripts/release.sh` (or the install
-   step) with a post-install fixture check — run `repos --json` against
-   a scratch repo containing a gitignored `.pi/` directory and assert
-   `untracked == 0`. This remains a useful guard against future release
-   artifacts diverging from the workspace dependency graph.
+2. **Resolved**: `dracon-sync/scripts/release.sh` now packages the crate,
+   installs that packaged directory with fresh dependency resolution, and
+   runs `scripts/verify-install.sh` against the resulting binary before it
+   creates the release tag. The fixture scans only its scratch repository and
+   asserts that a gitignored `.pi/` directory produces `untracked=0`, so a
+   future published-artifact dependency regression blocks the release before
+   publication to the operator's users.
+
+   After a manual `cargo install`, operators can still run
+   `dracon-sync/scripts/verify-install.sh` as a local smoke check.
