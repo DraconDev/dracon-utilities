@@ -898,6 +898,43 @@ mod tests {
     }
 
     #[test]
+    fn linked_worktree_gitfile_uses_real_gitdir_for_checkout_lock() {
+        // Submodules and linked worktrees expose `.git` as a file, not a
+        // directory. The daemon's hardening pass must still recognize a
+        // valid checkout and coordinate through that worktree's real lock.
+        let td = TestDir::new("warden_gitfile_worktree");
+        let repo = td.path().join("repo");
+        let worktree = td.path().join("worktree");
+        fs::create_dir_all(&repo).expect("repo");
+        run_git_in(&repo, &["init", "-q", "-b", "main"]);
+        run_git_in(&repo, &["config", "user.email", "test@test.local"]);
+        run_git_in(&repo, &["config", "user.name", "test"]);
+        fs::write(repo.join("tracked.txt"), "content\n").expect("tracked file");
+        run_git_in(&repo, &["add", "tracked.txt"]);
+        run_git_in(&repo, &["commit", "--no-verify", "-q", "-m", "init"]);
+        run_git_in(
+            &repo,
+            &[
+                "worktree",
+                "add",
+                "--detach",
+                "-q",
+                worktree.to_str().expect("worktree path"),
+                "HEAD",
+            ],
+        );
+
+        assert!(worktree.join(".git").is_file(), "test must use a gitfile");
+        assert!(is_repo_checked_out(&worktree));
+
+        let lock = IndexLock::acquire(&worktree).expect("real worktree lock");
+        let lock_path = lock.path.clone();
+        assert!(lock_path.exists(), "lock must be created in the gitdir");
+        drop(lock);
+        assert!(!lock_path.exists(), "RAII lock must be removed");
+    }
+
+    #[test]
     fn install_hooks_for_repo_skips_shadowed_git_hooks() {
         // A global (or repo-local) core.hooksPath makes .git/hooks inactive.
         // Warden's global wrappers chain any pre-existing foreign hooks, so
