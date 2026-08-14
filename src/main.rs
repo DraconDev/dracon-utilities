@@ -2490,6 +2490,45 @@ enum HookMode {
     Local,
 }
 
+/// Replace a hook with a fully-written executable file in one rename.
+///
+/// Hook installation is security-sensitive: a direct `fs::write` truncates
+/// the active hook before the replacement is complete, and a failed write can
+/// leave Git with a partial enforcement script. The temporary file lives in
+/// the same directory so the final rename is atomic on the supported Unix
+/// deployments.
+fn write_hook_atomically(path: &Path, content: &str) -> Result<()> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("hook path has no parent: {}", path.display()))?;
+    let mut temp = tempfile::Builder::new()
+        .prefix(".dracon-hook-")
+        .tempfile_in(parent)
+        .with_context(|| format!("failed to create temporary hook in {}", parent.display()))?;
+    temp.write_all(content.as_bytes())
+        .with_context(|| format!("failed to write temporary hook for {}", path.display()))?;
+    temp.flush()
+        .with_context(|| format!("failed to flush temporary hook for {}", path.display()))?;
+    temp.as_file()
+        .sync_all()
+        .with_context(|| format!("failed to sync temporary hook for {}", path.display()))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        temp.as_file()
+            .set_permissions(fs::Permissions::from_mode(0o755))
+            .with_context(|| format!("failed to set permissions on {}", path.display()))?;
+    }
+    temp.persist(path).map_err(|error| {
+        anyhow::anyhow!(
+            "failed to atomically install hook {}: {}",
+            path.display(),
+            error.error
+        )
+    })?;
+    Ok(())
+}
+
 fn hook_dir(mode: HookMode, repo: Option<&Path>) -> Result<PathBuf> {
     match mode {
         HookMode::Global => {
@@ -2868,16 +2907,13 @@ fn run_setup_hooks(mode: HookMode, repo: Option<&Path>) -> Result<()> {
     let pre_push_path = dir.join("pre-push");
     let pre_rebase_path = dir.join("pre-rebase");
 
-    fs::write(&pre_commit_path, PRE_COMMIT_HOOK)
-        .with_context(|| format!("failed to write {}", pre_commit_path.display()))?;
-    fs::write(&pre_push_path, PRE_PUSH_HOOK)
-        .with_context(|| format!("failed to write {}", pre_push_path.display()))?;
+    write_hook_atomically(&pre_commit_path, PRE_COMMIT_HOOK)?;
+    write_hook_atomically(&pre_push_path, PRE_PUSH_HOOK)?;
     // ADDED 2026-07-25 (v0.113.0): the history-rewrite guard's
     // rebase side. Also clean up stale chaining artifacts from the
     // brief dracon-sync per-repo hook experiment (`.pre-dracon`
     // siblings) — warden owns this directory.
-    fs::write(&pre_rebase_path, PRE_REBASE_HOOK)
-        .with_context(|| format!("failed to write {}", pre_rebase_path.display()))?;
+    write_hook_atomically(&pre_rebase_path, PRE_REBASE_HOOK)?;
     for name in [
         "pre-commit.pre-dracon",
         "pre-push.pre-dracon",
@@ -3078,14 +3114,14 @@ fn install_hooks_for_repo(repo: &Path) -> Result<()> {
     })?;
 
     if !pre_commit_path.exists() {
-        fs::write(&pre_commit_path, PRE_COMMIT_HOOK)?;
+        write_hook_atomically(&pre_commit_path, PRE_COMMIT_HOOK)?;
     }
     if !pre_push_path.exists() {
-        fs::write(&pre_push_path, PRE_PUSH_HOOK)?;
+        write_hook_atomically(&pre_push_path, PRE_PUSH_HOOK)?;
     }
     // ADDED 2026-07-25 (v0.113.0): history-rewrite guard, rebase side.
     if !pre_rebase_path.exists() {
-        fs::write(&pre_rebase_path, PRE_REBASE_HOOK)?;
+        write_hook_atomically(&pre_rebase_path, PRE_REBASE_HOOK)?;
     }
 
     #[cfg(unix)]

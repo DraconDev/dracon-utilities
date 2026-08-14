@@ -483,6 +483,33 @@ mod tests {
         );
     }
 
+    #[test]
+    fn hook_replacement_is_atomic_and_executable() {
+        let td = TestDir::new("atomic_hook_replace");
+        let path = td.path().join("hooks/pre-commit");
+        fs::create_dir_all(path.parent().expect("hook parent")).expect("hook parent");
+        fs::write(&path, "old hook\n").expect("old hook");
+
+        write_hook_atomically(&path, "#!/bin/sh\nexit 0\n").expect("atomic hook write");
+
+        assert_eq!(
+            fs::read_to_string(&path).expect("read hook"),
+            "#!/bin/sh\nexit 0\n"
+        );
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(
+                fs::metadata(&path)
+                    .expect("hook metadata")
+                    .permissions()
+                    .mode()
+                    & 0o777,
+                0o755
+            );
+        }
+    }
+
     /// ADDED 2026-07-21 (v0.112.32, audit M31/F4.5): the clean
     /// direction must FAIL CLOSED for oversized inputs and refused
     /// paths (passthrough would commit the file UNENCRYPTED), while
