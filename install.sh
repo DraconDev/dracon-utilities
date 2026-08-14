@@ -99,8 +99,11 @@ if [ "$CURRENT_DEFAULT" != "main" ]; then
     fi
 fi
 
-# Stop services if upgrading
-if [ "$UPGRADE" = true ]; then
+# Stop services if upgrading.  `--no-restart` deliberately leaves the
+# currently running image alone; replacing the on-disk executable is safe on
+# Unix because the running process holds the old inode open, and the next
+# sanctioned restart will load the new binary.
+if [ "$UPGRADE" = true ] && [ "$NO_RESTART" != true ]; then
     echo "Stopping services for upgrade..."
     for service in dracon-sync.service dracon-system-guard.service; do
         # Map service name to binary name
@@ -250,8 +253,10 @@ install_binary() {
             echo "  ✅ Installed ~/.local/bin/$binary (new)"
         fi
 
-        # Always scrap the old daemon before installing new binary.
-        # Prevents "Text file busy" and stale binary issues.
+        # A running Unix process keeps its executable inode open, so an
+        # in-place path replacement does not require a stop.  Stop/restart
+        # only when the caller requested a live upgrade; --no-restart must
+        # never quiesce a service as an incidental side effect.
         local svc_name=""
         case "$binary" in
             dracon-sync)   svc_name=dracon-sync.service ;;
@@ -259,16 +264,18 @@ install_binary() {
             # Warden has no daemon — hooks are the primary enforcement layer
         esac
 
-        # Stop service + kill all processes — always, no check
-        if [ -n "$svc_name" ]; then
+        # Stop service + kill all processes only for a live upgrade.
+        if [ "$NO_RESTART" != true ] && [ -n "$svc_name" ]; then
             systemctl --user stop "$svc_name" 2>/dev/null || true
         fi
-        pkill -x "$binary" 2>/dev/null || true
-        # Wait for process to fully exit (up to 3s)
-        for _ in $(seq 1 6); do
-            pgrep -x "$binary" &>/dev/null || break
-            sleep 0.5
-        done
+        if [ "$NO_RESTART" != true ]; then
+            pkill -x "$binary" 2>/dev/null || true
+            # Wait for process to fully exit (up to 3s)
+            for _ in $(seq 1 6); do
+                pgrep -x "$binary" &>/dev/null || break
+                sleep 0.5
+            done
+        fi
 
         # Remove old binary and install new
         rm -f ~/.local/bin/"$binary"
@@ -276,7 +283,7 @@ install_binary() {
         chmod +x ~/.local/bin/"$binary"
 
         # Restart the service and track it for the final restart block
-        if [ -n "$svc_name" ]; then
+        if [ "$NO_RESTART" != true ] && [ -n "$svc_name" ]; then
             systemctl --user start "$svc_name" 2>/dev/null || true
             RESTARTED_SERVICES="$RESTARTED_SERVICES $svc_name"
         fi
