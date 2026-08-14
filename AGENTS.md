@@ -308,10 +308,12 @@ legacy heuristic ownership check, and `owned = false` always blocks it.
 The no-rewrite policy below is now enforced, not just documented:
 
 1. **warden global hooks** (`~/.config/git/hooks`, warden-owned via
-   core.hooksPath + init.templateDir): `pre-push` refuses
+   `core.hooksPath`): `pre-push` refuses
    non-fast-forward updates and branch deletions; `pre-rebase`
    refuses rebasing commits already on any remote. Escape hatch for
    deliberate operator rewrites: `DRACON_ALLOW_REWRITE=1`.
+   `init.templateDir` is an operator-managed Git setting; warden does
+   not claim ownership of it.
 2. **gitlab branch protection**: every live main/master across the
    fleet is protected (`allow_force_push=false`, maintainers push);
    dracon-sync's gitlab auto-create protects `main` on creation.
@@ -771,6 +773,24 @@ Total workspace tests: **1038** (was 915 before v0.113.4).
 Test breakdown: dracon-sync 847 (837 + 10 integration);
 dracon-system 88; dracon-warden 103 (93 + 10 integration).
 
+### 2026-08-14 — second-pass source audit
+
+The current source was reviewed again against the deferred findings in
+`AUDIT_FULL_2026-07-26.md`. This pass added regression coverage and fixed
+bounded correctness issues in Git status/path parsing, failed-query handling,
+SHA-256 object IDs, large-blob paths containing spaces, bounded Git stdin and
+temporary-file cleanup, askpass cleanup, branch/ref validation, mirror error
+attribution, atomic origin-gone ledger writes, Cargo version comments,
+fail-closed future visibility timestamps, and several system cleanup/accounting
+paths (mount-aware inode checks, lock truncation ordering, Unicode-safe event
+formatting, and Nix reclaim reporting).
+
+The example policy now documents the live `exclude_repos`, GitHub privacy,
+stage-batch, and unpushed-alert settings. Historical design documents that no
+longer describe the active nested-on-`main` layout or the current timeout
+override are marked as superseded. Remaining low-priority design limitations
+are recorded in the audit handoff rather than silently treated as fixed.
+
 ## `[patch.crates-io]` status
 
 **RESOLVED 2026-08-08**: `dracon-git v94.7.2` was published to crates.io,
@@ -787,4 +807,3 @@ ssh-agent bug fixed in `dracon-git v94.7.2` (upgraded from v94.7.1 on
 Guard: `dracon-sync/scripts/verify-install.sh` (fixture check; wired into
 `dracon-sync/scripts/release.sh` step 7 against the packaged artifact, and reminded
 after every release).
-

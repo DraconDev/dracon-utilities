@@ -1,5 +1,10 @@
 # Push Timeout Fix — 2026-06-17
 
+> **Status: historical baseline, superseded by later operator tuning.**
+> The daemon code default remains 300 seconds, but the live operator config
+> uses `push_op_timeout_secs = 900`. This document records the original
+> 60→300 change; see `AGENTS.md` for the current policy and rationale.
+
 > **Goal**: `04e41051-1a0a-49b1-aa9c-f1c9b849a2ff`
 >
 > **Outcome**: `push_op_timeout_secs` raised from `60` to `300` in

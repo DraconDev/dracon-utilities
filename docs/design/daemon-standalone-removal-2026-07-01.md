@@ -1,5 +1,11 @@
 # daemon-standalone branch removal — 2026-07-01
 
+> **Status: historical migration record.** The standalone worktree design
+> described here was superseded by the nested-on-`main` architecture on
+> 2026-07-02. See `AGENTS.md` and
+> `docs/design/nested-on-main-architecture-2026-07-02.md` for the active
+> layout.
+
 ## Summary
 
 The daemon's per-submodule `daemon-standalone` branch (introduced in
