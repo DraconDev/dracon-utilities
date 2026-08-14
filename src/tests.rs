@@ -1501,6 +1501,14 @@ watch_roots = ["/tmp/test"]
     }
 
     #[test]
+    fn replace_managed_block_preserves_tail_after_malformed_marker() {
+        let current =
+            format!("prefix\n{BLOCK_BEGIN}\noperator content after an interrupted write\n");
+        let block = format!("{BLOCK_BEGIN}\nnew\n{BLOCK_END}");
+        assert_eq!(replace_managed_block(&current, &block), current);
+    }
+
+    #[test]
     fn replace_managed_block_preserves_leading_whitespace() {
         let current = "  prefix\n";
         let block = format!("{BLOCK_BEGIN}\nmanaged\n{BLOCK_END}");

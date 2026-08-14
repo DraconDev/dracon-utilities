@@ -585,9 +585,11 @@ pub(crate) fn replace_managed_block(current: &str, managed_block: &str) -> Strin
             let end = start + end_rel + BLOCK_END.len();
             rest = &rest[end..];
         } else {
-            // Malformed: begin without end — consume rest
-            rest = &rest[start + BLOCK_BEGIN.len()..];
-            break;
+            // Malformed: begin without end. Preserve the entire file rather
+            // than treating the rest of the file as managed content; a
+            // truncated write or an operator comment must never delete the
+            // tail on the next harden pass.
+            return current.to_string();
         }
     }
 
@@ -1654,7 +1656,7 @@ async fn main() -> Result<()> {
             } else {
                 discover_git_repos_local(&roots)
             };
-            let _ = resmudge_repos(&policy, &repos, apply)?;
+            resmudge_repos(&policy, &repos, apply)?;
         }
         Command::Repair {
             dry_run,
@@ -2883,7 +2885,13 @@ fn run_setup_hooks(mode: HookMode, repo: Option<&Path>) -> Result<()> {
     ] {
         let stale = dir.join(name);
         if stale.exists() {
-            let _ = fs::remove_file(&stale);
+            if let Err(e) = fs::remove_file(&stale) {
+                eprintln!(
+                    "⚠️ failed to remove stale warden hook artifact {}: {}",
+                    stale.display(),
+                    e
+                );
+            }
         }
     }
 
