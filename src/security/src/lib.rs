@@ -666,8 +666,8 @@ impl WardenSecurity {
         let repo_root = self.get_repo_root()?;
         let keys_dir = repo_root.join(".git").join("arcane").join("keys");
         std::fs::create_dir_all(&keys_dir)?;
-        let keys_metadata = fs::symlink_metadata(&keys_dir)
-            .context("inspect repository recipient directory")?;
+        let keys_metadata =
+            fs::symlink_metadata(&keys_dir).context("inspect repository recipient directory")?;
         if !keys_metadata.file_type().is_dir() {
             anyhow::bail!("repository recipient directory must be a real directory")
         }
@@ -701,12 +701,7 @@ impl WardenSecurity {
             if !public_exists {
                 anyhow::bail!("existing recipient delegation has no public pair")
             }
-            self.ensure_repo_recipient_authorization(
-                &repo_key,
-                &public_path,
-                "direct",
-                recipient,
-            )?;
+            self.ensure_repo_recipient_authorization(&repo_key, &public_path, "direct", recipient)?;
             return Ok(());
         }
 
@@ -742,12 +737,7 @@ impl WardenSecurity {
         if !public_exists {
             self.write_repo_public_recipient(&public_path, recipient)?;
         }
-        self.ensure_repo_recipient_authorization(
-            &repo_key,
-            &public_path,
-            "direct",
-            recipient,
-        )?;
+        self.ensure_repo_recipient_authorization(&repo_key, &public_path, "direct", recipient)?;
         Ok(())
     }
 
@@ -786,9 +776,9 @@ impl WardenSecurity {
             let Ok(public_content) = fs::read_to_string(&pub_path) else {
                 continue;
             };
-            let Some(recipient) = crate::modules::crypto::parse_single_repo_recipient(
-                &public_content,
-            ) else {
+            let Some(recipient) =
+                crate::modules::crypto::parse_single_repo_recipient(&public_content)
+            else {
                 continue;
             };
             if recipient != machine_recipient {
@@ -797,16 +787,15 @@ impl WardenSecurity {
             let Ok(repo_key) = self.try_decrypt_key_file(&path, identity) else {
                 continue;
             };
-            if self.verify_machine_recipient_authorization(
-                &pub_path,
-                &recipient,
-                identity,
-                &repo_key,
-            ) {
+            if self
+                .verify_machine_recipient_authorization(&pub_path, &recipient, identity, &repo_key)
+            {
                 return Ok(repo_key);
             }
         }
-        Err(anyhow::anyhow!("No authenticated matching machine key found"))
+        Err(anyhow::anyhow!(
+            "No authenticated matching machine key found"
+        ))
     }
 
     /// Generate a new Machine Identity (Private Key, Public Key)
@@ -856,10 +845,7 @@ impl WardenSecurity {
     /// encrypted to the owner's public key, make it decrypt to an arbitrary
     /// 32-byte value, and potentially make it the HMAC/AEAD trust key for a
     /// forged recipient authorization sidecar.
-    fn is_direct_repo_key_candidate(
-        path: &Path,
-        identity: &x25519::Identity,
-    ) -> bool {
+    fn is_direct_repo_key_candidate(path: &Path, identity: &x25519::Identity) -> bool {
         let Some(filename) = path.file_name().and_then(|name| name.to_str()) else {
             return false;
         };
@@ -915,11 +901,7 @@ impl WardenSecurity {
             };
             if recipient != identity_recipient
                 || !self.verify_owner_recipient_authorization(
-                    &pub_path,
-                    &recipient,
-                    identity,
-                    &repo_key,
-                    "direct",
+                    &pub_path, &recipient, identity, &repo_key, "direct",
                 )
             {
                 continue;
@@ -1243,7 +1225,6 @@ impl WardenSecurity {
                             );
                             return Some(plaintext);
                         }
-
                     }
                 }
             }
@@ -1443,9 +1424,18 @@ mod tests {
         let mut security = WardenSecurity::new(None).unwrap();
         security.apply_managed_patterns_override();
         assert!(path_is_protected(".env", &security.managed_patterns));
-        assert!(path_is_protected("secrets/master.key", &security.managed_patterns));
-        assert!(!path_is_protected("src/main.rs", &security.managed_patterns));
-        assert!(!path_is_protected("pi-session-export.html", &security.managed_patterns));
+        assert!(path_is_protected(
+            "secrets/master.key",
+            &security.managed_patterns
+        ));
+        assert!(!path_is_protected(
+            "src/main.rs",
+            &security.managed_patterns
+        ));
+        assert!(!path_is_protected(
+            "pi-session-export.html",
+            &security.managed_patterns
+        ));
         clear_managed_patterns_override();
         let mut security2 = WardenSecurity::new(None).unwrap();
         security2.apply_managed_patterns_override();
@@ -1466,7 +1456,10 @@ mod tests {
         let out = security
             .smart_clean_with_path(&big, "pi-session-export.html")
             .unwrap();
-        assert_eq!(out, big, "unprotected large file must pass through untouched");
+        assert_eq!(
+            out, big,
+            "unprotected large file must pass through untouched"
+        );
         clear_managed_patterns_override();
     }
 
@@ -1589,7 +1582,8 @@ mod tests {
         //      `sk-XXX` for OpenAI keys; we don't assert encryption
         //      here because the model-id content doesn't always
         //      match the strict Mistral regex).
-        let security = WardenSecurity::new(None).unwrap()
+        let security = WardenSecurity::new(None)
+            .unwrap()
             .with_managed_patterns(vec![
                 "*.env".to_string(),
                 "*.pem".to_string(),
@@ -1687,8 +1681,12 @@ mod tests {
             patterns.contains(&"Age Secret Key".to_string())
         );
 
-        let content =
-            concat!("AGE", "-SECRET", "-KEY-", "1QPZRY9X8GF2TVDW0S3JN54KHCE6MUA7LQPZRY9X8GF2TVDW0S3JN54KHCE6MUA7L");
+        let content = concat!(
+            "AGE",
+            "-SECRET",
+            "-KEY-",
+            "1QPZRY9X8GF2TVDW0S3JN54KHCE6MUA7LQPZRY9X8GF2TVDW0S3JN54KHCE6MUA7L"
+        );
         let scanned = scanner.scan_and_replace(content, |name, secret| {
             eprintln!("Match found: {} -> {}", name, secret);
             format!("[MATCHED:{}]", name)
@@ -1740,7 +1738,10 @@ mod tests {
         let body = "API_KEY=secret\n# Dracon Warden Encrypted Environment File mentioned later\nTAIL=value\n";
         let managed = format!("{}{}", header, body);
         let stripped = strip_env_version_header(&managed);
-        assert_eq!(stripped, body, "body (incl. its own marker mention) must be preserved");
+        assert_eq!(
+            stripped, body,
+            "body (incl. its own marker mention) must be preserved"
+        );
 
         // A marker on line 7+ (past the header region) with a closing
         // banner after it must NOT be stripped — the old code returned
@@ -2081,9 +2082,7 @@ API_KEY=secret"#;
 
         // Non-tag content returns None (caller falls back to inline path).
         assert!(security.decrypt_whole_file_tag(b"plain text").is_none());
-        assert!(security
-            .decrypt_whole_file_tag(&plaintext)
-            .is_none());
+        assert!(security.decrypt_whole_file_tag(&plaintext).is_none());
     }
 
     /// ADDED 2026-08-09 (audit MEDIUM): whole-file-tag recognition must
@@ -2097,9 +2096,7 @@ API_KEY=secret"#;
     #[test]
     fn test_whole_file_tag_tolerates_crlf_and_multiple_newlines() {
         let security = test_security_with_identity();
-        let plaintext: Vec<u8> = vec![
-            0x00, 0xFF, 0xFE, 0x80, 0xC3, 0x28, 0xF5, 0x90, 0x80, 0x0A,
-        ];
+        let plaintext: Vec<u8> = vec![0x00, 0xFF, 0xFE, 0x80, 0xC3, 0x28, 0xF5, 0x90, 0x80, 0x0A];
         assert!(std::str::from_utf8(&plaintext).is_err());
 
         let tag = security.encrypt_v2_to_b64_tag(&plaintext).unwrap();
@@ -2245,8 +2242,10 @@ API_KEY=secret"#;
             general_purpose::STANDARD.encode(&foreign_enc)
         )
         .into_bytes();
-        assert!(security.decrypt_whole_file_tag(&foreign).is_some(),
-                "age magic must still be recognized as a whole-file tag");
+        assert!(
+            security.decrypt_whole_file_tag(&foreign).is_some(),
+            "age magic must still be recognized as a whole-file tag"
+        );
         let out = smudge_with_security(&security, &foreign).unwrap();
         assert_eq!(out, foreign, "unlockable-fail tag must pass through raw");
     }
@@ -2261,9 +2260,7 @@ API_KEY=secret"#;
         let security = test_security_with_identity();
         let tag_shaped = b"[DRACON_SECRET:not-base64!!!]";
 
-        let cleaned = security
-            .smart_clean_with_path(tag_shaped, ".env")
-            .unwrap();
+        let cleaned = security.smart_clean_with_path(tag_shaped, ".env").unwrap();
         assert_ne!(
             cleaned, tag_shaped,
             "tag-shaped plaintext must NOT pass through unencrypted"
@@ -2276,7 +2273,9 @@ API_KEY=secret"#;
 
         // Control: a REAL tag still passes through unchanged (no
         // double encryption) — the guard must not weaken.
-        let real = security.encrypt_v2_to_b64_tag(b"already encrypted").unwrap();
+        let real = security
+            .encrypt_v2_to_b64_tag(b"already encrypted")
+            .unwrap();
         let cleaned = security.smart_clean_with_path(&real, ".env").unwrap();
         assert_eq!(cleaned, real);
     }
@@ -2291,8 +2290,7 @@ API_KEY=secret"#;
         hasher.update(repo_key);
         let hash = hasher.finalize();
         let cipher =
-            cfb_mode::Encryptor::<aes::Aes256>::new_from_slices(&hash[..32], &hash[..16])
-                .unwrap();
+            cfb_mode::Encryptor::<aes::Aes256>::new_from_slices(&hash[..32], &hash[..16]).unwrap();
         let mut out = plaintext.to_vec();
         cipher.encrypt(&mut out);
         out
@@ -2305,8 +2303,7 @@ API_KEY=secret"#;
         hasher.update(repo_key);
         let hash = hasher.finalize();
         let cipher =
-            cfb_mode::Decryptor::<aes::Aes256>::new_from_slices(&hash[..32], &hash[..16])
-                .unwrap();
+            cfb_mode::Decryptor::<aes::Aes256>::new_from_slices(&hash[..32], &hash[..16]).unwrap();
         let mut out = ciphertext.to_vec();
         cipher.decrypt(&mut out);
         out
@@ -2555,7 +2552,11 @@ API_KEY=secret"#;
 
         let evil = x25519::Identity::generate();
         let owner = x25519::Identity::generate();
-        fs::write(home_keys.join("owner_evil.pub"), evil.to_public().to_string()).unwrap();
+        fs::write(
+            home_keys.join("owner_evil.pub"),
+            evil.to_public().to_string(),
+        )
+        .unwrap();
         std::os::unix::fs::symlink(&home_keys, repo_data.join("keys")).unwrap();
 
         let mut security = WardenSecurity::new(Some(&repo)).unwrap();
@@ -2825,7 +2826,10 @@ API_KEY=secret"#;
     #[test]
     fn test_slack_bot_token_compact() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let token = concat!("xox", "b-abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnop");
+        let token = concat!(
+            "xox",
+            "b-abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnop"
+        );
         let found = scanner.scan(token);
         assert!(
             found.iter().any(|f| f.name == "Slack Bot Token (Compact)"),
@@ -2837,7 +2841,10 @@ API_KEY=secret"#;
     #[test]
     fn test_slack_bot_token_compact_has_length_cap() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let reasonable = concat!("xox", "b-abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnop");
+        let reasonable = concat!(
+            "xox",
+            "b-abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnop"
+        );
         let found = scanner.scan(reasonable);
         assert!(
             found.iter().any(|f| f.name == "Slack Bot Token (Compact)"),
@@ -2849,10 +2856,7 @@ API_KEY=secret"#;
     #[test]
     fn test_hex_secret_quoted_requires_context() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let with_context = concat!(
-            "secret = \"",
-            "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4\"",
-        );
+        let with_context = concat!("secret = \"", "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4\"",);
         let without_context = r#"label = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4""#;
         let found_with = scanner.scan(with_context);
         let found_without = scanner.scan(without_context);
@@ -2873,10 +2877,7 @@ API_KEY=secret"#;
     #[test]
     fn test_high_entropy_secret_quoted_requires_context() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let with_context = concat!(
-            "secret = \"",
-            "aBcDeFgHiJkLmNoPqRsTuVwXaBcDeFgH\"",
-        );
+        let with_context = concat!("secret = \"", "aBcDeFgHiJkLmNoPqRsTuVwXaBcDeFgH\"",);
         let without_context = r#"class_name = "aBcDeFgHiJkLmNoPqRsTuVwX""#;
         let found_with = scanner.scan(with_context);
         let found_without = scanner.scan(without_context);

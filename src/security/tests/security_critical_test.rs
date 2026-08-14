@@ -425,8 +425,8 @@ fn test_machine_and_team_recipients_require_authenticated_sidecars() {
     let master_identity = age::x25519::Identity::generate();
     let repo_key = setup_repo_with_age_key(repo_root, &master_identity);
 
-    let mut security = dracon_security::WardenSecurity::new(Some(repo_root))
-        .expect("init security");
+    let mut security =
+        dracon_security::WardenSecurity::new(Some(repo_root)).expect("init security");
     security.add_memory_identity(master_identity);
 
     let machine_identity = age::x25519::Identity::generate();
@@ -482,7 +482,9 @@ fn test_machine_and_team_recipients_require_authenticated_sidecars() {
         .add_team_member("legacy-team", &legacy_public)
         .expect("reauthorize legacy team member");
     assert!(legacy_pub_path.with_extension("auth").exists());
-    let recipients = security.gather_all_recipients().expect("gather reauthorized legacy");
+    let recipients = security
+        .gather_all_recipients()
+        .expect("gather reauthorized legacy");
     assert!(recipients.iter().any(|r| r.to_string() == legacy_public));
 
     // A copied proof is bound to both the original filename and recipient.
@@ -490,11 +492,12 @@ fn test_machine_and_team_recipients_require_authenticated_sidecars() {
     let swapped_public = swapped_identity.to_public().to_string();
     let swapped_pub_path = keys_dir.join("swapped-team.pub");
     fs::write(&swapped_pub_path, &swapped_public).expect("write swapped recipient");
-    fs::copy(&team_age_path, swapped_pub_path.with_extension("age"))
-        .expect("copy delegated age");
+    fs::copy(&team_age_path, swapped_pub_path.with_extension("age")).expect("copy delegated age");
     fs::copy(&team_auth_path, swapped_pub_path.with_extension("auth"))
         .expect("copy delegated proof");
-    let recipients = security.gather_all_recipients().expect("gather swapped proof");
+    let recipients = security
+        .gather_all_recipients()
+        .expect("gather swapped proof");
     assert!(!recipients.iter().any(|r| r.to_string() == swapped_public));
     fs::remove_file(swapped_pub_path).expect("remove swapped recipient");
     fs::remove_file(keys_dir.join("swapped-team.age")).expect("remove swapped age");
@@ -503,21 +506,30 @@ fn test_machine_and_team_recipients_require_authenticated_sidecars() {
     // The proof is not sufficient without the corresponding delegated age
     // key, and tampering or adding a second recipient invalidates the file.
     fs::remove_file(&team_age_path).expect("remove team age key");
-    let recipients = security.gather_all_recipients().expect("gather missing age");
+    let recipients = security
+        .gather_all_recipients()
+        .expect("gather missing age");
     assert!(!recipients.iter().any(|r| r.to_string() == team_public));
     fs::write(&team_age_path, &team_age).expect("restore team age key");
 
     let mut tampered_auth = team_auth.clone();
     tampered_auth[0] ^= 1;
     fs::write(&team_auth_path, tampered_auth).expect("tamper team proof");
-    let recipients = security.gather_all_recipients().expect("gather tampered proof");
+    let recipients = security
+        .gather_all_recipients()
+        .expect("gather tampered proof");
     assert!(!recipients.iter().any(|r| r.to_string() == team_public));
     fs::write(&team_auth_path, &team_auth).expect("restore team proof");
 
     let other = age::x25519::Identity::generate();
-    fs::write(&team_pub_path, format!("{}\n{}\n", team_public, other.to_public()))
-        .expect("write multiline team recipient");
-    let recipients = security.gather_all_recipients().expect("gather multiline recipient");
+    fs::write(
+        &team_pub_path,
+        format!("{}\n{}\n", team_public, other.to_public()),
+    )
+    .expect("write multiline team recipient");
+    let recipients = security
+        .gather_all_recipients()
+        .expect("gather multiline recipient");
     assert!(!recipients.iter().any(|r| r.to_string() == team_public));
     fs::write(&team_pub_path, &team_public).expect("restore team recipient");
 
@@ -533,9 +545,10 @@ fn test_machine_and_team_recipients_require_authenticated_sidecars() {
     // A contributor can add a valid age recipient under an arbitrary name,
     // but cannot forge the repo-key-authenticated sidecar.
     let evil = age::x25519::Identity::generate();
-    fs::write(keys_dir.join("evil.pub"), evil.to_public().to_string())
-        .expect("write attacker key");
-    let recipients = security.gather_all_recipients().expect("gather attacker file");
+    fs::write(keys_dir.join("evil.pub"), evil.to_public().to_string()).expect("write attacker key");
+    let recipients = security
+        .gather_all_recipients()
+        .expect("gather attacker file");
     assert!(!recipients
         .iter()
         .any(|r| r.to_string() == evil.to_public().to_string()));
@@ -627,8 +640,8 @@ fn test_list_authorized_recipients_rejects_symlink_aliases() {
     std::os::unix::fs::symlink(&owner_path, repo_owner_dir.join("evil.pub"))
         .expect("write symlink alias");
 
-    let mut security = dracon_security::WardenSecurity::new(Some(repo_root))
-        .expect("init security");
+    let mut security =
+        dracon_security::WardenSecurity::new(Some(repo_root)).expect("init security");
     security.add_memory_identity(master_identity);
     let listed = security
         .list_authorized_recipients()
@@ -656,8 +669,8 @@ fn test_authorize_recipient_writes_verified_direct_pair() {
     .expect("write owner trust anchor");
 
     let recipient_identity = age::x25519::Identity::generate();
-    let mut owner_security = dracon_security::WardenSecurity::new(Some(repo_root))
-        .expect("init owner security");
+    let mut owner_security =
+        dracon_security::WardenSecurity::new(Some(repo_root)).expect("init owner security");
     owner_security.add_memory_identity(owner_identity.clone());
     owner_security
         .authorize_recipient(&recipient_identity.to_public())
@@ -669,8 +682,8 @@ fn test_authorize_recipient_writes_verified_direct_pair() {
     let direct_auth = direct_age.with_extension("auth");
     assert!(direct_age.is_file() && direct_pub.is_file() && direct_auth.is_file());
 
-    let mut recipient_security = dracon_security::WardenSecurity::new(Some(repo_root))
-        .expect("init recipient security");
+    let mut recipient_security =
+        dracon_security::WardenSecurity::new(Some(repo_root)).expect("init recipient security");
     recipient_security.add_memory_identity(recipient_identity);
     let loaded = recipient_security
         .load_repo_key()
@@ -716,8 +729,8 @@ fn test_machine_only_repo_key_requires_owner_authenticated_proof() {
 
     let machine_identity = age::x25519::Identity::generate();
     let machine_public = machine_identity.to_public().to_string();
-    let mut owner_security = dracon_security::WardenSecurity::new(Some(repo_root))
-        .expect("init owner security");
+    let mut owner_security =
+        dracon_security::WardenSecurity::new(Some(repo_root)).expect("init owner security");
     owner_security.add_memory_identity(owner_identity);
     owner_security
         .whitelist_machine(&machine_public)
@@ -737,8 +750,8 @@ fn test_machine_only_repo_key_requires_owner_authenticated_proof() {
         "ARCANE_MACHINE_KEY",
         machine_identity.to_string().expose_secret(),
     );
-    let machine_security = dracon_security::WardenSecurity::new(Some(repo_root))
-        .expect("init machine-only security");
+    let machine_security =
+        dracon_security::WardenSecurity::new(Some(repo_root)).expect("init machine-only security");
     let loaded = machine_security
         .load_repo_key()
         .expect("owner-authenticated machine delegation should load");
@@ -766,11 +779,8 @@ fn test_machine_only_repo_key_requires_owner_authenticated_proof() {
         encrypt_for_recipient(&machine_identity.to_public(), &attacker_key),
     )
     .expect("write arbitrary machine blob");
-    fs::write(
-        keys_dir.join("machine:attacker.pub"),
-        machine_public,
-    )
-    .expect("write arbitrary machine recipient");
+    fs::write(keys_dir.join("machine:attacker.pub"), machine_public)
+        .expect("write arbitrary machine recipient");
     assert!(
         machine_security.load_repo_key().is_ok(),
         "the valid authorized delegation remains usable"
@@ -838,8 +848,8 @@ fn test_gather_rejects_forged_repo_key_authorization_without_owner_proof() {
     });
     let repo_key_ciphertext = {
         let payload = serde_json::to_vec(&auth).expect("serialize forged authorization");
-        let security = dracon_security::WardenSecurity::new(Some(repo_root))
-            .expect("init security");
+        let security =
+            dracon_security::WardenSecurity::new(Some(repo_root)).expect("init security");
         security
             .encrypt_with_repo_key(&forged_repo_key, &payload)
             .expect("encrypt forged authorization")
@@ -855,12 +865,14 @@ fn test_gather_rejects_forged_repo_key_authorization_without_owner_proof() {
     )
     .expect("write forged envelope");
 
-    let mut security = dracon_security::WardenSecurity::new(Some(repo_root))
-        .expect("init security");
+    let mut security =
+        dracon_security::WardenSecurity::new(Some(repo_root)).expect("init security");
     security.add_memory_identity(owner_identity);
     let recipients = security.gather_all_recipients().expect("gather recipients");
     assert!(
-        !recipients.iter().any(|recipient| recipient.to_string() == evil_public),
+        !recipients
+            .iter()
+            .any(|recipient| recipient.to_string() == evil_public),
         "a forged canonical repo key must not bless an envelope without owner proof"
     );
 }
@@ -1018,7 +1030,11 @@ fn test_generate_master_identity_refuses_dedicated_master_private() {
     let home = std::env::var("HOME").map(std::path::PathBuf::from).unwrap();
     let master_dir = home.join(".dracon").join("keys");
     fs::create_dir_all(&master_dir).expect("create master dir");
-    fs::write(master_dir.join("master.age"), concat!("AGE", "-SECRET", "-KEY-", "1\n")).expect("create master private");
+    fs::write(
+        master_dir.join("master.age"),
+        concat!("AGE", "-SECRET", "-KEY-", "1\n"),
+    )
+    .expect("create master private");
 
     let result = security.generate_master_identity();
     assert!(
@@ -1064,10 +1080,7 @@ fn test_create_team_creates_private_key_without_overwrite() {
         .expect("first team creation should succeed");
 
     let home = std::env::var("HOME").map(std::path::PathBuf::from).unwrap();
-    let team_key_path = home
-        .join(".dracon")
-        .join("teams")
-        .join("private-team.key");
+    let team_key_path = home.join(".dracon").join("teams").join("private-team.key");
     let original = fs::read(&team_key_path).expect("team key should be written");
 
     #[cfg(unix)]
@@ -1082,7 +1095,10 @@ fn test_create_team_creates_private_key_without_overwrite() {
     );
 
     let second = security.create_team("private-team");
-    assert!(second.is_err(), "recreating a team must not overwrite its key");
+    assert!(
+        second.is_err(),
+        "recreating a team must not overwrite its key"
+    );
     assert_eq!(
         fs::read(&team_key_path).expect("team key should remain"),
         original

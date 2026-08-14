@@ -5,12 +5,12 @@ use base64::{engine::general_purpose, Engine as _};
 use std::fs;
 use std::path::Path;
 
-use crate::{is_env_version_managed, make_env_version_header};
 use crate::normalize_secret_marker;
 use crate::strip_env_version_header;
 use crate::MarkerMigrationStats;
 use crate::SecretScanner;
 use crate::WardenSecurity;
+use crate::{is_env_version_managed, make_env_version_header};
 
 const HEADER_V2_MAGIC: &[u8] = b"age-encryption.org/v1";
 
@@ -82,9 +82,7 @@ pub fn path_is_protected(path_str: &str, protected_patterns: &[String]) -> bool 
         }
         // 3. Path-prefix match: `secrets/**` matches any path under `secrets/`.
         if let Some(prefix) = pat.strip_suffix("/**") {
-            if path_str.starts_with(&format!("{}/", prefix))
-                || path_str == prefix
-            {
+            if path_str.starts_with(&format!("{}/", prefix)) || path_str == prefix {
                 return true;
             }
         }
@@ -106,10 +104,7 @@ pub fn path_is_protected(path_str: &str, protected_patterns: &[String]) -> bool 
         if pat.starts_with("**/") {
             let rest = pat.trim_start_matches("**/");
             let component = rest.trim_end_matches("/**");
-            if !component.is_empty()
-                && !component.contains('/')
-                && !component.contains('*')
-            {
+            if !component.is_empty() && !component.contains('/') && !component.contains('*') {
                 if rest.ends_with("/**") {
                     // `**/name/**`: `name` as a component at any depth.
                     if path_str.split('/').any(|c| c == component) {
@@ -311,11 +306,7 @@ impl WardenSecurity {
                             // re-encrypt of a .env ending in a newline rewrite the
                             // file).
                             let stripped = strip_env_version_header(text_content);
-                            format!(
-                                "{}\n{}",
-                                make_env_version_header(text_content),
-                                stripped
-                            )
+                            format!("{}\n{}", make_env_version_header(text_content), stripped)
                         } else {
                             // First time encryption - add v1 header
                             format!(
@@ -554,5 +545,4 @@ impl WardenSecurity {
 
         Ok(stats)
     }
-
 }

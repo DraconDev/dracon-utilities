@@ -141,8 +141,8 @@ impl WardenSecurity {
 
         let repo_root = self.get_repo_root()?;
         let keys_dir = repo_root.join(".git").join("arcane").join("keys");
-        let keys_metadata = fs::symlink_metadata(&keys_dir)
-            .context("inspect repository recipient directory")?;
+        let keys_metadata =
+            fs::symlink_metadata(&keys_dir).context("inspect repository recipient directory")?;
         if !keys_metadata.file_type().is_dir() {
             anyhow::bail!("repository recipient directory must be a real directory")
         }
@@ -186,12 +186,7 @@ impl WardenSecurity {
         // authorization signal. Store an owner-signed sidecar that binds this
         // exact team recipient to the authorization operation.
         self.write_repo_public_recipient(&pub_key_path, &recipient)?;
-        self.write_repo_recipient_authorization(
-            &repo_key,
-            &pub_key_path,
-            "team",
-            &recipient,
-        )?;
+        self.write_repo_recipient_authorization(&repo_key, &pub_key_path, "team", &recipient)?;
 
         Ok(())
     }

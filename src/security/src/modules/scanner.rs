@@ -151,11 +151,26 @@ impl SecretScanner {
             // ============================================================
             // Stripe (ONLY LIVE KEYS)
             // ============================================================
-            ("Stripe Live Secret Key", concat!("sk", "_live_[0-9a-zA-Z]{24,}")),
-            ("Stripe Live Restricted Key", concat!("rk", "_live_[0-9a-zA-Z]{24,}")),
-            ("Stripe Test Secret Key", concat!("sk", "_test_[0-9a-zA-Z]{24,}")),
-            ("Stripe Test Restricted Key", concat!("rk", "_test_[0-9a-zA-Z]{24,}")),
-            ("Stripe Webhook Secret", concat!("wh", "sec_[0-9a-zA-Z]{24,}")),
+            (
+                "Stripe Live Secret Key",
+                concat!("sk", "_live_[0-9a-zA-Z]{24,}"),
+            ),
+            (
+                "Stripe Live Restricted Key",
+                concat!("rk", "_live_[0-9a-zA-Z]{24,}"),
+            ),
+            (
+                "Stripe Test Secret Key",
+                concat!("sk", "_test_[0-9a-zA-Z]{24,}"),
+            ),
+            (
+                "Stripe Test Restricted Key",
+                concat!("rk", "_test_[0-9a-zA-Z]{24,}"),
+            ),
+            (
+                "Stripe Webhook Secret",
+                concat!("wh", "sec_[0-9a-zA-Z]{24,}"),
+            ),
             // ============================================================
             // Slack
             // ============================================================
@@ -171,7 +186,10 @@ impl SecretScanner {
                 "Slack Bot Token",
                 concat!("xox", "b-[0-9]{11}-[0-9]{11}-[a-zA-Z0-9]{24}"),
             ),
-            ("Slack Bot Token (Compact)", concat!("xox", "b-[A-Za-z0-9]{24,68}")),
+            (
+                "Slack Bot Token (Compact)",
+                concat!("xox", "b-[A-Za-z0-9]{24,68}"),
+            ),
             // ============================================================
             // Discord
             // ============================================================
@@ -221,23 +239,38 @@ impl SecretScanner {
             // ============================================================
             (
                 "RSA Private Key",
-                concat!(r"(?s)-----BEGIN RSA PRIV", r"ATE KEY-----.*?-----END RSA PRIVATE KEY-----"),
+                concat!(
+                    r"(?s)-----BEGIN RSA PRIV",
+                    r"ATE KEY-----.*?-----END RSA PRIVATE KEY-----"
+                ),
             ),
             (
                 "DSA Private Key",
-                concat!(r"(?s)-----BEGIN DSA PRIV", r"ATE KEY-----.*?-----END DSA PRIVATE KEY-----"),
+                concat!(
+                    r"(?s)-----BEGIN DSA PRIV",
+                    r"ATE KEY-----.*?-----END DSA PRIVATE KEY-----"
+                ),
             ),
             (
                 "EC Private Key",
-                concat!(r"(?s)-----BEGIN EC PRIV", r"ATE KEY-----.*?-----END EC PRIVATE KEY-----"),
+                concat!(
+                    r"(?s)-----BEGIN EC PRIV",
+                    r"ATE KEY-----.*?-----END EC PRIVATE KEY-----"
+                ),
             ),
             (
                 "OpenSSH Private Key",
-                concat!(r"(?s)-----BEGIN OPENSSH PRIV", r"ATE KEY-----.*?-----END OPENSSH PRIVATE KEY-----"),
+                concat!(
+                    r"(?s)-----BEGIN OPENSSH PRIV",
+                    r"ATE KEY-----.*?-----END OPENSSH PRIVATE KEY-----"
+                ),
             ),
             (
                 "PGP Private Key",
-                concat!(r"(?s)-----BEGIN PGP PRIV", r"ATE KEY BLOCK-----.*?-----END PGP PRIVATE KEY BLOCK-----"),
+                concat!(
+                    r"(?s)-----BEGIN PGP PRIV",
+                    r"ATE KEY BLOCK-----.*?-----END PGP PRIVATE KEY BLOCK-----"
+                ),
             ),
             (
                 "SSH Private Key (generic)",
@@ -290,8 +323,14 @@ impl SecretScanner {
             // ============================================================
             ("Shopify Token", concat!("sh", "pat_[a-fA-F0-9]{32}")),
             ("Shopify Secret", r"shpss_[a-fA-F0-9]{32}"),
-            ("Square Access Token", concat!("sq", "0atp-[A-Za-z0-9_-]{22}")),
-            ("Square OAuth Secret", concat!("sq", "0csp-[A-Za-z0-9_-]{43}")),
+            (
+                "Square Access Token",
+                concat!("sq", "0atp-[A-Za-z0-9_-]{22}"),
+            ),
+            (
+                "Square OAuth Secret",
+                concat!("sq", "0csp-[A-Za-z0-9_-]{43}"),
+            ),
             (
                 "PayPal Client ID",
                 r#"(?i)paypal.{0,20}client.{0,20}id.{0,10}["'][A-Za-z0-9_-]{80}["']"#,
@@ -299,7 +338,10 @@ impl SecretScanner {
             // ============================================================
             // HashiCorp / Vault
             // ============================================================
-            ("HashiCorp Vault Token", concat!("hvs", "\\.[A-Za-z0-9_-]{24,}")),
+            (
+                "HashiCorp Vault Token",
+                concat!("hvs", "\\.[A-Za-z0-9_-]{24,}"),
+            ),
             (
                 "HashiCorp Terraform Token",
                 r#"(?i)terraform.{0,20}["'][A-Za-z0-9]{14}\.[A-Za-z0-9]{24}\.[A-Za-z0-9]{67}["']"#,
@@ -309,7 +351,12 @@ impl SecretScanner {
             // ============================================================
             (
                 "Age Secret Key",
-                concat!("AGE", "-SECRET", "-KEY-", "1[QPZRY9X8GF2TVDW0S3JN54KHCE6MUA7L]{58}"),
+                concat!(
+                    "AGE",
+                    "-SECRET",
+                    "-KEY-",
+                    "1[QPZRY9X8GF2TVDW0S3JN54KHCE6MUA7L]{58}"
+                ),
             ),
             // ============================================================
             // AI / Cloud Provider API Keys

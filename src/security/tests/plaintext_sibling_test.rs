@@ -39,7 +39,12 @@ fn clean_skips_encryption_when_plaintext_sibling_exists() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("example.env");
     let sibling = dir.path().join("example.env.plaintext");
-    let secret = concat!("AGE", "-SECRET", "-KEY-", "1QPZRY9X8GF2TVDW0S3JN54KHCE6MUA7LQPZRY9X8GF2TVDW0S3JN54KHCE6MUA7L");
+    let secret = concat!(
+        "AGE",
+        "-SECRET",
+        "-KEY-",
+        "1QPZRY9X8GF2TVDW0S3JN54KHCE6MUA7LQPZRY9X8GF2TVDW0S3JN54KHCE6MUA7L"
+    );
 
     fs::write(&path, secret).unwrap();
     fs::write(&sibling, "").unwrap();
@@ -59,7 +64,12 @@ fn clean_encrypts_normally_without_plaintext_sibling() {
     // encrypts the file (this proves the hatch is a real opt-in, not a no-op).
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("secrets.env");
-    let secret = concat!("AGE", "-SECRET", "-KEY-", "1QPZRY9X8GF2TVDW0S3JN54KHCE6MUA7LQPZRY9X8GF2TVDW0S3JN54KHCE6MUA7L");
+    let secret = concat!(
+        "AGE",
+        "-SECRET",
+        "-KEY-",
+        "1QPZRY9X8GF2TVDW0S3JN54KHCE6MUA7LQPZRY9X8GF2TVDW0S3JN54KHCE6MUA7L"
+    );
 
     fs::write(&path, secret).unwrap();
     // No `.plaintext` sibling
@@ -85,7 +95,12 @@ fn clean_with_plaintext_sibling_does_not_add_env_version_header() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join(".env");
     let sibling = dir.path().join(".env.plaintext");
-    let secret = concat!("AGE", "-SECRET", "-KEY-", "1QPZRY9X8GF2TVDW0S3JN54KHCE6MUA7LQPZRY9X8GF2TVDW0S3JN54KHCE6MUA7L");
+    let secret = concat!(
+        "AGE",
+        "-SECRET",
+        "-KEY-",
+        "1QPZRY9X8GF2TVDW0S3JN54KHCE6MUA7LQPZRY9X8GF2TVDW0S3JN54KHCE6MUA7L"
+    );
 
     fs::write(&path, secret).unwrap();
     fs::write(&sibling, "").unwrap();
@@ -130,7 +145,12 @@ fn clean_with_empty_sibling_path_is_a_noop() {
     // and accidentally skip encryption. The hatch is opt-in: empty path = no
     // hatch decision.
     let security = WardenSecurity::new(None).unwrap();
-    let secret = concat!("AGE", "-SECRET", "-KEY-", "1QPZRY9X8GF2TVDW0S3JN54KHCE6MUA7LQPZRY9X8GF2TVDW0S3JN54KHCE6MUA7L");
+    let secret = concat!(
+        "AGE",
+        "-SECRET",
+        "-KEY-",
+        "1QPZRY9X8GF2TVDW0S3JN54KHCE6MUA7LQPZRY9X8GF2TVDW0S3JN54KHCE6MUA7L"
+    );
     let cleaned = security
         .smart_clean_with_path(secret.as_bytes(), "")
         .expect("clean should succeed");

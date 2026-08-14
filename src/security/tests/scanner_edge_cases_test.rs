@@ -99,9 +99,7 @@ fn test_scanner_detects_private_key_formats_by_specific_name() {
     ];
 
     for (label, expected_name) in cases {
-        let content = format!(
-            "-----BEGIN {label}-----\nkey-material\n-----END {label}-----"
-        );
+        let content = format!("-----BEGIN {label}-----\nkey-material\n-----END {label}-----");
         let result = scanner.scan_and_replace(&content, |name, _| name.to_string());
         assert_eq!(
             result, expected_name,

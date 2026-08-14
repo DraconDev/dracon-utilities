@@ -115,7 +115,10 @@ pub(crate) fn parse_single_repo_recipient(content: &str) -> Option<x25519::Recip
 fn decode_identity_bytes(identity: &x25519::Identity) -> Option<[u8; 32]> {
     let identity_text = identity.to_string();
     let (identity_hrp, identity_bytes) = bech32::decode(identity_text.expose_secret()).ok()?;
-    if !identity_hrp.to_string().eq_ignore_ascii_case("age-secret-key-") {
+    if !identity_hrp
+        .to_string()
+        .eq_ignore_ascii_case("age-secret-key-")
+    {
         return None;
     }
     identity_bytes.try_into().ok()
@@ -157,9 +160,7 @@ fn recipient_proof_key(
 /// the base point, so the public key can be recovered from the age recipient
 /// alone. The domain-separated prefix keeps deterministic EdDSA nonces from
 /// reusing any age protocol hash state.
-fn owner_signature_key(
-    identity: &x25519::Identity,
-) -> Option<(ExpandedSecretKey, VerifyingKey)> {
+fn owner_signature_key(identity: &x25519::Identity) -> Option<(ExpandedSecretKey, VerifyingKey)> {
     let identity_bytes = decode_identity_bytes(identity)?;
     let mut expanded_bytes = [0u8; 64];
     expanded_bytes[..32].copy_from_slice(&identity_bytes);
@@ -172,12 +173,13 @@ fn owner_signature_key(
     Some((expanded, verifying_key))
 }
 
-fn owner_signature(
-    identity: &x25519::Identity,
-    payload: &[u8],
-) -> Option<Vec<u8>> {
+fn owner_signature(identity: &x25519::Identity, payload: &[u8]) -> Option<Vec<u8>> {
     let (expanded, verifying_key) = owner_signature_key(identity)?;
-    Some(raw_sign::<Sha512>(&expanded, payload, &verifying_key).to_bytes().to_vec())
+    Some(
+        raw_sign::<Sha512>(&expanded, payload, &verifying_key)
+            .to_bytes()
+            .to_vec(),
+    )
 }
 
 fn owner_signature_is_valid(
@@ -213,14 +215,11 @@ fn authorization_matches(
     };
     auth.version == RECIPIENT_AUTH_VERSION
         && required_role.is_none_or(|role| auth.role == role)
-        && expected_repo_key.is_some_and(|repo_key| {
-            auth.repo_key_commitment == repo_key_commitment(repo_key)
-        })
+        && expected_repo_key
+            .is_some_and(|repo_key| auth.repo_key_commitment == repo_key_commitment(repo_key))
         && matches!(
             auth.role.as_str(),
-            RECIPIENT_AUTH_ROLE_DIRECT
-                | RECIPIENT_AUTH_ROLE_MACHINE
-                | RECIPIENT_AUTH_ROLE_TEAM
+            RECIPIENT_AUTH_ROLE_DIRECT | RECIPIENT_AUTH_ROLE_MACHINE | RECIPIENT_AUTH_ROLE_TEAM
         )
         && auth.file_name == file_name
         && auth.recipient == recipient.to_string()
@@ -251,10 +250,7 @@ mod authorization_tests {
 
     static TEST_ENV_LOCK: Mutex<()> = Mutex::new(());
 
-    fn encrypt_for_age_recipient(
-        recipient: &x25519::Recipient,
-        plaintext: &[u8],
-    ) -> Vec<u8> {
+    fn encrypt_for_age_recipient(recipient: &x25519::Recipient, plaintext: &[u8]) -> Vec<u8> {
         let encryptor = age::Encryptor::with_recipients(vec![Box::new(recipient.clone())])
             .expect("create age encryptor");
         let mut ciphertext = Vec::new();
@@ -292,22 +288,16 @@ mod authorization_tests {
             encrypt_for_age_recipient(&owner_recipient, &forged_repo_key_bytes),
         )
         .expect("write forged canonical repo key");
-        fs::write(
-            keys_dir.join("evil.pub"),
-            delegated_recipient.to_string(),
-        )
-        .expect("write delegated recipient");
-        fs::write(keys_dir.join("evil.age"), b"delegation")
-            .expect("write delegated age marker");
+        fs::write(keys_dir.join("evil.pub"), delegated_recipient.to_string())
+            .expect("write delegated recipient");
+        fs::write(keys_dir.join("evil.age"), b"delegation").expect("write delegated age marker");
 
         let auth = RepoRecipientAuthorization {
             version: RECIPIENT_AUTH_VERSION,
             role: RECIPIENT_AUTH_ROLE_DIRECT.to_string(),
             file_name: "evil.pub".to_string(),
             recipient: delegated_recipient.to_string(),
-            repo_key_commitment: repo_key_commitment(&RepoKey(
-                forged_repo_key_bytes.to_vec(),
-            )),
+            repo_key_commitment: repo_key_commitment(&RepoKey(forged_repo_key_bytes.to_vec())),
         };
         let payload = serde_json::to_vec(&auth).expect("serialize authorization");
         let forged_repo_key = RepoKey(forged_repo_key_bytes.to_vec());
@@ -330,8 +320,8 @@ mod authorization_tests {
                 .encrypt_with_repo_key(&proof_key, &payload)
                 .expect("encrypt forged owner proof payload")
         };
-        let forged_signature = owner_signature(&delegated, &payload)
-            .expect("derive attacker signature");
+        let forged_signature =
+            owner_signature(&delegated, &payload).expect("derive attacker signature");
         let envelope = RepoRecipientAuthorizationEnvelope {
             version: RECIPIENT_AUTH_VERSION,
             repo_key_ciphertext,
@@ -389,8 +379,11 @@ mod authorization_tests {
             format!("{}\n{}\n", machine_recipient, MACHINE_RECIPIENT_MARKER),
         )
         .expect("write marked machine recipient");
-        fs::write(home_keys_dir.join("machine_builder.age"), b"machine identity")
-            .expect("write machine identity marker");
+        fs::write(
+            home_keys_dir.join("machine_builder.age"),
+            b"machine identity",
+        )
+        .expect("write machine identity marker");
         // A machine-only deployment may have only the old unmarked public
         // file plus ARCANE_MACHINE_KEY; the active machine recipient is
         // excluded independently of filename/marker heuristics.
@@ -404,7 +397,8 @@ mod authorization_tests {
             encrypt_for_age_recipient(&owner_recipient, &repo_key_bytes),
         )
         .expect("write repository key");
-        let mut owner_security = WardenSecurity::new(Some(&repo_root)).expect("init owner security");
+        let mut owner_security =
+            WardenSecurity::new(Some(&repo_root)).expect("init owner security");
         owner_security.master_identities.clear();
         owner_security.set_mock_home(home.clone());
         owner_security.add_memory_identity(owner.clone());
@@ -456,10 +450,7 @@ mod authorization_tests {
         .expect("write machine-forged envelope");
 
         let previous_machine_env = std::env::var("ARCANE_MACHINE_KEY").ok();
-        std::env::set_var(
-            "ARCANE_MACHINE_KEY",
-            machine.to_string().expose_secret(),
-        );
+        std::env::set_var("ARCANE_MACHINE_KEY", machine.to_string().expose_secret());
         let mut machine_security =
             WardenSecurity::new(Some(&repo_root)).expect("init machine-only security");
         machine_security.master_identities.clear();
@@ -755,7 +746,11 @@ impl WardenSecurity {
                 None,
             );
         }
-        trusted.extend(home_recipients.into_iter().map(|recipient| recipient.to_string()));
+        trusted.extend(
+            home_recipients
+                .into_iter()
+                .map(|recipient| recipient.to_string()),
+        );
         trusted
     }
 
@@ -878,9 +873,7 @@ impl WardenSecurity {
                 let Ok(metadata) = fs::symlink_metadata(&path) else {
                     continue;
                 };
-                if !metadata.file_type().is_file()
-                    || !is_canonical_repo_recipient_filename(&path)
-                {
+                if !metadata.file_type().is_file() || !is_canonical_repo_recipient_filename(&path) {
                     continue;
                 }
                 let Ok(content) = fs::read_to_string(&path) else {
@@ -1004,13 +997,16 @@ impl WardenSecurity {
         // Existing entries must be explicitly re-authorized; new output is a
         // V2 envelope with an owner signature and a DH-encrypted copy of the
         // authorization payload.
-        let Some(envelope) = serde_json::from_slice::<RepoRecipientAuthorizationEnvelope>(&auth_bytes).ok() else {
+        let Some(envelope) =
+            serde_json::from_slice::<RepoRecipientAuthorizationEnvelope>(&auth_bytes).ok()
+        else {
             return false;
         };
         if envelope.version != RECIPIENT_AUTH_VERSION {
             return false;
         }
-        let Ok(plaintext) = self.decrypt_with_repo_key(repo_key, &envelope.repo_key_ciphertext) else {
+        let Ok(plaintext) = self.decrypt_with_repo_key(repo_key, &envelope.repo_key_ciphertext)
+        else {
             return false;
         };
         let Ok(auth) = serde_json::from_slice::<RepoRecipientAuthorization>(&plaintext) else {
@@ -1185,9 +1181,7 @@ impl WardenSecurity {
     ) -> Result<()> {
         if !matches!(
             role,
-            RECIPIENT_AUTH_ROLE_DIRECT
-                | RECIPIENT_AUTH_ROLE_MACHINE
-                | RECIPIENT_AUTH_ROLE_TEAM
+            RECIPIENT_AUTH_ROLE_DIRECT | RECIPIENT_AUTH_ROLE_MACHINE | RECIPIENT_AUTH_ROLE_TEAM
         ) {
             anyhow::bail!("invalid repository recipient authorization role")
         }
@@ -1455,11 +1449,7 @@ impl WardenSecurity {
     /// parsing, but it cannot re-enable this unsafe path. Legacy ciphertexts
     /// must be recovered from a trusted plaintext source and re-encrypted
     /// using authenticated V2 encryption.
-    pub fn decrypt_git_seal(
-        &self,
-        _repo_key: &RepoKey,
-        _ciphertext: &[u8],
-    ) -> Result<Vec<u8>> {
+    pub fn decrypt_git_seal(&self, _repo_key: &RepoKey, _ciphertext: &[u8]) -> Result<Vec<u8>> {
         Err(anyhow::anyhow!(
             "V1 decryption refused: legacy AES-CFB ciphertext has no authenticated integrity; \
              recover the plaintext from a trusted source and re-encrypt with V2"

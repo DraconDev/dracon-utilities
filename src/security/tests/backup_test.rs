@@ -96,5 +96,8 @@ fn test_backup_does_not_overwrite_same_second_backup() {
         .restore_file(&original_path)
         .expect("restore failed");
     assert_eq!(restored_backup, second_backup);
-    assert_eq!(fs::read(&original_path).expect("read restored file failed"), second_content);
+    assert_eq!(
+        fs::read(&original_path).expect("read restored file failed"),
+        second_content
+    );
 }

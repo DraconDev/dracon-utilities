@@ -6,10 +6,10 @@ mod print;
 
 use anyhow::{Context, Result};
 use clap::{ArgAction, Parser, Subcommand};
-pub(crate) use dracon_security_kit::DraconWarden;
-use dracon_security_kit::set_managed_patterns;
 #[cfg(test)]
 use dracon_security_kit::clear_managed_patterns_override;
+use dracon_security_kit::set_managed_patterns;
+pub(crate) use dracon_security_kit::DraconWarden;
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use secrecy::ExposeSecret;
 use serde::Deserialize;
@@ -184,7 +184,13 @@ const ENCRYPTED_SECRETS_HEADER: &[&str] = &[
 ];
 const FORBIDDEN_PLAINTEXT_SUBSTRINGS: &[&str] = &[
     // Patterns that almost always carry secret material in our workflow.
-    ".env", "secrets/", "/secrets", "passwords.txt", "*.key", "*.pem", "*.age",
+    ".env",
+    "secrets/",
+    "/secrets",
+    "passwords.txt",
+    "*.key",
+    "*.pem",
+    "*.age",
 ];
 
 #[derive(Parser, Debug)]
@@ -989,7 +995,10 @@ fn ensure_repo_filter_config(repo: &Path) -> Result<bool> {
         ("filter.dracon.required", "true"),
         ("diff.dracon.textconv", "dracon-warden filter-smudge"),
         ("merge.dracon.driver", "dracon-warden merge %O %A %B"),
-        ("merge.dracon.name", "dracon-warden secret merge (decrypt, text-merge, re-encrypt)"),
+        (
+            "merge.dracon.name",
+            "dracon-warden secret merge (decrypt, text-merge, re-encrypt)",
+        ),
     ];
 
     let mut changed = false;
@@ -1230,8 +1239,7 @@ pub(crate) fn harden_repo(
     // outside it. `.gitattributes` gets the same treatment
     // (`build_gitattributes_block` never even looked at existing
     // content).
-    let existing_gitattributes =
-        fs::read_to_string(&gitattributes_path).unwrap_or_default();
+    let existing_gitattributes = fs::read_to_string(&gitattributes_path).unwrap_or_default();
     let merged_gitignore = replace_managed_block(
         &existing_gitignore,
         &build_gitignore_block_with_existing(policy, &existing_gitignore)?,
@@ -1410,9 +1418,7 @@ pub(crate) fn run_keygen() -> Result<()> {
                     pubkey_path.display()
                 )
             })?
-            .write_all(
-                format!("{}\n# dracon-warden role: machine\n", recipient).as_bytes(),
-            )
+            .write_all(format!("{}\n# dracon-warden role: machine\n", recipient).as_bytes())
             .with_context(|| format!("failed to write {}", pubkey_path.display()))?;
     }
     #[cfg(not(unix))]
@@ -2362,7 +2368,10 @@ fn run_filter(is_clean: bool, path: Option<&str>) -> Result<()> {
                 .components()
                 .any(|c| matches!(c, std::path::Component::ParentDir))
         {
-            eprintln!("dracon-warden: refusing filter path '{}' (smudge passthrough)", p);
+            eprintln!(
+                "dracon-warden: refusing filter path '{}' (smudge passthrough)",
+                p
+            );
             std::io::stdout().write_all(&input)?;
             return Ok(());
         }
@@ -2867,7 +2876,11 @@ fn run_setup_hooks(mode: HookMode, repo: Option<&Path>) -> Result<()> {
     // siblings) — warden owns this directory.
     fs::write(&pre_rebase_path, PRE_REBASE_HOOK)
         .with_context(|| format!("failed to write {}", pre_rebase_path.display()))?;
-    for name in ["pre-commit.pre-dracon", "pre-push.pre-dracon", "pre-rebase.pre-dracon"] {
+    for name in [
+        "pre-commit.pre-dracon",
+        "pre-push.pre-dracon",
+        "pre-rebase.pre-dracon",
+    ] {
         let stale = dir.join(name);
         if stale.exists() {
             let _ = fs::remove_file(&stale);
@@ -2926,7 +2939,12 @@ fn run_setup_hooks(mode: HookMode, repo: Option<&Path>) -> Result<()> {
                 // already written, leaving a partial application).
                 // Same bug class as the dracon-sync test-config
                 // incident the same week, but in production code.
-                .args(["config", "--local", "core.hooksPath", &dir.to_string_lossy()])
+                .args([
+                    "config",
+                    "--local",
+                    "core.hooksPath",
+                    &dir.to_string_lossy(),
+                ])
                 .output()
                 .context("failed to run git config")?;
             if !output.status.success() {
@@ -3045,7 +3063,10 @@ fn install_hooks_for_repo(repo: &Path) -> Result<()> {
     }
 
     fs::create_dir_all(&hooks_dir).with_context(|| {
-        format!("failed to create repository hooks directory {}", hooks_dir.display())
+        format!(
+            "failed to create repository hooks directory {}",
+            hooks_dir.display()
+        )
     })?;
 
     if !pre_commit_path.exists() {
