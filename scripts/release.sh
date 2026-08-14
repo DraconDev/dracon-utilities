@@ -21,7 +21,7 @@ Dispatch to the standalone release pipeline for one utility:
   scripts/release.sh dracon-warden <version> [options]
 
 Run the selected repository's scripts/release.sh --help for its options.
-The parent meta workspace has no coordinated release transaction.
+The parent meta-only workspace has no coordinated release transaction.
 EOF
 }
 
