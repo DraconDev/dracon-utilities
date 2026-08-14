@@ -30,13 +30,13 @@ Current release docs are tracked on `main`. Release notes live in [`CHANGELOG.md
 
 | Document | Purpose |
 |----------|---------|
-| [docs/ARCHITECTURE.md](ARCHITECTURE.md) | Service architecture, deterministic commit protocol, shared-library boundary |
+| [docs/ARCHITECTURE.md](ARCHITECTURE.md) | Service architecture, deterministic commit protocol, published-library boundary |
 | [docs/design/cli-print-style.md](design/cli-print-style.md) | Human-facing CLI output conventions and invariants |
 | [docs/design/warden-plaintext-sibling.md](design/warden-plaintext-sibling.md) | Warden plaintext escape hatch, threat model, revocation |
 | [docs/design/github-feature-repos.md](design/github-feature-repos.md) | GitHub façade repos for feature-focused utility surfaces |
 | [docs/design/sync-push-classification.md](design/sync-push-classification.md) | Push state classification rules and invariants for the `repos` table |
 | [docs/design/repos-state-cause.md](design/repos-state-cause.md) | `STATE` column vocabulary, threshold policy, and `last_push_for_branch` regression |
-| [UTILITY_BOUNDARIES.md](../UTILITY_BOUNDARIES.md) | Canonical ownership boundaries between utilities and `dracon-libs` |
+| [UTILITY_BOUNDARIES.md](../UTILITY_BOUNDARIES.md) | Canonical ownership boundaries between utilities and shared library crates |
 
 ## Historical Notes
 
