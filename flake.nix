@@ -43,8 +43,15 @@
           # Force rebuild when inputs change
           inherit dracon-sync-src dracon-system-src dracon-warden-src;
         } ''
-          mkdir -p $out
-          cp -r ${./.} $out/dracon-utilities
+          mkdir -p $out/dracon-utilities
+          cp -r ${./.}/. $out/dracon-utilities/
+          # The flake source may include local nested checkouts when it is
+          # evaluated from a dirty worktree. Make the copied tree writable
+          # before replacing those paths with the pinned standalone inputs.
+          chmod -R u+w $out/dracon-utilities
+          rm -rf $out/dracon-utilities/dracon-sync
+          rm -rf $out/dracon-utilities/dracon-system
+          rm -rf $out/dracon-utilities/dracon-warden
           cp -r ${dracon-sync-src} $out/dracon-utilities/dracon-sync
           cp -r ${dracon-system-src} $out/dracon-utilities/dracon-system
           cp -r ${dracon-warden-src} $out/dracon-utilities/dracon-warden
