@@ -52,7 +52,7 @@ recently and failed", and the four code sites are forced to consult it.
 5. **Hints must match the row classification.** A dirty repo with unpushed
    commits but no recent push failure is still a `WARN` row, so its hint
    says the daemon will push after changes settle instead of suggesting
-   `repair-concerns`.
+   `dracon-sync repair concerns`.
 6. **Intentional isolation is not a hidden concern.** A repo whose
    `.dracon/dracon-sync.toml` sets `intentional_no_upstream = true` is
    recognized as intentionally untracked by any remote. The
