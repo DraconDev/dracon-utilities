@@ -349,8 +349,9 @@ Evidence: endless-td's loop agent adapted correctly ON ITS OWN
 ## Daemon commands
 
 - `dracon-sync repos` — live state of all watched repos
-- `dracon-sync doctor` — diagnose a specific concern
-- `dracon-sync repair-concerns --apply` — apply a fix for a known concern
+- `dracon-sync health` — check daemon health and repository health
+- `dracon-sync repair concerns` — inspect known concerns (dry-run)
+- `dracon-sync repair concerns --apply` — apply a fix for a known concern
 - `systemctl --user status dracon-sync.service` — daemon health
 - `dracon-sync pause` / `dracon-sync resume` — freeze/unfreeze sync
   (daemon keeps RUNNING, skips cycles; 24h TTL self-heals forgotten pauses)
