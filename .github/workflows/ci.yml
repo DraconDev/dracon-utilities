@@ -27,16 +27,19 @@ jobs:
         with:
           repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
           path: dracon-sync
+          ref: fdc00690fe95f344b6e054bb73c30249c53102e8
       - name: Checkout dracon-system
         uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-system-disk-process-guard-doctor
           path: dracon-system
+          ref: b565510e25487e81b144f1d5221a9dc6fec3581b
       - name: Checkout dracon-warden
         uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-warden-secret-encrypt-age-git-filter
           path: dracon-warden
+          ref: f8e7577af24773764df0c6f2d979b8f5bf2491f0
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -54,16 +57,13 @@ jobs:
           restore-keys: ${{ runner.os }}-cargo-
 
       - name: Check formatting
-        run: cargo fmt -p dracon-sync -p dracon-system -p dracon-warden -- --check
+        run: cargo fmt --all -- --check
 
       - name: Clippy (all lints)
-        run: cargo clippy -p dracon-sync -p dracon-system -p dracon-warden -- -D clippy::all -D clippy::correctness -D clippy::suspicious -D clippy::complexity -D clippy::perf -D clippy::style
-
-      - name: Clippy (pedantic — warnings only)
-        run: cargo clippy -p dracon-sync -p dracon-system -p dracon-warden -- -W clippy::pedantic -W clippy::nursery 2>&1 | tail -1
+        run: cargo clippy --workspace --locked -- -D warnings
 
       - name: Docs (strict)
-        run: cargo doc -p dracon-sync -p dracon-system -p dracon-warden --no-deps
+        run: cargo doc --workspace --locked --no-deps
         env:
           RUSTDOCFLAGS: -D warnings
 
@@ -78,16 +78,19 @@ jobs:
         with:
           repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
           path: dracon-sync
+          ref: fdc00690fe95f344b6e054bb73c30249c53102e8
       - name: Checkout dracon-system
         uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-system-disk-process-guard-doctor
           path: dracon-system
+          ref: b565510e25487e81b144f1d5221a9dc6fec3581b
       - name: Checkout dracon-warden
         uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-warden-secret-encrypt-age-git-filter
           path: dracon-warden
+          ref: f8e7577af24773764df0c6f2d979b8f5bf2491f0
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -103,13 +106,13 @@ jobs:
           restore-keys: ${{ runner.os }}-cargo-
 
       - name: Build (debug)
-        run: cargo build -p dracon-sync -p dracon-system -p dracon-warden
+        run: cargo build --workspace --locked
 
       - name: Test (serial)
-        run: cargo test --workspace -- --test-threads=1
+        run: cargo test --workspace --locked -- --test-threads=1
 
       - name: Test (release profile)
-        run: cargo test --workspace --release -- --test-threads=1
+        run: cargo test --workspace --release --locked -- --test-threads=1
 
   release-build:
     name: Release Build
@@ -122,16 +125,19 @@ jobs:
         with:
           repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
           path: dracon-sync
+          ref: fdc00690fe95f344b6e054bb73c30249c53102e8
       - name: Checkout dracon-system
         uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-system-disk-process-guard-doctor
           path: dracon-system
+          ref: b565510e25487e81b144f1d5221a9dc6fec3581b
       - name: Checkout dracon-warden
         uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-warden-secret-encrypt-age-git-filter
           path: dracon-warden
+          ref: f8e7577af24773764df0c6f2d979b8f5bf2491f0
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -147,7 +153,7 @@ jobs:
           restore-keys: ${{ runner.os }}-cargo-release-
 
       - name: Build (release)
-        run: cargo build --release -p dracon-sync -p dracon-system -p dracon-warden
+        run: cargo build --workspace --release --locked
 
       - name: Check binary sizes
         run: |
@@ -194,16 +200,19 @@ jobs:
         with:
           repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
           path: dracon-sync
+          ref: fdc00690fe95f344b6e054bb73c30249c53102e8
       - name: Checkout dracon-system
         uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-system-disk-process-guard-doctor
           path: dracon-system
+          ref: b565510e25487e81b144f1d5221a9dc6fec3581b
       - name: Checkout dracon-warden
         uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-warden-secret-encrypt-age-git-filter
           path: dracon-warden
+          ref: f8e7577af24773764df0c6f2d979b8f5bf2491f0
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -219,16 +228,16 @@ jobs:
           restore-keys: ${{ runner.os }}-cargo-msrv-
 
       - name: Build
-        run: cargo build -p dracon-sync -p dracon-system -p dracon-warden
+        run: cargo build --workspace --locked
 
       - name: Clippy
-        run: cargo clippy -p dracon-sync -p dracon-system -p dracon-warden -- -D clippy::all -D clippy::correctness
+        run: cargo clippy --workspace --locked -- -D warnings
 
       - name: Test
-        run: cargo test --workspace -- --test-threads=1
+        run: cargo test --workspace --locked -- --test-threads=1
 
       - name: Clippy (MSRV)
-        run: cargo clippy -p dracon-sync -p dracon-system -p dracon-warden -- -D clippy::all -D clippy::correctness
+        run: cargo clippy --workspace --locked -- -D warnings
 
   deny:
     name: Dependencies
@@ -241,16 +250,19 @@ jobs:
         with:
           repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
           path: dracon-sync
+          ref: fdc00690fe95f344b6e054bb73c30249c53102e8
       - name: Checkout dracon-system
         uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-system-disk-process-guard-doctor
           path: dracon-system
+          ref: b565510e25487e81b144f1d5221a9dc6fec3581b
       - name: Checkout dracon-warden
         uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-warden-secret-encrypt-age-git-filter
           path: dracon-warden
+          ref: f8e7577af24773764df0c6f2d979b8f5bf2491f0
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
