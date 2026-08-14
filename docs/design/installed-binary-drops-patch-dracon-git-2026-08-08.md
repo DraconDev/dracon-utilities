@@ -83,15 +83,14 @@ are behavioral: run `repos --json` on any repo with a gitignored `.pi/`
 dir (must show 0), or diff the published crate's Cargo.toml against the
 workspace (published manifest must contain `[patch.crates-io]`).
 
-## Required follow-ups
+## Follow-up status (updated 2026-08-14)
 
-1. **Publish dracon-git v94.7.2 to crates.io** (needs
-   `CARGO_REGISTRY_TOKEN`), then remove `[patch.crates-io]` from the
-   workspace `Cargo.toml` and clear `deny.toml [sources].allow-git`.
-   This is the AGENTS.md-documented follow-up; this incident proves it
-   has real user-visible consequences, not just theoretical ones.
-2. **Harden the release pipeline**: `scripts/release.sh` (or the
-   install step) should run a post-install fixture check —
-   `repos --json` against a scratch repo with a gitignored `.pi/`
-   dir and assert `untracked == 0`. Cheap, catches this class
-   immediately after every future `cargo install`.
+1. **Resolved**: `dracon-git v94.7.2` was published to crates.io on
+   2026-08-08. The workspace now depends on `dracon-git = "94.7.2"`
+   directly, with no `[patch.crates-io]` workaround or git-source
+   allowlist. This closes the published-binary dependency gap.
+2. **Still recommended**: harden `scripts/release.sh` (or the install
+   step) with a post-install fixture check — run `repos --json` against
+   a scratch repo containing a gitignored `.pi/` directory and assert
+   `untracked == 0`. This remains a useful guard against future release
+   artifacts diverging from the workspace dependency graph.

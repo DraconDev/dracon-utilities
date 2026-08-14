@@ -131,13 +131,13 @@ was auto-committed. Treat the token as a secret even in markdown.)
 
 ## dracon-git / dracon-system-lib external deps
 
-The workspace depends on `dracon-git = "94.7.0"` and
+The workspace depends on `dracon-git = "94.7.2"` and
 `dracon-system-lib = "94.2.7"`. These are external crates.io deps
-and are not published by this script. The release flow assumes they
-are stable; if a new version of either is needed, the operator must
-publish it separately first and then update the workspace's
-`Cargo.toml` `dracon-git` / `dracon-system-lib` requirement before
-running `scripts/release.sh`.
+and are not published by this script. `dracon-git` 94.7.2 is already
+published; the release flow assumes both dependencies are stable. If
+a new version of either is needed, the operator must publish it
+separately first and then update the workspace's `Cargo.toml`
+requirement before running `scripts/release.sh`.
 
 ## Façade repos — auto-sync design
 
