@@ -1,8 +1,14 @@
 # Release process — 2026-06-21
 
-Status: design + working script (`scripts/release.sh`). Tested end-to-end
-with `--dry-run` against a fictitious version. Real cut is **blocked
-on operator decisions** (see "Open questions" at the bottom).
+Status: historical design (2026-06-21). The coordinated monorepo flow below
+is retained as an audit record, but is not the current release entry point.
+
+Current status (2026-08-14): releases are cut per nested standalone repo.
+For `dracon-sync`, use
+[`dracon-sync/scripts/release.sh`](../../dracon-sync/scripts/release.sh);
+it runs the required gates, packages the crate, and checks the packaged
+artifact with the isolated gitignore fixture before tagging. The old
+coordinated cut remains subject to the operator decisions documented below.
 
 ## Why this exists
 

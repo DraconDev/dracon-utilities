@@ -1,5 +1,9 @@
 # Installed binary silently dropped `[patch.crates-io]` → phantom untracked counts (2026-08-08)
 
+This document is a historical incident record. The symptom and root-cause
+sections describe the state observed on 2026-08-08; the current resolution is
+recorded in [Follow-up status](#follow-up-status-updated-2026-08-14) below.
+
 ## Symptom
 
 `dracon-sync repos` showed **persistent untracked counts** that never got
