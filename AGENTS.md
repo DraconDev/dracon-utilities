@@ -21,12 +21,12 @@ directory, each with its own `.git/`, its own remotes
 - `dracon-system/` → `codeberg:dracondev/dracon-system-disk-process-guard-doctor`
 - `dracon-warden/` → `codeberg:dracondev/dracon-warden-secret-encrypt-age-git-filter`
 
-The parent `Cargo.toml` is a plain `[workspace]` manifest listing
-`members = ["dracon-sync", "dracon-system", "dracon-warden"]` so the
-AGENTS.md test-discipline commands (`cargo build --release --locked`,
-`cargo test --workspace --locked`, `cargo deny check`) work from the
-monorepo root by path — it does **not** submodule or symlink the
-source. Because the source is in the nested repos, `git status` at
+The parent `Cargo.toml` is a plain `[workspace]` manifest listing the
+three utility crates plus the in-tree `dracon-warden/src/security`
+workspace member, so the AGENTS.md test-discipline commands (`cargo
+build --release --locked`, `cargo test --workspace --locked`, `cargo
+deny check`) work from the monorepo root by path — it does **not**
+submodule or symlink the source. Because the source is in the nested repos, `git status` at
 the parent shows `?? dracon-sync/` etc. as "untracked": these are the
 nested repos themselves, **not** lost files. To edit a utility, `cd`
 into its nested directory and work there; the daemon commits each
