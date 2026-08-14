@@ -1,5 +1,53 @@
 {
   "nodes": {
+    "dracon-sync-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1786748502,
+        "narHash": "sha256-pXIPfqN1wNMZSiS5jMNk+lvdxKpDvekXcczsCZpcHVQ=",
+        "owner": "DraconDev",
+        "repo": "dracon-sync-background-auto-commit-multi-remote",
+        "rev": "fdc00690fe95f344b6e054bb73c30249c53102e8",
+        "type": "github"
+      },
+      "original": {
+        "owner": "DraconDev",
+        "repo": "dracon-sync-background-auto-commit-multi-remote",
+        "type": "github"
+      }
+    },
+    "dracon-system-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1786748636,
+        "narHash": "sha256-563Bmf4TlHOdTLGCFilkKsvEfGb/kjpabi0ZDBWjQho=",
+        "owner": "DraconDev",
+        "repo": "dracon-system-disk-process-guard-doctor",
+        "rev": "b565510e25487e81b144f1d5221a9dc6fec3581b",
+        "type": "github"
+      },
+      "original": {
+        "owner": "DraconDev",
+        "repo": "dracon-system-disk-process-guard-doctor",
+        "type": "github"
+      }
+    },
+    "dracon-warden-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1786748502,
+        "narHash": "sha256-YVkLh7BY/jbO4lj8VQxMFC8/YY0jPGVM6v9Dha3GqZY=",
+        "owner": "DraconDev",
+        "repo": "dracon-warden-secret-encrypt-age-git-filter",
+        "rev": "f8e7577af24773764df0c6f2d979b8f5bf2491f0",
+        "type": "github"
+      },
+      "original": {
+        "owner": "DraconDev",
+        "repo": "dracon-warden-secret-encrypt-age-git-filter",
+        "type": "github"
+      }
+    },
     "flake-utils": {
       "inputs": {
         "systems": "systems"
@@ -36,6 +84,9 @@
     },
     "root": {
       "inputs": {
+        "dracon-sync-src": "dracon-sync-src",
+        "dracon-system-src": "dracon-system-src",
+        "dracon-warden-src": "dracon-warden-src",
         "flake-utils": "flake-utils",
         "nixpkgs": "nixpkgs"
       }
