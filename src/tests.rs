@@ -1159,6 +1159,18 @@ mod tests {
     }
 
     #[test]
+    fn salvage_invalid_json_preserves_unicode_before_marker() {
+        // The salvage scanner must advance by UTF-8 characters, not bytes.
+        // This input used to panic at the second byte of the lock emoji (and
+        // the byte-wise fallback corrupted any non-ASCII text it reached).
+        let input = r#"{"title":"钥匙🔒","value":[DRACON_SECRET:abc]}"#;
+        let salvaged = salvage_invalid_json_markers(input).expect("salvaged");
+        let value: serde_json::Value = serde_json::from_str(&salvaged).expect("parse");
+        assert_eq!(value["title"], serde_json::Value::String("钥匙🔒".into()));
+        assert!(value["value"].is_null());
+    }
+
+    #[test]
     fn effective_repo_roots_merges_and_dedupes() {
         let td = TestDir::new("warden_effective_roots");
         let p1 = td.path().join("one");
@@ -1538,6 +1550,11 @@ watch_roots = ["/tmp/test"]
             marker_prefix_at("text [DRACON_SECRET:abc] end", 5),
             Some("[DRACON_SECRET:"),
             "at position 5 [ bracket is at position 5"
+        );
+        assert_eq!(
+            marker_prefix_at("🔒 [DRACON_SECRET:abc]", 1),
+            None,
+            "a byte offset inside UTF-8 must be rejected without panicking"
         );
     }
 

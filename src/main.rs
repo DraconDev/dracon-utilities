@@ -1037,6 +1037,35 @@ fn ensure_repo_filter_config(repo: &Path) -> Result<bool> {
     Ok(changed)
 }
 
+/// Resolve the repository's actual git directory.
+///
+/// A normal checkout has a `.git` directory, while submodules and linked
+/// worktrees have a `.git` file containing a `gitdir:` pointer. Warden writes
+/// into these repositories too, so treating the pointer as a directory
+/// silently disables checkout-race protection for exactly those paths.
+fn resolved_git_dir(repo: &Path) -> Option<PathBuf> {
+    let dot_git = repo.join(".git");
+    if dot_git.is_dir() {
+        return Some(dot_git);
+    }
+
+    let content = fs::read_to_string(&dot_git).ok()?;
+    let raw = content
+        .lines()
+        .find_map(|line| line.trim().strip_prefix("gitdir:"))?
+        .trim();
+    if raw.is_empty() {
+        return None;
+    }
+
+    let path = Path::new(raw);
+    Some(if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        repo.join(path)
+    })
+}
+
 /// RAII guard that acquires `.git/index.lock` using the same protocol git uses.
 ///
 /// Git commands (checkout, add, reset, etc.) hold this lock while modifying
@@ -1061,7 +1090,10 @@ impl IndexLock {
     /// Returns Ok(lock) if acquired, Err if another process holds it.
     /// Uses `O_EXCL` (create_new) for atomic creation — no TOCTOU race.
     fn acquire(repo: &Path) -> Result<Self> {
-        let path = repo.join(".git").join("index.lock");
+        let git_dir = resolved_git_dir(repo).ok_or_else(|| {
+            anyhow::anyhow!("failed to resolve git directory for {}", repo.display())
+        })?;
+        let path = git_dir.join("index.lock");
         match fs::OpenOptions::new()
             .write(true)
             .create_new(true) // O_EXCL — fails if file exists
@@ -1098,7 +1130,9 @@ impl Drop for IndexLock {
 }
 
 fn is_repo_checked_out(repo: &Path) -> bool {
-    let git_dir = repo.join(".git");
+    let Some(git_dir) = resolved_git_dir(repo) else {
+        return false;
+    };
     let head = git_dir.join("HEAD");
 
     if !head.exists() {
@@ -1111,7 +1145,7 @@ fn is_repo_checked_out(repo: &Path) -> bool {
     };
 
     let head_content = head_content.trim();
-    if !head_content.starts_with("ref: refs/heads/") {
+    if head_content.is_empty() {
         return false;
     }
 
@@ -1703,7 +1737,7 @@ pub(crate) fn is_marker_string(s: &str) -> bool {
 }
 
 pub(crate) fn marker_prefix_at(s: &str, idx: usize) -> Option<&'static str> {
-    if s[idx..].starts_with("[DRACON_SECRET:") {
+    if s.get(idx..)?.starts_with("[DRACON_SECRET:") {
         Some("[DRACON_SECRET:")
     } else {
         None
@@ -1719,11 +1753,18 @@ pub(crate) fn salvage_invalid_json_markers(content: &str) -> Option<String> {
 
     let mut out = String::with_capacity(content.len());
     let mut i = 0usize;
-    let bytes = content.as_bytes();
     while i < content.len() {
         if marker_prefix_at(content, i).is_none() {
-            out.push(bytes[i] as char);
-            i += 1;
+            // Advance by a complete UTF-8 scalar. The old byte-at-a-time
+            // loop both panicked when `marker_prefix_at` sliced at a
+            // non-character boundary and emitted mojibake for ordinary
+            // non-ASCII text before a marker.
+            let ch = content[i..]
+                .chars()
+                .next()
+                .expect("i remains within valid UTF-8 content");
+            out.push(ch);
+            i += ch.len_utf8();
             continue;
         }
 
@@ -2960,19 +3001,39 @@ fn same_path(a: &Path, b: &Path) -> bool {
     }
 }
 
+fn common_hooks_dir(repo: &Path) -> Option<PathBuf> {
+    let git_dir = resolved_git_dir(repo)?;
+    let common_dir = match fs::read_to_string(git_dir.join("commondir")) {
+        Ok(raw) => {
+            let path = Path::new(raw.trim());
+            if path.is_absolute() {
+                path.to_path_buf()
+            } else {
+                git_dir.join(path)
+            }
+        }
+        Err(_) => git_dir,
+    };
+    Some(common_dir.join("hooks"))
+}
+
 fn install_hooks_for_repo(repo: &Path) -> Result<()> {
-    let hooks_dir = repo.join(".git/hooks");
-    if !hooks_dir.exists() {
+    let Some(local_hooks_dir) = common_hooks_dir(repo) else {
+        return Ok(());
+    };
+    if !local_hooks_dir.exists() {
         return Ok(());
     }
 
     let effective_hooks = effective_hooks_dir(repo)?;
-    if !same_path(&effective_hooks, &hooks_dir) {
+    if !same_path(&effective_hooks, &local_hooks_dir) {
         // Global or repo-local core.hooksPath is active.  Do not seed files
         // into an inactive directory; the effective wrapper is responsible
         // for chaining any pre-existing foreign local hooks.
         return Ok(());
     }
+
+    let hooks_dir = effective_hooks;
 
     let pre_commit_path = hooks_dir.join("pre-commit");
     let pre_push_path = hooks_dir.join("pre-push");
