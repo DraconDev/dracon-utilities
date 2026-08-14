@@ -2,27 +2,21 @@
 
 Public release repository for the Dracon system service CLI utilities. These tools install to `~/.local/bin/`, run as user-level system services where appropriate, and keep operational state outside the git tree.
 
-This repository contains the CLI wrappers and release packaging. Shared library code lives in the sibling [`dracon-libs`](https://github.com/DraconDev/dracon-libs) repository.
+This is the meta workspace and release-documentation repository. The three
+utilities are standalone git repositories nested below this directory; their
+published `dracon-git` and `dracon-system-lib` dependencies come from
+crates.io, so no `dracon-libs` checkout is required.
 
-## Latest versions (2026-07-27)
+## Latest versions (2026-08-15)
 
 | Utility | Version | What shipped | Release notes |
 |---------|---------|--------------|---------------|
-| `dracon-sync` | **v0.113.4** | Full-audit remediation batch 4 — SYNC-H4 visibility cache-poison + SYNC-H5 `standard_files` source path traversal | [release-notes-v0.113.4.md](dracon-sync/release-notes-v0.113.4.md) |
-| `dracon-warden` | **v0.113.2** | Pre-push hook `--not --remotes` scan — tag-push false-positive fix (F0.1 follow-up) | [release-notes-v0.113.2.md](dracon-warden/release-notes-v0.113.2.md) |
-| `dracon-system` | **v0.112.34** | Full-audit remediation batch 4 — SYS-H1 guard daemon busy-loop + SYS-H2 `link apply` drifted-symlink fix | [release-notes-v0.112.34.md](dracon-system/release-notes-v0.112.34.md) |
+| `dracon-sync` | **v0.113.50** | Standalone daemon repository; see its changelog for the latest release notes | [dracon-sync/CHANGELOG.md](dracon-sync/CHANGELOG.md) |
+| `dracon-warden` | **v0.113.4** | Standalone encryption and repository-hardening repository | [dracon-warden/CHANGELOG.md](dracon-warden/CHANGELOG.md) |
+| `dracon-system` | **v0.112.37** | Standalone disk/process guard repository | [dracon-system/CHANGELOG.md](dracon-system/CHANGELOG.md) |
 
-Interim `dracon-sync` releases also tagged: **v0.113.1** (FilterOnly
-push starvation fix), **v0.113.2** (full-audit batch 1 — SYNC-H1/H2/H3/H7/H8),
-**v0.113.3** (full-audit batch 3 — SYNC-H6 auto-repair backup + force-push).
-
-Interim `dracon-warden` releases also tagged: **v0.113.1** (full-audit
-batch 2 — WARDEN-H1/H2/H3/M2).
-
-The 3 utilities share one test-discipline gate (`cargo test
---workspace --locked` + `cargo clippy --workspace --locked -- -D
-warnings`). Current totals: **1038 tests passing, 0 failing**
-(`dracon-sync` 847 + `dracon-system` 88 + `dracon-warden` 103).
+The workspace gate is `cargo test --workspace --locked`, with the additional
+format, build, deny, and clippy checks documented in `AGENTS.md`.
 
 ## Install
 
@@ -34,16 +28,20 @@ cargo install dracon-system   # Disk, process, guard, doctor
 cargo install dracon-warden   # Secret, encrypt, age, git-filter
 ```
 
-Or install all 3 from the monorepo:
+Or build all 3 from a checkout of this meta workspace:
 
 ```bash
 git clone https://github.com/DraconDev/dracon-utilities.git
 cd dracon-utilities
+# The parent tracks the standalone repositories by path; clone them first.
+git clone https://github.com/DraconDev/dracon-sync-background-auto-commit-multi-remote.git dracon-sync
+git clone https://github.com/DraconDev/dracon-system-disk-process-guard-doctor.git dracon-system
+git clone https://github.com/DraconDev/dracon-warden-secret-encrypt-age-git-filter.git dracon-warden
 cargo build --release
 # Binaries at target/release/dracon-{sync,system,warden}
 ```
 
-Or install any one of the 3 long-name façade repos (independently buildable since v0.112.7):
+Each long-name repository is also independently buildable:
 
 ```bash
 git clone https://github.com/DraconDev/dracon-sync-background-auto-commit-multi-remote.git
@@ -59,15 +57,20 @@ cargo build --release
 | [`dracon-system`](dracon-system/README.md) | [crates.io](https://crates.io/crates/dracon-system) | Disk, process, guard, doctor — local machine diagnostics and watchdog | systemd user service |
 | [`dracon-warden`](dracon-warden/README.md) | [crates.io](https://crates.io/crates/dracon-warden) | Secret, encrypt, age, git-filter — repository hardening and smudge/clean encryption | git hooks + CLI |
 
-### Façade repos
+### Standalone utility repositories
 
-Each utility has a feature-presentation repo (a "façade") for discoverability on GitHub, GitLab, and Codeberg. As of v0.112.7, each façade repo is **independently buildable**: it contains the actual source code (mirrored from the monorepo), a standalone `Cargo.toml`, tests, examples, and the per-utility README. Cloning a façade repo + its sibling `dracon-libs` (and for warden, `dracon-utilities`) is enough to build that one utility.
+Each utility has its own standalone repository on GitHub, GitLab, and
+Codeberg. Those repositories contain the implementation, tests, examples, and
+release metadata; this parent repository provides the shared workspace,
+installer, CI, and operational documentation.
 
 - [`DraconDev/dracon-sync-background-auto-commit-multi-remote`](https://github.com/DraconDev/dracon-sync-background-auto-commit-multi-remote) (also on [GitLab](https://gitlab.com/DraconDev/dracon-sync-background-auto-commit-multi-remote) + [Codeberg](https://codeberg.org/dracondev/dracon-sync-background-auto-commit-multi-remote))
 - [`DraconDev/dracon-system-disk-process-guard-doctor`](https://github.com/DraconDev/dracon-system-disk-process-guard-doctor) (also on [GitLab](https://gitlab.com/DraconDev/dracon-system-disk-process-guard-doctor) + [Codeberg](https://codeberg.org/dracondev/dracon-system-disk-process-guard-doctor))
 - [`DraconDev/dracon-warden-secret-encrypt-age-git-filter`](https://github.com/DraconDev/dracon-warden-secret-encrypt-age-git-filter) (also on [GitLab](https://gitlab.com/DraconDev/dracon-warden-secret-encrypt-age-git-filter) + [Codeberg](https://codeberg.org/dracondev/dracon-warden-secret-encrypt-age-git-filter))
 
-The names are deliberately brutally-descriptive so they are self-explanatory in search results. The 3 façade repos stay in sync with this monorepo via `scripts/regenerate_facade_repos.py` (called from a `post-commit` hook). See `docs/design/github-feature-repos.md` for the full design.
+The names are deliberately descriptive so they are self-explanatory in search
+results. The daemon commits each nested repository independently; there is no
+façade-generation script or parent post-commit mirror step.
 
 ## Repository architecture
 
@@ -75,16 +78,19 @@ This is a 4-repo system with distinct roles. Each repo has one job:
 
 | Repo | Role | Contains | Updated by |
 |------|------|----------|------------|
-| `DraconDev/dracon-utilities` (this repo) | **Dev workspace + build source** | All 3 utilities' source code + monorepo build + `install.sh` + tests + docs | The operator (manual commits) + `dracon-sync` daemon (auto-commits to all 4 remotes) |
-| `DraconDev/dracon-sync-background-auto-commit-multi-remote` | **Canonical install target** for `dracon-sync` | Real source code (mirrored from monorepo) + standalone `Cargo.toml` + tests + README + LICENSE + .github/ | `post-commit` hook → `regenerate_facade_repos.py` → `dracon-sync` daemon (auto-pushes to all 3 remotes) |
-| `DraconDev/dracon-system-disk-process-guard-doctor` | **Canonical install target** for `dracon-system` | Same as above | Same |
-| `DraconDev/dracon-warden-secret-encrypt-age-git-filter` | **Canonical install target** for `dracon-warden` | Same as above | Same |
+| `DraconDev/dracon-utilities` (this repo) | **Meta workspace** | Workspace manifest, installer, CI, policy docs, and audit records | Operator + daemon for this repo |
+| `DraconDev/dracon-sync-background-auto-commit-multi-remote` | **Standalone source/install target** | `dracon-sync` source, tests, config, and release metadata | Daemon watches and pushes this repo |
+| `DraconDev/dracon-system-disk-process-guard-doctor` | **Standalone source/install target** | `dracon-system` source, tests, config, and release metadata | Daemon watches and pushes this repo |
+| `DraconDev/dracon-warden-secret-encrypt-age-git-filter` | **Standalone source/install target** | `dracon-warden` plus its embedded security crate | Daemon watches and pushes this repo |
 
-**Each repo is a real install target** since v0.112.7. Users can choose any of the 4 paths: `cargo install dracon-{sync,system,warden}` from crates.io, clone the long-name façade repo, or clone the monorepo.
+Each nested utility repository is a real install target. Users can choose
+`cargo install dracon-{sync,system,warden}` from crates.io, clone one of the
+standalone repositories, or clone this meta workspace plus its three nested
+members.
 
-**The flow is one-way**: operator edits code in the monorepo → commits trigger the `post-commit` hook → the hook runs `regenerate_facade_repos.py` for the affected utility → the script writes the new content to the 3 façade repo clones at `/home/dracon/Dev/facade-repos/` → the daemon (`dracon-sync`) sees the local change and auto-pushes to GitHub + GitLab + Codeberg. The crates.io publish is a separate manual step (`cargo publish -p <crate>`).
-
-For a per-utility visitor who lands on a façade repo, the README has standalone build + install instructions. For a developer who wants to build all 3, they clone the monorepo + the sibling `dracon-libs` repo and run `./install.sh` (or `cargo build --release`). For a user who just wants to install one tool, they can `cargo install dracon-{sync,system,warden}` from crates.io. See `docs/design/github-feature-repos.md` for the full design.
+Releases are cut from the relevant nested repository with its local
+`scripts/release.sh`. The parent workspace is for coordinated build and audit
+checks; it is not a source-mirroring layer.
 
 ## Quick Start
 
@@ -93,8 +99,10 @@ For a per-utility visitor who lands on a façade repo, the README has standalone
 git clone https://github.com/DraconDev/dracon-utilities.git
 cd dracon-utilities
 
-# Required for building
-git clone https://github.com/DraconDev/dracon-libs.git ../dracon-libs
+# Restore the three nested standalone repositories
+git clone https://github.com/DraconDev/dracon-sync-background-auto-commit-multi-remote.git dracon-sync
+git clone https://github.com/DraconDev/dracon-system-disk-process-guard-doctor.git dracon-system
+git clone https://github.com/DraconDev/dracon-warden-secret-encrypt-age-git-filter.git dracon-warden
 
 # Install all utilities
 ./install.sh

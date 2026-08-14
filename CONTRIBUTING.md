@@ -4,13 +4,16 @@ Thank you for contributing to Dracon Utilities. This repository publishes determ
 
 ## What Belongs Here
 
-This repository owns three CLI binaries and their release packaging:
+This repository coordinates three standalone CLI repositories and owns their
+workspace build, installer, CI, and operational documentation:
 
 - `dracon-sync` — git sync automation
 - `dracon-system` — disk/process/storage diagnostics and guard behavior
 - `dracon-warden` — git filter encryption and repo hardening
 
-Shared library code lives in the sibling [`dracon-libs`](https://github.com/DraconDev/dracon-libs) repository. Keep reusable capabilities in `dracon-libs`; keep these crates focused on CLI, policy, packaging, and orchestration.
+The implementation for each utility lives in its nested standalone git repo.
+The published `dracon-git` and `dracon-system-lib` crates provide shared
+library functionality; do not add a local `dracon-libs` path dependency.
 
 ## License
 
@@ -28,8 +31,10 @@ All contributions are licensed under [AGPL-3.0-only](./LICENSE). By submitting a
 ## Setup
 
 ```bash
-# Required sibling dependency
-git clone https://github.com/DraconDev/dracon-libs.git ../dracon-libs
+# Restore the nested standalone repositories (the parent is meta-only)
+git clone https://github.com/DraconDev/dracon-sync-background-auto-commit-multi-remote.git dracon-sync
+git clone https://github.com/DraconDev/dracon-system-disk-process-guard-doctor.git dracon-system
+git clone https://github.com/DraconDev/dracon-warden-secret-encrypt-age-git-filter.git dracon-warden
 
 # Optional local diagnostics
 ./doctor.sh

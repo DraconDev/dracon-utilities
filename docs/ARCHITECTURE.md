@@ -101,15 +101,16 @@ Every metric is regex-extracted from the diff. No LLM, no guessing.
 
 ## Shared Libraries
 
-The CLI binaries are wrappers. Shared logic lives in a sibling repo:
+The utility repositories are standalone install targets. The reusable git and
+system helpers are consumed as published crates (`dracon-git` and
+`dracon-system-lib`); no sibling `dracon-libs` checkout is needed to build the
+workspace. `dracon-warden` keeps its security crate under
+`dracon-warden/src/security` so the audited local implementation is part of
+the workspace build.
 
-```
-dracon-libs/                (required for building)
-├── services/ai/            ← AI adapters, router, lanes
-└── tools/sync/dracon-git/  ← git operations library
-```
-
-`dracon-libs` must be checked out as a sibling to `dracon-utilities`. Only the CLI binaries get installed.
+The parent repository itself is meta-only. Its `Cargo.toml` names the three
+nested standalone repositories as workspace members, which is why a local
+checkout must restore those directories before running Cargo.
 
 ## Coordination: IndexLock
 
