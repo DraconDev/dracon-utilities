@@ -1,21 +1,5 @@
 {
   "nodes": {
-    "dracon-libs": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1778920181,
-        "narHash": "sha256-xsEosidIztW5b8tSaadyVeJTkXeK5EqAag7eTFMqnqk=",
-        "owner": "DraconDev",
-        "repo": "dracon-libs",
-        "rev": "2ef499990f8702a3e4970a0d3ae1886c71a560fc",
-        "type": "github"
-      },
-      "original": {
-        "owner": "DraconDev",
-        "repo": "dracon-libs",
-        "type": "github"
-      }
-    },
     "flake-utils": {
       "inputs": {
         "systems": "systems"
@@ -52,7 +36,6 @@
     },
     "root": {
       "inputs": {
-        "dracon-libs": "dracon-libs",
         "flake-utils": "flake-utils",
         "nixpkgs": "nixpkgs"
       }

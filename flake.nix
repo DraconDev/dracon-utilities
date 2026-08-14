@@ -4,34 +4,50 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
-    dracon-libs = {
-      url = "github:DraconDev/dracon-libs";
+    dracon-sync-src = {
+      url = "github:DraconDev/dracon-sync-background-auto-commit-multi-remote";
+      flake = false;
+    };
+    dracon-system-src = {
+      url = "github:DraconDev/dracon-system-disk-process-guard-doctor";
+      flake = false;
+    };
+    dracon-warden-src = {
+      url = "github:DraconDev/dracon-warden-secret-encrypt-age-git-filter";
       flake = false;
     };
   };
 
-  outputs = { self, nixpkgs, flake-utils, dracon-libs }:
+  outputs = {
+    self,
+    nixpkgs,
+    flake-utils,
+    dracon-sync-src,
+    dracon-system-src,
+    dracon-warden-src,
+  }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; };
 
-        # Merge dracon-utilities and dracon-libs into a single source tree
-        # so that Cargo path dependencies (../../dracon-libs/...) resolve.
+        # Reconstruct the plain workspace expected by Cargo.  The parent repo
+        # is intentionally meta-only, so its three standalone members arrive
+        # as separate flake inputs.
         #
         # Layout inside mergedSrc:
         #   dracon-utilities/   <- workspace root (Cargo.toml, Cargo.lock, crates)
-        #   dracon-libs/        <- sibling (tools/sync/dracon-git, tools/system/dracon-system)
-        #
-        # dracon-sync depends on ../../dracon-libs/tools/sync/dracon-git
-        # dracon-system depends on ../../dracon-libs/tools/system/dracon-system
-        # Both resolve because dracon-libs is a sibling of dracon-utilities.
+        #   dracon-utilities/dracon-sync/   <- standalone workspace member
+        #   dracon-utilities/dracon-system/ <- standalone workspace member
+        #   dracon-utilities/dracon-warden/ <- standalone workspace member
         mergedSrc = pkgs.runCommand "dracon-merged-src" {
           # Force rebuild when inputs change
-          inherit dracon-libs;
+          inherit dracon-sync-src dracon-system-src dracon-warden-src;
         } ''
           mkdir -p $out
           cp -r ${./.} $out/dracon-utilities
-          cp -r ${dracon-libs} $out/dracon-libs
+          cp -r ${dracon-sync-src} $out/dracon-utilities/dracon-sync
+          cp -r ${dracon-system-src} $out/dracon-utilities/dracon-system
+          cp -r ${dracon-warden-src} $out/dracon-utilities/dracon-warden
           # Make writable for buildRustPackage (Cargo needs to write target/, .cargo/)
           chmod -R u+w $out
         '';
@@ -125,11 +141,6 @@
 
           shellHook = ''
             echo "Dracon Utilities dev shell loaded"
-            # Link dracon-libs if not present (for Cargo path deps)
-            if [ ! -d "../dracon-libs" ]; then
-              echo "NOTE: dracon-libs not found at ../dracon-libs"
-              echo "  git clone https://github.com/DraconDev/dracon-libs.git ../dracon-libs"
-            fi
           '';
         };
       }

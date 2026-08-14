@@ -20,8 +20,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Checkout dracon-libs
-        run: git clone https://github.com/DraconDev/dracon-libs.git ../dracon-libs
+      # The parent repo is meta-only; restore its standalone workspace members
+      # at the paths expected by Cargo.toml.
+      - name: Checkout dracon-sync
+        uses: actions/checkout@v4
+        with:
+          repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
+          path: dracon-sync
+      - name: Checkout dracon-system
+        uses: actions/checkout@v4
+        with:
+          repository: DraconDev/dracon-system-disk-process-guard-doctor
+          path: dracon-system
+      - name: Checkout dracon-warden
+        uses: actions/checkout@v4
+        with:
+          repository: DraconDev/dracon-warden-secret-encrypt-age-git-filter
+          path: dracon-warden
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -58,8 +73,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Checkout dracon-libs
-        run: git clone https://github.com/DraconDev/dracon-libs.git ../dracon-libs
+      - name: Checkout dracon-sync
+        uses: actions/checkout@v4
+        with:
+          repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
+          path: dracon-sync
+      - name: Checkout dracon-system
+        uses: actions/checkout@v4
+        with:
+          repository: DraconDev/dracon-system-disk-process-guard-doctor
+          path: dracon-system
+      - name: Checkout dracon-warden
+        uses: actions/checkout@v4
+        with:
+          repository: DraconDev/dracon-warden-secret-encrypt-age-git-filter
+          path: dracon-warden
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -89,8 +117,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Checkout dracon-libs
-        run: git clone https://github.com/DraconDev/dracon-libs.git ../dracon-libs
+      - name: Checkout dracon-sync
+        uses: actions/checkout@v4
+        with:
+          repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
+          path: dracon-sync
+      - name: Checkout dracon-system
+        uses: actions/checkout@v4
+        with:
+          repository: DraconDev/dracon-system-disk-process-guard-doctor
+          path: dracon-system
+      - name: Checkout dracon-warden
+        uses: actions/checkout@v4
+        with:
+          repository: DraconDev/dracon-warden-secret-encrypt-age-git-filter
+          path: dracon-warden
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -148,8 +189,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Checkout dracon-libs
-        run: git clone https://github.com/DraconDev/dracon-libs.git ../dracon-libs
+      - name: Checkout dracon-sync
+        uses: actions/checkout@v4
+        with:
+          repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
+          path: dracon-sync
+      - name: Checkout dracon-system
+        uses: actions/checkout@v4
+        with:
+          repository: DraconDev/dracon-system-disk-process-guard-doctor
+          path: dracon-system
+      - name: Checkout dracon-warden
+        uses: actions/checkout@v4
+        with:
+          repository: DraconDev/dracon-warden-secret-encrypt-age-git-filter
+          path: dracon-warden
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -182,8 +236,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Checkout dracon-libs
-        run: git clone https://github.com/DraconDev/dracon-libs.git ../dracon-libs
+      - name: Checkout dracon-sync
+        uses: actions/checkout@v4
+        with:
+          repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
+          path: dracon-sync
+      - name: Checkout dracon-system
+        uses: actions/checkout@v4
+        with:
+          repository: DraconDev/dracon-system-disk-process-guard-doctor
+          path: dracon-system
+      - name: Checkout dracon-warden
+        uses: actions/checkout@v4
+        with:
+          repository: DraconDev/dracon-warden-secret-encrypt-age-git-filter
+          path: dracon-warden
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
