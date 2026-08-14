@@ -404,7 +404,10 @@ watching. Three things changed:
    true): during warn/critical memory pressure the top-5 RSS offenders
    get graduated nice (4 GiB → 5, 8 GiB → 10), restored on recovery.
    Fixes the "system unresponsive" symptom (CPU starvation) without
-   killing. Whitelist via `process_exempt_names`.
+   killing. The implementation applies this only when the service has
+   `CAP_SYS_NICE`, because an unprivileged user service can lower priority
+   but cannot restore it; otherwise it emits one diagnostic and leaves
+   processes untouched. Whitelist via `process_exempt_names`.
 3. **OOM-killer bias** (`bias_oom_on_pressure`, default true): during
    critical pressure offenders get `oom_score_adj` 250 so the kernel's
    last-resort kill picks them, not an innocent process. Never
