@@ -184,9 +184,12 @@ cooldown directly, so the repo is skipped until the timer expires.
   create` fails, the daemon retries with HTTPS fallback; a permanent
   failure (e.g., 403 from the GitHub API) is logged but does not
   block other remotes.
-- The webhook notifier fires for every push failure regardless of
-  classification. The classification determines whether the daemon
-  retries; the webhook is purely informational.
+- A single push failure is logged to the journal and incident/stuck
+  ledgers but does not page the operator. Desktop and configured webhook
+  notifications are reserved for sustained states: a mirror degraded
+  across repeated failures, a repo stuck ahead for the sustained-state
+  threshold, or exhaustion of the persisted push retry budget. The
+  classified failure cause is included only once the failure persists.
 - `repair stuck-list` is the operator's escape hatch for repos that
   have been `STUCK_PUSH` long enough to require manual intervention.
   It is unaffected by this classification and always lists the same
