@@ -39,7 +39,7 @@ jobs:
         with:
           repository: DraconDev/dracon-warden-secret-encrypt-age-git-filter
           path: dracon-warden
-          ref: f4c3a78328803c6ff4d1047ca840424dddda8863
+          ref: aed7e9771101ae284bc1ff825ceec8ba6b4c8b98
 
       - name: Verify nested source pins
         run: python3 scripts/check-nested-pins.py --check-local
@@ -93,7 +93,7 @@ jobs:
         with:
           repository: DraconDev/dracon-warden-secret-encrypt-age-git-filter
           path: dracon-warden
-          ref: f4c3a78328803c6ff4d1047ca840424dddda8863
+          ref: aed7e9771101ae284bc1ff825ceec8ba6b4c8b98
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -140,7 +140,7 @@ jobs:
         with:
           repository: DraconDev/dracon-warden-secret-encrypt-age-git-filter
           path: dracon-warden
-          ref: f4c3a78328803c6ff4d1047ca840424dddda8863
+          ref: aed7e9771101ae284bc1ff825ceec8ba6b4c8b98
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -215,7 +215,7 @@ jobs:
         with:
           repository: DraconDev/dracon-warden-secret-encrypt-age-git-filter
           path: dracon-warden
-          ref: f4c3a78328803c6ff4d1047ca840424dddda8863
+          ref: aed7e9771101ae284bc1ff825ceec8ba6b4c8b98
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -265,7 +265,7 @@ jobs:
         with:
           repository: DraconDev/dracon-warden-secret-encrypt-age-git-filter
           path: dracon-warden
-          ref: f4c3a78328803c6ff4d1047ca840424dddda8863
+          ref: aed7e9771101ae284bc1ff825ceec8ba6b4c8b98
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable

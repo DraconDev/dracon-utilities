@@ -37,11 +37,11 @@
     "dracon-warden-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1786776014,
-        "narHash": "sha256-LIpo96adNPQx+tRF9GgGzGPPYngVX1MZgZqGwX4k2Ps=",
+        "lastModified": 1786776613,
+        "narHash": "sha256-qMSM7gvBVSw3PYxjFkLet/hBbkVut0g6i6GG2S/5//g=",
         "owner": "DraconDev",
         "repo": "dracon-warden-secret-encrypt-age-git-filter",
-        "rev": "f4c3a78328803c6ff4d1047ca840424dddda8863",
+        "rev": "aed7e9771101ae284bc1ff825ceec8ba6b4c8b98",
         "type": "github"
       },
       "original": {
