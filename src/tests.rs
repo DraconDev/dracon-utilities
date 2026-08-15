@@ -510,6 +510,39 @@ mod tests {
         }
     }
 
+    #[test]
+    fn global_hook_install_preserves_and_chains_foreign_hooks() {
+        let td = TestDir::new("global_hook_foreign_preserve");
+        let hooks_dir = td.path().join("hooks");
+        fs::create_dir_all(&hooks_dir).expect("hooks directory");
+        let foreign = hooks_dir.join("pre-commit");
+        let foreign_content = "#!/bin/sh\necho foreign-hook\n";
+        fs::write(&foreign, foreign_content).expect("foreign hook");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&foreign, fs::Permissions::from_mode(0o755))
+                .expect("foreign hook permissions");
+        }
+
+        let preserved = install_global_hooks(&hooks_dir).expect("global hook install");
+        let backup = hooks_dir.join("pre-commit.dracon-foreign");
+        assert!(preserved.iter().any(|path| path == &backup));
+        assert_eq!(
+            fs::read_to_string(&backup).expect("preserved foreign hook"),
+            foreign_content
+        );
+        let installed = fs::read_to_string(&foreign).expect("installed Warden hook");
+        assert!(installed.contains("Dracon Warden"));
+        assert!(installed.contains(&shell_single_quote(&backup)));
+        for name in ["pre-commit", "pre-push", "pre-rebase"] {
+            assert!(
+                hooks_dir.join(name).is_file(),
+                "global hook {name} should be installed"
+            );
+        }
+    }
+
     /// ADDED 2026-07-21 (v0.112.32, audit M31/F4.5): the clean
     /// direction must FAIL CLOSED for oversized inputs and refused
     /// paths (passthrough would commit the file UNENCRYPTED), while

@@ -292,9 +292,10 @@ enum Command {
     /// Install git hooks globally for warden encryption enforcement.
     ///
     /// Installs pre-commit and pre-push hooks to ~/.config/git/hooks/
-    /// and sets core.hooksPath globally. The pre-commit hook blocks commits
-    /// if the warden filter is not configured. The pre-push hook scans for
-    /// plaintext secrets as defense-in-depth.
+    /// and sets core.hooksPath globally. Same-named foreign hooks are moved
+    /// to `.dracon-foreign` siblings and chained after being preserved. The
+    /// pre-commit hook blocks commits if the warden filter is not configured.
+    /// The pre-push hook scans for plaintext secrets as defense-in-depth.
     SetupHooks {
         /// Install hooks globally (default). Sets core.hooksPath in global git config.
         #[arg(long, conflicts_with = "local")]
