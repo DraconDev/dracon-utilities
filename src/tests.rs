@@ -1021,7 +1021,11 @@ mod tests {
 
         let hooks_dir = repo.join(".git/hooks");
         for name in ["pre-commit", "pre-push", "pre-rebase"] {
-            fs::remove_file(hooks_dir.join(name)).expect("remove template hook");
+            match fs::remove_file(hooks_dir.join(name)) {
+                Ok(()) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => panic!("remove template hook: {error}"),
+            }
         }
         let shadow_dir = td.path().join("effective-hooks");
         fs::create_dir_all(&shadow_dir).expect("shadow hooks dir");
@@ -2903,11 +2907,28 @@ protected_patterns = ["secrets.json"]
         )
         .expect("global gitconfig");
 
+        // The hook verifies that the filter executable is available on PATH.
+        // Workspace tests normally inherit the operator's installation, but
+        // Nix's isolated build environment intentionally does not.  Provide
+        // a harmless stand-in so this test exercises config scope rather than
+        // depending on an ambient user installation.
+        let bin_dir = td.path().join("bin");
+        fs::create_dir_all(&bin_dir).expect("bin dir");
+        let warden_bin = bin_dir.join("dracon-warden");
+        fs::write(&warden_bin, "#!/bin/sh\nexit 0\n").expect("warden stand-in");
+        chmod_755(&warden_bin);
+        let test_path = format!(
+            "{}:{}",
+            bin_dir.display(),
+            std::env::var("PATH").unwrap_or_default()
+        );
+
         use std::process::Command;
         let output = Command::new(&hook)
             .current_dir(repo)
             .env("GIT_CONFIG_GLOBAL", &global_cfg)
             .env("GIT_CONFIG_SYSTEM", "/dev/null")
+            .env("PATH", &test_path)
             .output()
             .expect("run hook");
         let text = String::from_utf8_lossy(&output.stdout).to_string()
@@ -2934,6 +2955,7 @@ protected_patterns = ["secrets.json"]
             .current_dir(repo)
             .env("GIT_CONFIG_GLOBAL", &global_cfg)
             .env("GIT_CONFIG_SYSTEM", "/dev/null")
+            .env("PATH", &test_path)
             .output()
             .expect("run hook");
         assert!(
