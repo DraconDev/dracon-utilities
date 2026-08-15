@@ -2531,9 +2531,7 @@ fn next_foreign_hook_backup(path: &Path) -> Result<PathBuf> {
 
     let pid = std::process::id();
     for index in 0..10_000u32 {
-        let candidate = path.with_file_name(format!(
-            "{file_name}.dracon-foreign.{pid}.{index}"
-        ));
+        let candidate = path.with_file_name(format!("{file_name}.dracon-foreign.{pid}.{index}"));
         if !candidate.exists() {
             return Ok(candidate);
         }
@@ -2582,11 +2580,7 @@ fn prepare_hook(path: &Path, content: &[u8]) -> Result<tempfile::NamedTempFile> 
 fn restore_hook_bytes(path: &Path, content: &[u8]) -> Result<()> {
     let temp = prepare_hook(path, content)?;
     temp.persist(path).map_err(|error| {
-        anyhow::anyhow!(
-            "failed to restore hook {}: {}",
-            path.display(),
-            error.error
-        )
+        anyhow::anyhow!("failed to restore hook {}: {}", path.display(), error.error)
     })?;
     Ok(())
 }
@@ -3121,10 +3115,7 @@ fn run_setup_hooks(mode: HookMode, repo: Option<&Path>) -> Result<()> {
             let pre_commit_path = dir.join("pre-commit");
             let pre_push_path = dir.join("pre-push");
             let pre_rebase_path = dir.join("pre-rebase");
-            write_hook_atomically(
-                &pre_commit_path,
-                &render_hook(PRE_COMMIT_HOOK, None),
-            )?;
+            write_hook_atomically(&pre_commit_path, &render_hook(PRE_COMMIT_HOOK, None))?;
             write_hook_atomically(&pre_push_path, &render_hook(PRE_PUSH_HOOK, None))?;
             // ADDED 2026-07-25 (v0.113.0): the history-rewrite guard's
             // rebase side. Also clean up stale chaining artifacts from the
@@ -3157,10 +3148,7 @@ fn run_setup_hooks(mode: HookMode, repo: Option<&Path>) -> Result<()> {
     }
 
     for path in &preserved_foreign_hooks {
-        println!(
-            "   preserved foreign global hook = {}",
-            path.display()
-        );
+        println!("   preserved foreign global hook = {}", path.display());
     }
 
     // Set executable permissions
@@ -3346,10 +3334,7 @@ fn install_hooks_for_repo(repo: &Path) -> Result<()> {
     })?;
 
     if !pre_commit_path.exists() {
-        write_hook_atomically(
-            &pre_commit_path,
-            &render_hook(PRE_COMMIT_HOOK, None),
-        )?;
+        write_hook_atomically(&pre_commit_path, &render_hook(PRE_COMMIT_HOOK, None))?;
     }
     if !pre_push_path.exists() {
         write_hook_atomically(&pre_push_path, &render_hook(PRE_PUSH_HOOK, None))?;
