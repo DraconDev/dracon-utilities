@@ -11,7 +11,10 @@ output="$(nix flake check --no-build 2>&1)" || {
 }
 
 unexpected="$({
-    printf '%s\n' "$output" | grep '^warning:' | grep -v "unknown flake output 'homeManagerModules'" || true
+    printf '%s\n' "$output" \
+        | grep '^warning:' \
+        | grep -v "unknown flake output 'homeManagerModules'" \
+        | grep -Ev "^warning: Git tree .* is dirty$" || true
 } | sed '/^warning: The check omitted these incompatible systems:/d' | sed "/^Use '--all-systems' to check all\./d")"
 
 if [[ -n "$unexpected" ]]; then
@@ -21,7 +24,8 @@ if [[ -n "$unexpected" ]]; then
 fi
 
 printf '%s\n' "$output" \
+    | sed -E '/^warning: Git tree .* is dirty$/d' \
     | sed "/^warning: unknown flake output 'homeManagerModules'$/d" \
-    | sed '/^warning: The check omitted these incompatible systems:$/d' \
+    | sed '/^warning: The check omitted these incompatible systems:/d' \
     | sed "/^Use '--all-systems' to check all\.$/d"
 echo "PASS: Nix flake checks passed (Home Manager output warning is intentional and documented)."
