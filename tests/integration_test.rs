@@ -6,8 +6,7 @@ use std::path::PathBuf;
 
 /// Helper to run a git command.
 fn git_cmd(repo: &PathBuf, args: &[&str]) -> std::process::Output {
-    let git_bin = std::env::var("DRACON_SYNC_GIT_BIN")
-        .unwrap_or_else(|_| "/run/current-system/sw/bin/git".to_string());
+    let git_bin = std::env::var("DRACON_SYNC_GIT_BIN").unwrap_or_else(|_| "git".to_string());
     std::process::Command::new(&git_bin)
         .arg("-C")
         .arg(repo)
