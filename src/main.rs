@@ -2921,11 +2921,22 @@ while read local_ref local_sha remote_ref remote_sha; do
         continue
     fi
 
-    # Determine the diff range to scan
+    # Determine the diff range to scan.
     if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
-        # New branch — scan the entire local commit history being pushed.
-        # Use the empty-tree SHA so `git diff` always has a valid left side,
-        # even if the remote ref hasn't been created yet.
+        # A tag commonly points at a commit that was already published on a
+        # branch. The old empty-tree range re-scanned the entire repository
+        # for that tag and could reject historical documentation placeholders
+        # as if they were newly pushed secrets. If the tag accompanies a
+        # branch update in this same push, the branch leg below already scans
+        # the new commit; if the branch was pushed earlier, the remote-tracking
+        # ref proves the tag target was already scanned and accepted.
+        PUBLISHED_COMMITS=$(git rev-list "$local_sha" --not --remotes 2>/dev/null || true)
+        if [ -z "$PUBLISHED_COMMITS" ] || awk -v sha="$local_sha" \
+            '$1 ~ /^refs\/heads\// && $2 == sha { found=1 } END { exit(found ? 0 : 1) }' \
+            "$REFS_FILE"; then
+            continue
+        fi
+        # A genuinely new tag/branch still scans from the empty tree.
         RANGE="4b825dc642cb6eb9a060e54bf8d69288fbee4904..$local_sha"
     else
         # Existing branch — scan commits being pushed

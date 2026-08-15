@@ -171,21 +171,15 @@ mod tests {
         String::from_utf8(out.stdout).expect("utf8 stdout")
     }
 
-    /// Invoke the pre-push hook as a subprocess with a single
-    /// `<local_ref> <local_sha> <remote_ref> <remote_sha>` line on stdin.
+    /// Invoke the pre-push hook with a caller-provided ref stream.
     /// Returns the exit status and captured stderr.
-    fn run_hook(
+    fn run_hook_input(
         repo: &std::path::Path,
         hook_path: &std::path::Path,
-        local_sha: &str,
-        remote_sha: &str,
+        stdin_data: &str,
     ) -> (std::process::ExitStatus, String) {
         use std::io::Write;
         use std::process::{Command, Stdio};
-        let stdin_data = format!(
-            "refs/heads/main {} refs/heads/main {}\n",
-            local_sha, remote_sha
-        );
         let mut child = Command::new(hook_path)
             .current_dir(repo)
             .stdin(Stdio::piped())
@@ -202,6 +196,20 @@ mod tests {
         let output = child.wait_with_output().expect("wait hook");
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
         (output.status, stderr)
+    }
+
+    /// Invoke the pre-push hook with a single branch ref update.
+    fn run_hook(
+        repo: &std::path::Path,
+        hook_path: &std::path::Path,
+        local_sha: &str,
+        remote_sha: &str,
+    ) -> (std::process::ExitStatus, String) {
+        let stdin_data = format!(
+            "refs/heads/main {} refs/heads/main {}\n",
+            local_sha, remote_sha
+        );
+        run_hook_input(repo, hook_path, &stdin_data)
     }
 
     /// Empty tree SHA — used as the "remote side" when simulating the
@@ -228,6 +236,47 @@ mod tests {
             status.success(),
             "hook should pass on clean push, but exited with: {:?}",
             status.code()
+        );
+    }
+
+    /// A tag pushed alongside an already-scanned branch commit must not
+    /// rescan the entire historical tree. This is the production release
+    /// shape: the branch and tag point at the same new commit, while an older
+    /// documentation placeholder contains a secret-shaped token name.
+    #[test]
+    fn pre_push_hook_tag_does_not_rescan_published_history() {
+        let (td, hook_path) = make_repo_with_pre_push_hook("hook_tag_published_history");
+        let repo = td.path();
+
+        fs::write(
+            repo.join("docs.txt"),
+            concat!("token_", "secret = \"documentation-placeholder\"\n"),
+        )
+        .unwrap();
+        run_git_in(repo, &["add", "docs.txt"]);
+        run_git_in(repo, &["commit", "-q", "-m", "baseline"]);
+        let baseline = git_in_output(repo, &["rev-parse", "HEAD"])
+            .trim()
+            .to_string();
+
+        fs::write(repo.join("release.txt"), "release\n").unwrap();
+        run_git_in(repo, &["add", "release.txt"]);
+        run_git_in(repo, &["commit", "-q", "-m", "release"]);
+        let head = git_in_output(repo, &["rev-parse", "HEAD"])
+            .trim()
+            .to_string();
+
+        // Simulate one atomic push of main and the tag. The branch leg scans
+        // only baseline..head; the tag leg must not rescan docs.txt.
+        let stdin_data = format!(
+            "refs/heads/main {} refs/heads/main {}\nrefs/tags/v0.113.51 {} refs/tags/v0.113.51 {}\n",
+            head, baseline, head, ZERO_SHA
+        );
+        let (status, stderr) = run_hook_input(repo, &hook_path, &stdin_data);
+        assert!(
+            status.success(),
+            "tag alongside a branch must pass without rescanning published history; stderr: {}",
+            stderr
         );
     }
 

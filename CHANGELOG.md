@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Tag pushes no longer rescan already-published history**: the pre-push
+  secret scan now reuses the branch scan when a tag points at a commit being
+  published on `main` in the same push, and skips the duplicate scan when the
+  commit is already present on a remote-tracking branch. This prevents
+  historical documentation placeholders from being misclassified as newly
+  pushed secrets. Added a regression for the atomic branch-plus-tag release
+  flow.
+
 - **Hook hardening no longer seeds inactive local copies**: when Git dispatches
   hooks through a global or repository-local `core.hooksPath`, `harden_repo`
   leaves the shadowed `.git/hooks` directory untouched; global wrappers chain
