@@ -94,8 +94,8 @@ All final checks pass:
 - `bash -n` for all root shell scripts
 - `git diff --check` in the parent and all nested repositories
 
-No service was stopped for remediation, no history was rewritten, and no
-operator data was deleted during this follow-up.
+No service was manually stopped and left down for remediation, no history was
+rewritten, and no operator data was deleted during this follow-up.
 
 ## Intentional residuals
 
