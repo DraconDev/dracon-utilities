@@ -292,4 +292,4 @@ jobs:
         uses: cachix/install-nix-action@v30
 
       - name: Check flake evaluates
-        run: nix flake check --no-build
+        run: ./scripts/check-flake.sh

@@ -53,10 +53,18 @@ cargo test --workspace -- --test-threads=1
 cargo build --release -p dracon-sync -p dracon-system -p dracon-warden
 cargo deny check
 ./scripts/verify-spec.sh
+./scripts/check-nested-pins.py
+./scripts/check-flake.sh
 ./install.sh --dry-run
 ```
 
 Use `--test-threads=1` for the full workspace test run. Some tests mutate process-wide state such as `PATH` or environment variables, and serial execution avoids flaky races.
+
+When a nested utility advances, run `scripts/check-nested-pins.py --check-local`
+after updating the CI checkout refs and `flake.lock`. The check also verifies
+that the parent `Cargo.lock` carries the nested package versions. The generic
+Nix checker emits a harmless warning for the conventional `homeManagerModules`
+output; `scripts/check-flake.sh` treats only that known warning as allowed.
 
 ## Documentation Standards
 

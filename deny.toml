@@ -13,21 +13,37 @@ unsound = "all"
 ignore = []
 
 [bans]
-multiple-versions = "warn"
+# Every currently accepted duplicate is listed below with its transitive
+# owner. New duplicate versions fail the gate instead of becoming silent
+# dependency drift.
+multiple-versions = "deny"
 wildcards = "allow"
 highlight = "all"
 skip = [
+    { crate = "block-buffer@0.10", reason = "age's authenticated crypto stack uses digest 0.10; rust-embed uses digest 0.11" },
+    { crate = "block-buffer@0.12", reason = "rust-embed's sha2 0.11 stack; age remains on digest 0.10" },
     { crate = "base64@0.21", reason = "age (encryption) uses old version" },
     { crate = "bech32@0.9", reason = "age 0.10 uses the older Bech32 API while dracon-security uses 0.11" },
+    { crate = "cpufeatures@0.2", reason = "age/aes-gcm crypto stack uses cpufeatures 0.2; sha2 0.11 uses 0.3" },
+    { crate = "cpufeatures@0.3", reason = "sha2 0.11 transitive stack; age/aes-gcm remains on 0.2" },
+    { crate = "crypto-common@0.1", reason = "age/aead 0.5 crypto stack uses crypto-common 0.1; sha2 0.11 uses 0.2" },
+    { crate = "crypto-common@0.2", reason = "sha2 0.11 transitive stack; age/aead 0.5 remains on 0.1" },
+    { crate = "digest@0.10", reason = "age and the authenticated encryption stack use digest 0.10; rust-embed uses 0.11" },
+    { crate = "digest@0.11", reason = "rust-embed's sha2 0.11 stack; age remains on digest 0.10" },
     { crate = "getrandom@0.2", reason = "age/rand 0.8 crypto stack requires getrandom 0.2" },
     { crate = "getrandom@0.4", reason = "tempfile 3.27 and uuid 1.23 use the newest getrandom API" },
     { crate = "hashbrown@0.14", reason = "age/i18n-embed-fl 0.7 pulls dashmap 5" },
     { crate = "hashbrown@0.17", reason = "reqwest/zbus stack pulls newer indexmap 2" },
+    { crate = "openssl-probe@0.1", reason = "git2/libgit2 uses the older native TLS probe API" },
+    { crate = "openssl-probe@0.2", reason = "reqwest/native-tls uses the newer probe API" },
     { crate = "rustc-hash@1.1", reason = "fluent/i18n-embed-fl 0.7 dependency chain" },
     { crate = "rustc-hash@2.1", reason = "fluent/intl-memoizer dependency chain" },
+    { crate = "sha2@0.10", reason = "age and dracon-security use the 0.10 API; rust-embed uses 0.11" },
+    { crate = "sha2@0.11", reason = "rust-embed's utility stack; age and dracon-security remain on 0.10" },
     { crate = "strsim@0.10", reason = "i18n-embed-fl 0.7 dependency chain" },
     { crate = "strsim@0.11", reason = "clap 4 dependency chain" },
     { crate = "syn@1.0", reason = "proc-macro-error/i18n-embed-fl 0.7 dependency chain" },
+    { crate = "syn@2.0", reason = "current proc-macro and zbus ecosystem uses syn 2 while legacy i18n-embed-fl uses syn 1" },
     { crate = "toml@0.5", reason = "i18n-embed-fl/find-crate dependency chain" },
     { crate = "toml_datetime@0.6", reason = "toml 0.8 dependency chain" },
     { crate = "toml_datetime@1.1", reason = "zbus/proc-macro-crate dependency chain" },

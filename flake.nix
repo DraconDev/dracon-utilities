@@ -152,7 +152,10 @@
         };
       }
     ) // {
-      # Home Manager module for declarative systemd user services
+      # Home Manager module for declarative systemd user services.  Nix's
+      # generic `flake check` does not recognize the Home Manager convention
+      # `homeManagerModules`; scripts/check-flake.sh validates the flake while
+      # explicitly filtering that known, non-functional warning.
       homeManagerModules.dracon = { config, lib, pkgs, ... }:
         with lib;
         let
