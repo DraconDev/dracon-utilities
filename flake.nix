@@ -5,15 +5,15 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
     dracon-sync-src = {
-      url = "github:DraconDev/dracon-sync-background-auto-commit-multi-remote";
+      url = "github:DraconDev/dracon-sync-background-auto-commit-multi-remote/main";
       flake = false;
     };
     dracon-system-src = {
-      url = "github:DraconDev/dracon-system-disk-process-guard-doctor";
+      url = "github:DraconDev/dracon-system-disk-process-guard-doctor/main";
       flake = false;
     };
     dracon-warden-src = {
-      url = "github:DraconDev/dracon-warden-secret-encrypt-age-git-filter";
+      url = "github:DraconDev/dracon-warden-secret-encrypt-age-git-filter/main";
       flake = false;
     };
   };

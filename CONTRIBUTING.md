@@ -71,6 +71,7 @@ output; `scripts/check-flake.sh` treats only that known warning as allowed.
 - The root [`README.md`](README.md) is the public quick start and must stay accurate.
 - Each utility README must explain purpose, install, commands, configuration, safety notes, and links to deeper docs.
 - Design notes in `docs/design/` describe decisions and tradeoffs. They are not user guides.
+- Global hook ownership behavior is documented in [`docs/design/warden-global-hook-ownership-2026-08-15.md`](docs/design/warden-global-hook-ownership-2026-08-15.md).
 - Blueprints in crate directories are implementation notes. Keep them updated when behavior changes.
 - Do not link to removed internal audit files, private state, local task directories, or legacy paths that do not exist in the public tree.
 

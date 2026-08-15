@@ -3,15 +3,16 @@
     "dracon-sync-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1786748502,
-        "narHash": "sha256-pXIPfqN1wNMZSiS5jMNk+lvdxKpDvekXcczsCZpcHVQ=",
+        "lastModified": 1786749775,
+        "narHash": "sha256-pYufEpr6k+aWhmYJg15E62FQAzd9+9tquMQY1Lpo54w=",
         "owner": "DraconDev",
         "repo": "dracon-sync-background-auto-commit-multi-remote",
-        "rev": "fdc00690fe95f344b6e054bb73c30249c53102e8",
+        "rev": "1ca9f7827da8afd8f29ba37c2f0cbd21fbe957bd",
         "type": "github"
       },
       "original": {
         "owner": "DraconDev",
+        "ref": "main",
         "repo": "dracon-sync-background-auto-commit-multi-remote",
         "type": "github"
       }
@@ -19,15 +20,16 @@
     "dracon-system-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1786748636,
-        "narHash": "sha256-563Bmf4TlHOdTLGCFilkKsvEfGb/kjpabi0ZDBWjQho=",
+        "lastModified": 1786749776,
+        "narHash": "sha256-zu56H8SQd296eHsQ6mWO6htI7s3pjuwtZPszt7GXydw=",
         "owner": "DraconDev",
         "repo": "dracon-system-disk-process-guard-doctor",
-        "rev": "b565510e25487e81b144f1d5221a9dc6fec3581b",
+        "rev": "a5c821ca48b4d7d0994e90f29d72f77bb56b1d8e",
         "type": "github"
       },
       "original": {
         "owner": "DraconDev",
+        "ref": "main",
         "repo": "dracon-system-disk-process-guard-doctor",
         "type": "github"
       }
@@ -35,15 +37,16 @@
     "dracon-warden-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1786748502,
-        "narHash": "sha256-YVkLh7BY/jbO4lj8VQxMFC8/YY0jPGVM6v9Dha3GqZY=",
+        "lastModified": 1786776014,
+        "narHash": "sha256-LIpo96adNPQx+tRF9GgGzGPPYngVX1MZgZqGwX4k2Ps=",
         "owner": "DraconDev",
         "repo": "dracon-warden-secret-encrypt-age-git-filter",
-        "rev": "f8e7577af24773764df0c6f2d979b8f5bf2491f0",
+        "rev": "f4c3a78328803c6ff4d1047ca840424dddda8863",
         "type": "github"
       },
       "original": {
         "owner": "DraconDev",
+        "ref": "main",
         "repo": "dracon-warden-secret-encrypt-age-git-filter",
         "type": "github"
       }
