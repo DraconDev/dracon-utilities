@@ -74,6 +74,11 @@ mitigation is disabled without `CAP_SYS_NICE`.
 The installer removed only stale utility binaries and installer backup
 artifacts from `~/.cargo/bin`/`~/.local/bin`; no operator data was deleted.
 
+The subsequent artifact cleanup removed 29.2 GiB of regeneratable Cargo build
+output, deleted the empty `plain-test.txt` and obsolete `AGENTS.md.bak-2026-06-30`
+snapshot, and moved the obsolete global `pre-commit.bak` hook to the desktop
+Trash. The tracked audit history under `.pi-glla/` and `evidence/` was retained.
+
 ## Verification
 
 All final checks pass:
@@ -99,14 +104,11 @@ rewritten, and no operator data was deleted during this follow-up.
 
 ## Intentional residuals
 
-1. `/home/dracon/.config/git/hooks/pre-commit.bak` is an older Warden hook
-   artifact. It remains untouched because its provenance is ambiguous; the
-   active hooks are the current transactional Warden wrappers.
-2. `cargo deny` still contains the documented transitive duplicate versions
+1. `cargo deny` still contains the documented transitive duplicate versions
    that cannot be consolidated locally. New unlisted duplicates now fail the
    gate.
-3. The Nix `homeManagerModules` output is intentionally retained for Home
+2. The Nix `homeManagerModules` output is intentionally retained for Home
    Manager consumers; its generic `nix flake check` warning is handled by
    `scripts/check-flake.sh` and is not a functional failure.
-4. Nested utility pin updates remain a deliberate release step, now guarded
+3. Nested utility pin updates remain a deliberate release step, now guarded
    by the CI/Nix/Cargo consistency check.
