@@ -33,7 +33,7 @@ jobs:
         with:
           repository: DraconDev/dracon-system-disk-process-guard-doctor
           path: dracon-system
-          ref: a5c821ca48b4d7d0994e90f29d72f77bb56b1d8e
+          ref: 7366c7b3060641bff4f2204166548e8b577e6ce7
       - name: Checkout dracon-warden
         uses: actions/checkout@v4
         with:
@@ -87,7 +87,7 @@ jobs:
         with:
           repository: DraconDev/dracon-system-disk-process-guard-doctor
           path: dracon-system
-          ref: a5c821ca48b4d7d0994e90f29d72f77bb56b1d8e
+          ref: 7366c7b3060641bff4f2204166548e8b577e6ce7
       - name: Checkout dracon-warden
         uses: actions/checkout@v4
         with:
@@ -134,7 +134,7 @@ jobs:
         with:
           repository: DraconDev/dracon-system-disk-process-guard-doctor
           path: dracon-system
-          ref: a5c821ca48b4d7d0994e90f29d72f77bb56b1d8e
+          ref: 7366c7b3060641bff4f2204166548e8b577e6ce7
       - name: Checkout dracon-warden
         uses: actions/checkout@v4
         with:
@@ -209,7 +209,7 @@ jobs:
         with:
           repository: DraconDev/dracon-system-disk-process-guard-doctor
           path: dracon-system
-          ref: a5c821ca48b4d7d0994e90f29d72f77bb56b1d8e
+          ref: 7366c7b3060641bff4f2204166548e8b577e6ce7
       - name: Checkout dracon-warden
         uses: actions/checkout@v4
         with:
@@ -259,7 +259,7 @@ jobs:
         with:
           repository: DraconDev/dracon-system-disk-process-guard-doctor
           path: dracon-system
-          ref: a5c821ca48b4d7d0994e90f29d72f77bb56b1d8e
+          ref: 7366c7b3060641bff4f2204166548e8b577e6ce7
       - name: Checkout dracon-warden
         uses: actions/checkout@v4
         with:
