@@ -2490,14 +2490,69 @@ enum HookMode {
     Local,
 }
 
-/// Replace a hook with a fully-written executable file in one rename.
+/// Marker replaced with the absolute path of a preserved foreign global hook.
 ///
-/// Hook installation is security-sensitive: a direct `fs::write` truncates
-/// the active hook before the replacement is complete, and a failed write can
-/// leave Git with a partial enforcement script. The temporary file lives in
-/// the same directory so the final rename is atomic on the supported Unix
-/// deployments.
-fn write_hook_atomically(path: &Path, content: &str) -> Result<()> {
+/// The empty string is used for repository-local hooks, which must not invoke
+/// a machine-global hook a second time.
+const FOREIGN_HOOK_PLACEHOLDER: &str = "__DRACON_FOREIGN_HOOK__";
+
+/// Quote a value for use as one POSIX shell word.
+fn shell_single_quote(value: &Path) -> String {
+    let escaped = value.to_string_lossy().replace('\'', "'\\''");
+    format!("'{escaped}'")
+}
+
+/// Render a hook with an optional preserved foreign global hook path.
+fn render_hook(content: &str, foreign_hook: Option<&Path>) -> String {
+    let replacement = foreign_hook
+        .map(shell_single_quote)
+        .unwrap_or_else(|| "''".to_string());
+    content.replace(FOREIGN_HOOK_PLACEHOLDER, &replacement)
+}
+
+/// Return true when `path` is a hook written by Warden.
+fn is_warden_hook(path: &Path) -> bool {
+    fs::read_to_string(path)
+        .map(|content| content.contains("Dracon Warden"))
+        .unwrap_or(false)
+}
+
+/// Choose a non-destructive backup path for a foreign global hook.
+fn next_foreign_hook_backup(path: &Path) -> Result<PathBuf> {
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| anyhow::anyhow!("hook path has no usable filename: {}", path.display()))?;
+    let base = path.with_file_name(format!("{file_name}.dracon-foreign"));
+    if !base.exists() {
+        return Ok(base);
+    }
+
+    let pid = std::process::id();
+    for index in 0..10_000u32 {
+        let candidate = path.with_file_name(format!(
+            "{file_name}.dracon-foreign.{pid}.{index}"
+        ));
+        if !candidate.exists() {
+            return Ok(candidate);
+        }
+    }
+
+    Err(anyhow::anyhow!(
+        "could not choose a backup path for foreign hook {}",
+        path.display()
+    ))
+}
+
+/// Find the preserved foreign hook that a newly-rendered wrapper should call.
+fn existing_foreign_hook_backup(path: &Path) -> Option<PathBuf> {
+    let file_name = path.file_name()?.to_str()?;
+    let base = path.with_file_name(format!("{file_name}.dracon-foreign"));
+    base.is_file().then_some(base)
+}
+
+/// Prepare an executable hook in a same-directory temporary file.
+fn prepare_hook(path: &Path, content: &[u8]) -> Result<tempfile::NamedTempFile> {
     let parent = path
         .parent()
         .ok_or_else(|| anyhow::anyhow!("hook path has no parent: {}", path.display()))?;
@@ -2505,7 +2560,7 @@ fn write_hook_atomically(path: &Path, content: &str) -> Result<()> {
         .prefix(".dracon-hook-")
         .tempfile_in(parent)
         .with_context(|| format!("failed to create temporary hook in {}", parent.display()))?;
-    temp.write_all(content.as_bytes())
+    temp.write_all(content)
         .with_context(|| format!("failed to write temporary hook for {}", path.display()))?;
     temp.flush()
         .with_context(|| format!("failed to flush temporary hook for {}", path.display()))?;
@@ -2519,6 +2574,31 @@ fn write_hook_atomically(path: &Path, content: &str) -> Result<()> {
             .set_permissions(fs::Permissions::from_mode(0o755))
             .with_context(|| format!("failed to set permissions on {}", path.display()))?;
     }
+    Ok(temp)
+}
+
+/// Restore an executable hook from bytes after a failed multi-hook install.
+fn restore_hook_bytes(path: &Path, content: &[u8]) -> Result<()> {
+    let temp = prepare_hook(path, content)?;
+    temp.persist(path).map_err(|error| {
+        anyhow::anyhow!(
+            "failed to restore hook {}: {}",
+            path.display(),
+            error.error
+        )
+    })?;
+    Ok(())
+}
+
+/// Replace a hook with a fully-written executable file in one rename.
+///
+/// Hook installation is security-sensitive: a direct `fs::write` truncates
+/// the active hook before the replacement is complete, and a failed write can
+/// leave Git with a partial enforcement script. The temporary file lives in
+/// the same directory so the final rename is atomic on the supported Unix
+/// deployments.
+fn write_hook_atomically(path: &Path, content: &str) -> Result<()> {
+    let temp = prepare_hook(path, content.as_bytes())?;
     temp.persist(path).map_err(|error| {
         anyhow::anyhow!(
             "failed to atomically install hook {}: {}",
@@ -2527,6 +2607,117 @@ fn write_hook_atomically(path: &Path, content: &str) -> Result<()> {
         )
     })?;
     Ok(())
+}
+
+/// One staged global hook replacement.
+struct HookInstallPlan {
+    target: PathBuf,
+    original: Option<Vec<u8>>,
+    foreign_backup: Option<PathBuf>,
+    moved_foreign: bool,
+    temp: Option<tempfile::NamedTempFile>,
+}
+
+/// Install all global hooks as one staged operation while preserving foreign
+/// hooks under `.dracon-foreign` siblings for explicit chaining.
+fn install_global_hooks(dir: &Path) -> Result<Vec<PathBuf>> {
+    let specs = [
+        ("pre-commit", PRE_COMMIT_HOOK),
+        ("pre-push", PRE_PUSH_HOOK),
+        ("pre-rebase", PRE_REBASE_HOOK),
+    ];
+    let mut plans = Vec::with_capacity(specs.len());
+
+    // Stage every replacement before changing any live hook. This catches
+    // permission, disk, and temp-file failures before the first rename.
+    for (name, content) in specs {
+        let target = dir.join(name);
+        let original = if target.exists() {
+            Some(fs::read(&target).with_context(|| {
+                format!("failed to read existing global hook {}", target.display())
+            })?)
+        } else {
+            None
+        };
+        let foreign_backup = if target.exists() && !is_warden_hook(&target) {
+            Some(next_foreign_hook_backup(&target)?)
+        } else if !target.exists() {
+            existing_foreign_hook_backup(&target)
+        } else {
+            None
+        };
+        let rendered = render_hook(content, foreign_backup.as_deref());
+        let temp = prepare_hook(&target, rendered.as_bytes())?;
+        plans.push(HookInstallPlan {
+            target,
+            original,
+            foreign_backup,
+            moved_foreign: false,
+            temp: Some(temp),
+        });
+    }
+
+    let install_result = (|| -> Result<()> {
+        for plan in &mut plans {
+            if plan.foreign_backup.is_some()
+                && plan.target.exists()
+                && !is_warden_hook(&plan.target)
+            {
+                fs::rename(
+                    &plan.target,
+                    plan.foreign_backup
+                        .as_ref()
+                        .expect("foreign backup was checked above"),
+                )
+                .with_context(|| {
+                    format!(
+                        "failed to preserve foreign global hook {}",
+                        plan.target.display()
+                    )
+                })?;
+                plan.moved_foreign = true;
+            }
+        }
+
+        for plan in &mut plans {
+            let temp = plan
+                .temp
+                .take()
+                .expect("every global hook was staged before installation");
+            temp.persist(&plan.target).map_err(|error| {
+                anyhow::anyhow!(
+                    "failed to atomically install global hook {}: {}",
+                    plan.target.display(),
+                    error.error
+                )
+            })?;
+        }
+        Ok(())
+    })();
+
+    if let Err(error) = install_result {
+        // Best-effort rollback keeps a failed setup from leaving a partially
+        // installed hook set or losing a preserved foreign hook.
+        for plan in plans.iter_mut().rev() {
+            if plan.moved_foreign {
+                let _ = fs::remove_file(&plan.target);
+                if let Some(backup) = plan.foreign_backup.as_ref() {
+                    let _ = fs::rename(backup, &plan.target);
+                }
+            } else if let Some(original) = plan.original.as_deref() {
+                let _ = restore_hook_bytes(&plan.target, original);
+            } else {
+                let _ = fs::remove_file(&plan.target);
+            }
+        }
+        return Err(error.context("global hook installation rolled back"));
+    }
+
+    Ok(plans
+        .into_iter()
+        .filter_map(|plan| plan.moved_foreign.then_some(plan.foreign_backup))
+        .flatten()
+        .collect())
 }
 
 fn hook_dir(mode: HookMode, repo: Option<&Path>) -> Result<PathBuf> {
@@ -2565,6 +2756,13 @@ REPO=$(git rev-parse --show-toplevel)
 LOCAL_HOOK="$REPO/.git/hooks/pre-commit"
 if [ -x "$LOCAL_HOOK" ] && ! grep -q "Dracon Warden" "$LOCAL_HOOK" 2>/dev/null; then
     "$LOCAL_HOOK" "$@" || exit $?
+fi
+
+# A previous global hook with the same name is preserved beside this wrapper
+# and chained here. Warden never silently discards machine-global policy.
+DRACON_FOREIGN_HOOK=__DRACON_FOREIGN_HOOK__
+if [ -n "$DRACON_FOREIGN_HOOK" ] && [ -x "$DRACON_FOREIGN_HOOK" ]; then
+    "$DRACON_FOREIGN_HOOK" "$@" || exit $?
 fi
 
 # (2) The pre-fix hook exited 1 in EVERY repo lacking filter=dracon —
@@ -2688,6 +2886,13 @@ SECRET_RE='(A{1}KIA[A-Z0-9]{16}|-----BEGIN [A-Z]+ PRIVATE KEY|password\s*=\s*["'
 # loop; a repo-local hook failure must abort the push regardless.
 REFS_FILE=$(mktemp)
 cat > "$REFS_FILE"
+
+# Preserve and invoke any pre-existing foreign global pre-push hook. The ref
+# stream is buffered so both hooks receive identical Git input.
+DRACON_FOREIGN_HOOK=__DRACON_FOREIGN_HOOK__
+if [ -n "$DRACON_FOREIGN_HOOK" ] && [ -x "$DRACON_FOREIGN_HOOK" ]; then
+    "$DRACON_FOREIGN_HOOK" "$@" < "$REFS_FILE" || exit $?
+fi
 
 REPO=$(git rev-parse --show-toplevel)
 LOCAL_HOOK="$REPO/.git/hooks/pre-push"
@@ -2869,6 +3074,12 @@ if [ -x "$LOCAL_HOOK" ] && ! grep -q "Dracon Warden" "$LOCAL_HOOK" 2>/dev/null; 
     "$LOCAL_HOOK" "$@" || exit $?
 fi
 
+# Preserve and invoke any pre-existing foreign global pre-rebase hook.
+DRACON_FOREIGN_HOOK=__DRACON_FOREIGN_HOOK__
+if [ -n "$DRACON_FOREIGN_HOOK" ] && [ -x "$DRACON_FOREIGN_HOOK" ]; then
+    "$DRACON_FOREIGN_HOOK" "$@" || exit $?
+fi
+
 upstream="$1"
 [ -z "$upstream" ] && exit 0
 
@@ -2903,17 +3114,30 @@ fn run_setup_hooks(mode: HookMode, repo: Option<&Path>) -> Result<()> {
     fs::create_dir_all(&dir)
         .with_context(|| format!("failed to create hook directory: {}", dir.display()))?;
 
+    let preserved_foreign_hooks = match mode {
+        HookMode::Global => install_global_hooks(&dir)?,
+        HookMode::Local => {
+            let pre_commit_path = dir.join("pre-commit");
+            let pre_push_path = dir.join("pre-push");
+            let pre_rebase_path = dir.join("pre-rebase");
+            write_hook_atomically(
+                &pre_commit_path,
+                &render_hook(PRE_COMMIT_HOOK, None),
+            )?;
+            write_hook_atomically(&pre_push_path, &render_hook(PRE_PUSH_HOOK, None))?;
+            // ADDED 2026-07-25 (v0.113.0): the history-rewrite guard's
+            // rebase side. Also clean up stale chaining artifacts from the
+            // brief dracon-sync per-repo hook experiment (`.pre-dracon`
+            // siblings) — warden owns this directory.
+            write_hook_atomically(&pre_rebase_path, &render_hook(PRE_REBASE_HOOK, None))?;
+            Vec::new()
+        }
+    };
+
     let pre_commit_path = dir.join("pre-commit");
     let pre_push_path = dir.join("pre-push");
     let pre_rebase_path = dir.join("pre-rebase");
 
-    write_hook_atomically(&pre_commit_path, PRE_COMMIT_HOOK)?;
-    write_hook_atomically(&pre_push_path, PRE_PUSH_HOOK)?;
-    // ADDED 2026-07-25 (v0.113.0): the history-rewrite guard's
-    // rebase side. Also clean up stale chaining artifacts from the
-    // brief dracon-sync per-repo hook experiment (`.pre-dracon`
-    // siblings) — warden owns this directory.
-    write_hook_atomically(&pre_rebase_path, PRE_REBASE_HOOK)?;
     for name in [
         "pre-commit.pre-dracon",
         "pre-push.pre-dracon",
@@ -2929,6 +3153,13 @@ fn run_setup_hooks(mode: HookMode, repo: Option<&Path>) -> Result<()> {
                 );
             }
         }
+    }
+
+    for path in &preserved_foreign_hooks {
+        println!(
+            "   preserved foreign global hook = {}",
+            path.display()
+        );
     }
 
     // Set executable permissions
@@ -3114,14 +3345,17 @@ fn install_hooks_for_repo(repo: &Path) -> Result<()> {
     })?;
 
     if !pre_commit_path.exists() {
-        write_hook_atomically(&pre_commit_path, PRE_COMMIT_HOOK)?;
+        write_hook_atomically(
+            &pre_commit_path,
+            &render_hook(PRE_COMMIT_HOOK, None),
+        )?;
     }
     if !pre_push_path.exists() {
-        write_hook_atomically(&pre_push_path, PRE_PUSH_HOOK)?;
+        write_hook_atomically(&pre_push_path, &render_hook(PRE_PUSH_HOOK, None))?;
     }
     // ADDED 2026-07-25 (v0.113.0): history-rewrite guard, rebase side.
     if !pre_rebase_path.exists() {
-        write_hook_atomically(&pre_rebase_path, PRE_REBASE_HOOK)?;
+        write_hook_atomically(&pre_rebase_path, &render_hook(PRE_REBASE_HOOK, None))?;
     }
 
     #[cfg(unix)]
