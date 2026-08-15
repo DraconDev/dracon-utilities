@@ -2654,23 +2654,16 @@ fn install_global_hooks(dir: &Path) -> Result<Vec<PathBuf>> {
 
     let install_result = (|| -> Result<()> {
         for plan in &mut plans {
-            if plan.foreign_backup.is_some()
-                && plan.target.exists()
-                && !is_warden_hook(&plan.target)
-            {
-                fs::rename(
-                    &plan.target,
-                    plan.foreign_backup
-                        .as_ref()
-                        .expect("foreign backup was checked above"),
-                )
-                .with_context(|| {
-                    format!(
-                        "failed to preserve foreign global hook {}",
-                        plan.target.display()
-                    )
-                })?;
-                plan.moved_foreign = true;
+            if plan.target.exists() && !is_warden_hook(&plan.target) {
+                if let Some(backup) = plan.foreign_backup.as_ref() {
+                    fs::rename(&plan.target, backup).with_context(|| {
+                        format!(
+                            "failed to preserve foreign global hook {}",
+                            plan.target.display()
+                        )
+                    })?;
+                    plan.moved_foreign = true;
+                }
             }
         }
 
