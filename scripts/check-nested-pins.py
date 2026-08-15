@@ -23,6 +23,11 @@ SOURCES = {
     "dracon-system": "dracon-system-src",
     "dracon-warden": "dracon-warden-src",
 }
+GITHUB_REPOS = {
+    "dracon-sync": "dracon-sync-background-auto-commit-multi-remote",
+    "dracon-system": "dracon-system-disk-process-guard-doctor",
+    "dracon-warden": "dracon-warden-secret-encrypt-age-git-filter",
+}
 LOCK_PACKAGES = {
     "dracon-sync": ("dracon-sync", ROOT / "dracon-sync"),
     "dracon-system": ("dracon-system", ROOT / "dracon-system"),
@@ -70,6 +75,7 @@ def main() -> int:
     args = parser.parse_args()
 
     workflow = (ROOT / ".github/workflows/ci.yml").read_text()
+    flake = (ROOT / "flake.nix").read_text()
     flake_lock = json.loads((ROOT / "flake.lock").read_text())
     cargo_lock = tomllib.loads((ROOT / "Cargo.lock").read_text())
     lock_by_name = {}
@@ -80,6 +86,12 @@ def main() -> int:
             lock_by_name[package["name"]] = str(package["version"])
 
     for checkout_path, flake_node in SOURCES.items():
+        expected_url = (
+            f'url = "github:DraconDev/{GITHUB_REPOS[checkout_path]}/main";'
+        )
+        if expected_url not in flake:
+            fail(f"flake.nix must pin {checkout_path} to the main branch explicitly")
+
         matches = re.findall(
             rf"path:\s*{re.escape(checkout_path)}\s*\n\s*ref:\s*([0-9a-f]{{40}})",
             workflow,
@@ -92,8 +104,11 @@ def main() -> int:
 
         try:
             flake_rev = flake_lock["nodes"][flake_node]["locked"]["rev"]
+            flake_ref = flake_lock["nodes"][flake_node]["original"]["ref"]
         except KeyError as error:
             fail(f"flake.lock has no locked revision for {flake_node}: {error}")
+        if flake_ref != "main":
+            fail(f"flake.lock input {flake_node} is not locked from main: {flake_ref}")
         if ci_rev != flake_rev:
             fail(f"{checkout_path}: CI pin {ci_rev} != flake pin {flake_rev}")
 
