@@ -41,6 +41,9 @@ jobs:
           path: dracon-warden
           ref: f8e7577af24773764df0c6f2d979b8f5bf2491f0
 
+      - name: Verify nested source pins
+        run: python3 scripts/check-nested-pins.py --check-local
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:

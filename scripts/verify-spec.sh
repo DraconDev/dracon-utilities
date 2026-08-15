@@ -45,6 +45,18 @@ else
   echo "PASS: all nested utility repositories present"
 fi
 
+# Invariant 3b: CI, Nix, and workspace lock metadata agree on the nested
+# standalone revisions and crate versions.  This intentionally does not
+# require local HEADs to equal the pins while a nested utility is being
+# prepared for release; CI uses --check-local after checking out the pins.
+echo "--- Invariant 3b: Nested source pins ---"
+if python3 scripts/check-nested-pins.py; then
+  echo "PASS: CI/Nix/Cargo nested pins agree"
+else
+  echo "FAIL: nested source pins are inconsistent"
+  failures=$((failures + 1))
+fi
+
 # Invariant 4: Core unit tests pass
 # (--workspace because these crates are binaries, not libraries, so --lib would fail)
 echo "--- Invariant 4: Core unit tests pass ---"
