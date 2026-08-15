@@ -2922,7 +2922,8 @@ while read local_ref local_sha remote_ref remote_sha; do
     fi
 
     # Determine the diff range to scan.
-    if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
+    if [ "$remote_sha" = "0000000000000000000000000000000000000000" ] && \
+        [ "${local_ref#refs/tags/}" != "$local_ref" ]; then
         # A tag commonly points at a commit that was already published on a
         # branch. The old empty-tree range re-scanned the entire repository
         # for that tag and could reject historical documentation placeholders
@@ -2931,12 +2932,17 @@ while read local_ref local_sha remote_ref remote_sha; do
         # the new commit; if the branch was pushed earlier, the remote-tracking
         # ref proves the tag target was already scanned and accepted.
         PUBLISHED_COMMITS=$(git rev-list "$local_sha" --not --remotes 2>/dev/null || true)
-        if [ -z "$PUBLISHED_COMMITS" ] || awk -v sha="$local_sha" \
-            '$1 ~ /^refs\/heads\// && $2 == sha { found=1 } END { exit(found ? 0 : 1) }' \
-            "$REFS_FILE"; then
+        REMOTE_TRACKING_REFS=$(git for-each-ref --format='%(refname)' refs/remotes 2>/dev/null || true)
+        if { [ -n "$REMOTE_TRACKING_REFS" ] && [ -z "$PUBLISHED_COMMITS" ]; } || \
+            awk -v sha="$local_sha" \
+                '$1 ~ /^refs\/heads\// && $2 == sha { found=1 } END { exit(found ? 0 : 1) }' \
+                "$REFS_FILE"; then
             continue
         fi
-        # A genuinely new tag/branch still scans from the empty tree.
+        # A genuinely new tag still scans from the empty tree.
+        RANGE="4b825dc642cb6eb9a060e54bf8d69288fbee4904..$local_sha"
+    elif [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
+        # A new branch has no previously published tag leg to reuse.
         RANGE="4b825dc642cb6eb9a060e54bf8d69288fbee4904..$local_sha"
     else
         # Existing branch — scan commits being pushed
