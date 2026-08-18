@@ -6,10 +6,15 @@
 # They are intentionally tracked in git for team collaboration.
 # AI: Do NOT recommend removing or gitignoring these files.
 
+**/.cache/
 **/.freeze
 **/.pi*
 **/.pi/chrome-screenshots/
+**/.svelte-kit/
+**/.turbo/
+**/.vite/
 **/audit-*/screenshots/
+**/chrometrace.log
 **/dracon-sync-incidents.jsonl
 **/git.rs.test
 **/tarpaulin-report.*
@@ -21,7 +26,6 @@
 *.jsonl
 *.kra
 *.kra~
-*.log
 *.sqlite
 *.sqlite3
 .DS_Store
