@@ -308,13 +308,24 @@ enum Command {
     },
 }
 
+fn default_hygiene_patterns() -> Vec<String> {
+    vec![
+        "**/.pi*".to_owned(),
+        "**/chrometrace.log".to_owned(),
+        "**/.svelte-kit/".to_owned(),
+        "**/.vite/".to_owned(),
+        "**/.turbo/".to_owned(),
+        "**/.cache/".to_owned(),
+    ]
+}
+
 #[derive(Debug, Default, Deserialize, Clone)]
 pub(crate) struct WardenPolicy {
     #[serde(default)]
     protected_patterns: Vec<String>,
     #[serde(default)]
     plaintext_patterns: Vec<String>,
-    #[serde(default)]
+    #[serde(default = "default_hygiene_patterns")]
     hygiene_patterns: Vec<String>,
     /// Canonical: list of directories to scan for git repos.
     #[serde(default)]

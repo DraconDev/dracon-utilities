@@ -640,6 +640,30 @@ mod tests {
         );
     }
 
+    #[test]
+    fn omitted_hygiene_patterns_use_product_defaults() {
+        let policy: WardenPolicy =
+            toml::from_str("repo_roots = []\n").expect("parse policy without hygiene list");
+        let patterns: Vec<&str> = policy.hygiene_patterns.iter().map(String::as_str).collect();
+        assert_eq!(
+            patterns,
+            vec![
+                "**/.pi*",
+                "**/chrometrace.log",
+                "**/.svelte-kit/",
+                "**/.vite/",
+                "**/.turbo/",
+                "**/.cache/",
+            ]
+        );
+
+        // An explicit list remains an operator override rather than being
+        // silently merged with the product defaults.
+        let explicit_empty: WardenPolicy =
+            toml::from_str("hygiene_patterns = []\n").expect("parse explicit empty list");
+        assert!(explicit_empty.hygiene_patterns.is_empty());
+    }
+
     /// ADDED 2026-07-21 (v0.112.33, audit H2/F0.1 follow-up): a
     /// push containing a commit authored by a test identity must be
     /// REJECTED (the F0.1 test-pollution class — the daemon

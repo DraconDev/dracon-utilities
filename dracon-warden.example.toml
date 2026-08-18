@@ -40,7 +40,15 @@ protected_patterns = []
 # Example: ["*.md", "*.txt", "LICENSE*"]
 plaintext_patterns = []
 
-# Glob patterns for hygiene checks (files that should NOT exist in repo)
-# Warden will warn if these patterns are found in the working tree.
-# Example: ["*.secret", "*.private", "*.bak"]
-hygiene_patterns = []
+# Glob patterns for hygiene checks (files that should NOT exist in repo).
+# These are the shipped defaults: Pi harness state, browser trace logs, and
+# regeneratable frontend build caches stay machine-local. Set an explicit list
+# to extend or replace them for a particular installation.
+hygiene_patterns = [
+    "**/.pi*",
+    "**/chrometrace.log",
+    "**/.svelte-kit/",
+    "**/.vite/",
+    "**/.turbo/",
+    "**/.cache/",
+]

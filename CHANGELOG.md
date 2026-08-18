@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Machine-local hygiene now has shipped defaults**: omitted
+  `hygiene_patterns` entries default to Pi harness state (`**/.pi*`),
+  Chromium trace logs, and regeneratable frontend caches (`.svelte-kit`,
+  `.vite`, `.turbo`, and `.cache`). The example policy documents the same
+  baseline, while explicit lists remain available for operator overrides.
+
 ### Fixed
 
 - **Tag pushes no longer rescan already-published history**: the pre-push
