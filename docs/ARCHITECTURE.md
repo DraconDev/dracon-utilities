@@ -47,6 +47,9 @@ Git filter + repo hardening. Encrypts secrets at rest with age encryption while 
 - Age x25519 keys — one keypair per machine, pubkeys published per-repo
 - DRACON_SECRET markers — encrypted payloads are tagged, not raw ciphertext
 - Defense-in-depth — pre-push hook scans for plaintext secrets as a second layer
+- Narrow machine-local hygiene defaults — Pi state, Chromium traces, and
+  regeneratable frontend caches are ignored without broad `*.log` matching;
+  an explicit empty hygiene list remains an operator override
 
 ## dracon-sync: AI-to-AI Commit Protocol
 

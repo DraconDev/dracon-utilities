@@ -53,6 +53,7 @@ root `*.md` = canonical audits, release notes, and core files.
 | `commit-all-policy-durable-2026-06-15.md` | The durable *code change* implementing it (5 design docs cite this) |
 | `commit-all-principle-2026-06-16.md` | The operator's framing ("nothing left out unless very good reason") |
 | `hygiene-what-to-ignore-2026-07-05.md` | What belongs in `.gitignore` vs committed |
+| `warden-hygiene-defaults-2026-08-18.md` | Warden's narrow machine-local hygiene defaults and local-build release handoff |
 | `codeberg-public-only-policy-2026-07-17.md` | Codeberg = public mirrors only (quota posture) |
 | `codeberg-quota-leak-fix-2026-07-13.md` | The 85 GiB quota leak + forward-only fix |
 | `pi-tmp-persist-policy-2026-06-16.md` | pi-tmp persistence policy |

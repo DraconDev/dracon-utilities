@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **dracon-warden v0.113.5 local release candidate** (2026-08-19): the
+  machine-local hygiene defaults are documented across the standalone and meta
+  repositories, the locked release artifact is built and installed, and the
+  Warden changelog/release notes are prepared. The candidate ignores Pi state,
+  Chromium traces, and regeneratable frontend caches without adding broad
+  `*.log` matching. Registry publication, tags, and forge releases remain
+  explicit operator-approved steps.
+
 ### Fixed
 
 - **Operations documentation now matches dracon-system v0.112.36**: the

@@ -7,16 +7,19 @@ utilities are standalone git repositories nested below this directory; their
 published `dracon-git` and `dracon-system-lib` dependencies come from
 crates.io, so no `dracon-libs` checkout is required.
 
-## Latest versions (2026-08-15)
+## Latest versions (2026-08-19; Warden candidate prepared locally)
 
 | Utility | Version | What shipped | Release notes |
 |---------|---------|--------------|---------------|
 | `dracon-sync` | **v0.113.50** | Standalone daemon repository; see its changelog for the latest release notes | [dracon-sync/CHANGELOG.md](dracon-sync/CHANGELOG.md) |
-| `dracon-warden` | **v0.113.4** | Standalone encryption and repository-hardening repository | [dracon-warden/CHANGELOG.md](dracon-warden/CHANGELOG.md) |
+| `dracon-warden` | **v0.113.5** | Standalone encryption and repository-hardening repository; local release candidate built and installed | [dracon-warden/CHANGELOG.md](dracon-warden/CHANGELOG.md) |
 | `dracon-system` | **v0.112.37** | Standalone disk/process guard repository | [dracon-system/CHANGELOG.md](dracon-system/CHANGELOG.md) |
 
-The workspace gate is `cargo test --workspace --locked`, with the additional
-format, build, deny, and clippy checks documented in `AGENTS.md`.
+The Warden v0.113.5 candidate is source-complete and built locally from the
+locked checkout; registry publication, tag creation, and a forge release are
+still separate operator-approved steps. The workspace gate is `cargo test
+--workspace --locked`, with the additional format, build, deny, and clippy
+checks documented in `AGENTS.md`.
 
 ## Install
 
@@ -37,7 +40,7 @@ cd dracon-utilities
 git clone https://github.com/DraconDev/dracon-sync-background-auto-commit-multi-remote.git dracon-sync
 git clone https://github.com/DraconDev/dracon-system-disk-process-guard-doctor.git dracon-system
 git clone https://github.com/DraconDev/dracon-warden-secret-encrypt-age-git-filter.git dracon-warden
-cargo build --release
+cargo build --release --locked
 # Binaries at target/release/dracon-{sync,system,warden}
 ```
 
@@ -59,14 +62,14 @@ cargo build --release
 
 ### Standalone utility repositories
 
-Each utility has its own standalone repository on GitHub, GitLab, and
-Codeberg. Those repositories contain the implementation, tests, examples, and
-release metadata; this parent repository provides the shared workspace,
-installer, CI, and operational documentation.
+Each utility has its own standalone repository on GitHub and GitLab. Codeberg
+is retired from the active mirror set. The standalone repositories contain the
+implementation, tests, examples, and release metadata; this parent repository
+provides the shared workspace, installer, CI, and operational documentation.
 
-- [`DraconDev/dracon-sync-background-auto-commit-multi-remote`](https://github.com/DraconDev/dracon-sync-background-auto-commit-multi-remote) (also on [GitLab](https://gitlab.com/DraconDev/dracon-sync-background-auto-commit-multi-remote) + [Codeberg](https://codeberg.org/dracondev/dracon-sync-background-auto-commit-multi-remote))
-- [`DraconDev/dracon-system-disk-process-guard-doctor`](https://github.com/DraconDev/dracon-system-disk-process-guard-doctor) (also on [GitLab](https://gitlab.com/DraconDev/dracon-system-disk-process-guard-doctor) + [Codeberg](https://codeberg.org/dracondev/dracon-system-disk-process-guard-doctor))
-- [`DraconDev/dracon-warden-secret-encrypt-age-git-filter`](https://github.com/DraconDev/dracon-warden-secret-encrypt-age-git-filter) (also on [GitLab](https://gitlab.com/DraconDev/dracon-warden-secret-encrypt-age-git-filter) + [Codeberg](https://codeberg.org/dracondev/dracon-warden-secret-encrypt-age-git-filter))
+- [`DraconDev/dracon-sync-background-auto-commit-multi-remote`](https://github.com/DraconDev/dracon-sync-background-auto-commit-multi-remote) (also on [GitLab](https://gitlab.com/DraconDev/dracon-sync-background-auto-commit-multi-remote))
+- [`DraconDev/dracon-system-disk-process-guard-doctor`](https://github.com/DraconDev/dracon-system-disk-process-guard-doctor) (also on [GitLab](https://gitlab.com/DraconDev/dracon-system-disk-process-guard-doctor))
+- [`DraconDev/dracon-warden-secret-encrypt-age-git-filter`](https://github.com/DraconDev/dracon-warden-secret-encrypt-age-git-filter) (also on [GitLab](https://gitlab.com/DraconDev/dracon-warden-secret-encrypt-age-git-filter))
 
 The names are deliberately descriptive so they are self-explanatory in search
 results. The daemon commits each nested repository independently; there is no
