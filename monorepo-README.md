@@ -13,7 +13,7 @@ The binary will be at `~/.cargo/bin/dracon-warden`. Or install from the long-nam
 ```bash
 git clone https://github.com/DraconDev/dracon-warden-secret-encrypt-age-git-filter.git
 cd dracon-warden-secret-encrypt-age-git-filter
-cargo build --release
+cargo build --release --locked
 ```
 
 ## Mental Model (Important)
@@ -95,13 +95,17 @@ The per-utility directories do not contain standalone installers; use the root `
 ### Manual Install
 
 ```bash
-# Build
-cargo build --release
+# Build the locked release artifact
+cargo build --release --locked
 
-# Copy binary
-cp target/release/dracon-warden ~/.local/bin/
+# Install atomically (GNU/Linux)
+install -d "$HOME/.local/bin"
+tmp="$(mktemp "$HOME/.local/bin/.dracon-warden.XXXXXX")"
+install -m 0755 target/release/dracon-warden "$tmp"
+mv -f -- "$tmp" "$HOME/.local/bin/dracon-warden"
 
-# Install git hooks globally
+# Verify the installed binary, then install git hooks globally
+scripts/verify-install.sh "$HOME/.local/bin/dracon-warden"
 dracon-warden setup-hooks --global
 ```
 

@@ -60,6 +60,15 @@ dracon-warden is a Git filter + repository hardening CLI:
    leave it alone. See `docs/design/warden-plaintext-sibling.md` for the
    full design, threat model, and revocation story.
 
+### Hygiene policy defaults (v0.113.5)
+
+When `hygiene_patterns` is omitted, the policy deserializer supplies a narrow
+machine-local baseline: `**/.pi*`, `**/chrometrace.log`, and the regeneratable
+frontend caches `**/.svelte-kit/`, `**/.vite/`, `**/.turbo/`, and `**/.cache/`.
+An explicit empty list remains an operator override. Broad `*.log` matching is
+not a shipped Warden default; repository-local rules outside the managed block
+remain the repository owner's decision.
+
 ---
 
 ## Key Files

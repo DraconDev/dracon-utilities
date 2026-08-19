@@ -3,7 +3,7 @@
 Secret, encrypt, age, git-filter — repository hardening and smudge/clean encryption for Dracon workspaces.
 
 This repository is the **canonical standalone source** for `dracon-warden` on
-GitHub, GitLab, and Codeberg. It contains the source code, embedded security
+GitHub and GitLab. It contains the source code, embedded security
 crate, `Cargo.toml`, tests, examples, and release metadata.
 You can build and install this utility directly from this repo.
 
@@ -14,11 +14,17 @@ You can build and install this utility directly from this repo.
 git clone https://github.com/DraconDev/dracon-warden-secret-encrypt-age-git-filter.git
 cd dracon-warden-secret-encrypt-age-git-filter
 
-# Build
-cargo build --release
+# Build the locked release artifact
+cargo build --release --locked
 
-# Install (binary lands in target/release/)
-sudo cp target/release/dracon-warden /usr/local/bin/
+# Install atomically into the user-local bin directory
+install -d "$HOME/.local/bin"
+tmp="$(mktemp "$HOME/.local/bin/.dracon-warden.XXXXXX")"
+install -m 0755 target/release/dracon-warden "$tmp"
+mv -f -- "$tmp" "$HOME/.local/bin/dracon-warden"
+
+# Verify the installed binary on a configured machine
+scripts/verify-install.sh "$HOME/.local/bin/dracon-warden"
 ```
 
 ## What is in this repo
@@ -54,6 +60,16 @@ audience/UX claims) is documented in
 ## Purpose
 
 Encrypts secret-shaped content at rest in git while preserving normal plaintext files in the working tree. Uses age encryption and git smudge/clean filters plus a pre-commit hook for plaintext-secret prevention.
+
+## Machine-local hygiene defaults
+
+When `hygiene_patterns` is omitted, Warden supplies the narrow machine-local
+baseline used by the fleet: `**/.pi*`, `**/chrometrace.log`, and regeneratable
+frontend caches (`**/.svelte-kit/`, `**/.vite/`, `**/.turbo/`, and `**/.cache/`).
+These paths are ignored by the managed `.gitignore` block so harness state,
+trace output, and build caches do not become repository content. An explicit
+`hygiene_patterns = []` remains a supported operator override; Warden does not
+add broad `*.log` matching by default.
 
 ## Runtime
 
