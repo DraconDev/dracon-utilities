@@ -49,7 +49,7 @@ Each long-name repository is also independently buildable:
 ```bash
 git clone https://github.com/DraconDev/dracon-sync-background-auto-commit-multi-remote.git
 cd dracon-sync-background-auto-commit-multi-remote
-cargo build --release
+cargo build --release --locked
 ```
 
 ## Utilities

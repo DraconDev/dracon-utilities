@@ -54,9 +54,18 @@ an external release was made.
 
 - `cargo fmt -- --check`
 - `cargo test --workspace --locked -- --test-threads=1`
-- `cargo clippy --workspace --locked --all-targets -- -D warnings`
-- `cargo build --release --locked`
-- `scripts/verify-install.sh ~/.local/bin/dracon-warden`
-- `dracon-warden --version` reports `0.113.5`
-- `git diff --check`
-- local/GitHub/GitLab `main` SHAs agree after daemon synchronization
+- `cargo test --workspace --locked -- --test-threads=1` — passed (977 sync,
+  10 sync integration, 136 system, 119 Warden, 10 Warden integration).
+- `cargo clippy --package dracon-warden --locked --all-targets -- -D warnings`
+  — passed.
+- `cargo build --package dracon-warden --release --locked` — passed.
+- Isolated Warden `cargo deny check` — passed.
+- `scripts/verify-install.sh ~/.local/bin/dracon-warden` — passed.
+- `dracon-warden --version` reports `0.113.5`; installed SHA matches the build.
+- `git diff --check` — passed.
+- local/GitHub/GitLab `main` SHAs agree after daemon synchronization.
+
+The full parent-workspace Clippy gate still has six unrelated existing test
+lints in `dracon-sync` and `dracon-system`. The full parent `cargo deny check`
+currently reports `RUSTSEC-2026-0258` for `h2 0.4.15`, pulled by those other
+utilities; neither issue was altered in this Warden release candidate.
