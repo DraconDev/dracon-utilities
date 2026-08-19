@@ -31,10 +31,15 @@ The candidate is built with the committed lockfile:
 ```bash
 cargo fmt -- --check
 cargo test --workspace --locked -- --test-threads=1
-cargo clippy --workspace --locked --all-targets -- -D warnings
+cargo clippy --package dracon-warden --locked --all-targets -- -D warnings
 cargo build --release --locked
 scripts/verify-install.sh "$HOME/.local/bin/dracon-warden"
 ```
+
+The isolated Warden dependency graph also passes `cargo deny check`. The
+parent workspace currently reports `RUSTSEC-2026-0258` for `h2 0.4.15`, pulled
+by the unrelated `dracon-sync`/`dracon-system` dependency graph; that lockfile
+was not changed as part of this Warden candidate.
 
 For a source checkout, install the artifact atomically after the build:
 

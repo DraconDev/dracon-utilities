@@ -8,7 +8,9 @@
 cargo install dracon-warden
 ```
 
-The binary will be at `~/.cargo/bin/dracon-warden`. Or install from the long-name façade repo:
+The binary will be at `~/.cargo/bin/dracon-warden`. The v0.113.5 candidate is
+not yet published to crates.io; use the locked source build below when you
+need this candidate. Or install from the long-name façade repo:
 
 ```bash
 git clone https://github.com/DraconDev/dracon-warden-secret-encrypt-age-git-filter.git
