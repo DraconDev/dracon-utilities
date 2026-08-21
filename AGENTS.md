@@ -35,6 +35,26 @@ nested repo independently.
 This mirrors the `dracon-platform/web/games/<name>/` nested-on-`main`
 submodule design documented below, but here the crates are full
 standalone repos rather than git submodules.
+
+## Canonical checkouts MUST NOT be deleted (2026-08-21)
+
+The three nested checkout directories (`dracon-sync/`,
+`dracon-system/`, `dracon-warden/`) are the **canonical local
+checkouts** of the fleet's utilities — the daemon watches these exact
+paths, and their loss is nearly invisible (see
+`docs/design/utilities-checkout-disappearance-2026-08-21.md`: all three
+were deleted by an unlogged agent cleanup on 2026-08-19 and stayed gone
+for two days because the parent repo does not track them).
+
+Agents doing disk cleanup, "prune stale dirs", or any recursive delete
+under `~/Dev/dracon-utilities/` MUST NOT remove, move, or rename these
+directories. The only sanctioned removal path is an explicit,
+operator-approved maintenance procedure that (1) pauses the daemon
+first, (2) records what is being removed and why in a design doc, and
+(3) restores or re-clones the checkout before resuming. If a nested
+checkout looks like junk because it is untracked at the parent level —
+that is its normal state, not a reason to delete it.
+
 ## Commit policy (the most important section)
 
 **Default behavior (since 2026-06-17, after
