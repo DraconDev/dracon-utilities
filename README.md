@@ -35,7 +35,6 @@ scripts/verify-install.sh "$HOME/.local/bin/dracon-warden"
 - `README.md` — this utility's user guide
 - `BLUEPRINT.md` — design notes
 - `dracon-warden.example.toml` — example config
-- `No systemd service; enforced through global git hooks.` — systemd user-service unit
 - `LICENSE`, `SECURITY.md`, `.gitignore`, `.github/` — repo metadata
 - `docs/SOURCE_OF_TRUTH.md` — architecture + invariants
 
