@@ -1,9 +1,0 @@
-[submodule "dracon-sync"]
-	path = dracon-sync
-	url = git@github.com:DraconDev/dracon-sync-background-auto-commit-multi-remote.git
-[submodule "dracon-system"]
-	path = dracon-system
-	url = git@github.com:DraconDev/dracon-system-disk-process-guard-doctor.git
-[submodule "dracon-warden"]
-	path = dracon-warden
-	url = git@github.com:DraconDev/dracon-warden-secret-encrypt-age-git-filter.git
