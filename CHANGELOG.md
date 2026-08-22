@@ -5,40 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.113.53] - 2026-08-22
 
 ### Changed
 
-- **2026-08-22 — full monorepo conversion**: the three utilities now
-  LIVE in this repo (`dracon-sync/`, `dracon-system/`, `dracon-warden/`
-  as real tracked source trees, imported via subtree merges so history
-  stays connected). GitHub shows browsable code; CI builds from a
-  single checkout; the Nix flake dropped its three `-src` inputs.
+- **Full monorepo conversion**: the three utilities now LIVE in this
+  repo (`dracon-sync/`, `dracon-system/`, `dracon-warden/` as real
+  tracked source trees, imported via subtree merges so history stays
+  connected). GitHub shows browsable code; CI builds from a single
+  checkout; the Nix flake dropped its three `-src` inputs.
   The standalone GitHub repos become frozen mirrors. Utility releases
   are tagged on this repo going forward. (Same-day submodule
   registration superseded; gitdir bundles archived under
   `~/dracon/backups/submodule-gitdirs-20260822/`.)
-
-
-### Changed
-
-- **2026-08-22 — utilities are now git submodules**: `dracon-sync`,
-  `dracon-system`, `dracon-warden` registered in `.gitmodules`
-  (gitdirs absorbed into `.git/modules/`), so the GitHub meta repo
-  shows the source trees and a plain clone fetches everything.
-  Worktree paths unchanged; flake/CI pins unchanged and still
-  authoritative.
-
+- **Utilities are now git submodules** (superseded same day by the
+  monorepo conversion): `dracon-sync`, `dracon-system`,
+  `dracon-warden` were registered in `.gitmodules`; gitdirs absorbed
+  into `.git/modules/`.
 
 ### Added
 
-- **dracon-warden v0.113.5 local release candidate** (2026-08-19): the
-  machine-local hygiene defaults are documented across the standalone and meta
-  repositories, the locked release artifact is built and installed, and the
-  Warden changelog/release notes are prepared. The candidate ignores Pi state,
-  Chromium traces, and regeneratable frontend caches without adding broad
-  `*.log` matching. Registry publication, tags, and forge releases remain
-  explicit operator-approved steps.
+- **Daily fleet git-identity guard** (`scripts/check-repo-identities.py`,
+  wired into the daily timer): fails on any repo whose effective git
+  identity is neither canonical DraconDev nor its deliberate loop
+  identity — prevention for the 2026-08-22 dracon-platform local-
+  override bug that mis-attributed ~1000/day auto-commits.
+- **dracon-warden v0.113.5 local release candidate** (2026-08-19): machine-local
+  hygiene defaults documented across standalone and meta repositories, locked
+  release artifact built and installed. Registry publication, tags, and forge
+  releases remain explicit operator-approved steps.
 
 ### Fixed
 
