@@ -13,7 +13,7 @@ docs (`AUDIT-*.md`, `AUDIT_REPOS_*.md`, archived `release-notes-v0.112.*.md`),
 `.cargo/config.toml`, the workspace `Cargo.toml`/`Cargo.lock`, and
 `.pi/goals/**`.
 
-The 3 utilities live in **nested standalone git repos** under this
+The 3 utilities live in **nested git submodules** under this
 directory, each with its own `.git/`, its own remotes
 (codeberg/github/gitlab), its own history, tags, and CHANGELOG:
 
@@ -26,15 +26,23 @@ three utility crates plus the in-tree `dracon-warden/src/security`
 workspace member, so the AGENTS.md test-discipline commands (`cargo
 build --release --locked`, `cargo test --workspace --locked`, `cargo
 deny check`) work from the monorepo root by path — it does **not**
-submodule or symlink the source. Because the source is in the nested repos, `git status` at
-the parent shows `?? dracon-sync/` etc. as "untracked": these are the
-nested repos themselves, **not** lost files. To edit a utility, `cd`
+submodule or symlink the source. To edit a utility, `cd`
 into its nested directory and work there; the daemon commits each
 nested repo independently.
 
+> **CHANGED 2026-08-22 (submodule conversion)**: the three utilities
+> are now registered as **proper git submodules** of the meta repo
+> (`.gitmodules` + gitlinks; gitdirs absorbed into `.git/modules/`).
+> Before this, they were untracked nested standalone clones — invisible
+> on github.com/DraconDev/dracon-utilities. The worktree paths are
+> unchanged, so all tooling above works identically; the parent's
+> gitlink advances via the same `stage_gitlink_updates` mechanism the
+> platform games use. `flake.lock` / `ci.yml` pins still reference the
+> standalone GitHub repos directly and remain authoritative for
+> builds — the daily pins checker validates local HEAD == pin.
+
 This mirrors the `dracon-platform/web/games/<name>/` nested-on-`main`
-submodule design documented below, but here the crates are full
-standalone repos rather than git submodules.
+submodule design.
 
 ## Canonical checkouts MUST NOT be deleted (2026-08-21)
 
