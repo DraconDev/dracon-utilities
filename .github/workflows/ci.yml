@@ -27,19 +27,19 @@ jobs:
         with:
           repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
           path: dracon-sync
-          ref: b43e098c0ca71be878745e23661fd33dbf8e82ae
+          ref: d93559f59d8120e33a6a0d8937757608f4f701d6
       - name: Checkout dracon-system
         uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-system-disk-process-guard-doctor
           path: dracon-system
-          ref: 65786d3d001edfb3f7fd89ba046baa425668ba14
+          ref: 88a65daa2947477ce8af7a4174087deaeff4a6c1
       - name: Checkout dracon-warden
         uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-warden-secret-encrypt-age-git-filter
           path: dracon-warden
-          ref: d3dfbde84847fde3e03f02d6aa7640cb063b8151
+          ref: 861800696f8bb03fa127f88531736374ab39bc63
 
       - name: Verify nested source pins
         run: python3 scripts/check-nested-pins.py --check-local
@@ -81,19 +81,19 @@ jobs:
         with:
           repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
           path: dracon-sync
-          ref: b43e098c0ca71be878745e23661fd33dbf8e82ae
+          ref: d93559f59d8120e33a6a0d8937757608f4f701d6
       - name: Checkout dracon-system
         uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-system-disk-process-guard-doctor
           path: dracon-system
-          ref: 65786d3d001edfb3f7fd89ba046baa425668ba14
+          ref: 88a65daa2947477ce8af7a4174087deaeff4a6c1
       - name: Checkout dracon-warden
         uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-warden-secret-encrypt-age-git-filter
           path: dracon-warden
-          ref: d3dfbde84847fde3e03f02d6aa7640cb063b8151
+          ref: 861800696f8bb03fa127f88531736374ab39bc63
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -128,19 +128,19 @@ jobs:
         with:
           repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
           path: dracon-sync
-          ref: b43e098c0ca71be878745e23661fd33dbf8e82ae
+          ref: d93559f59d8120e33a6a0d8937757608f4f701d6
       - name: Checkout dracon-system
         uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-system-disk-process-guard-doctor
           path: dracon-system
-          ref: 65786d3d001edfb3f7fd89ba046baa425668ba14
+          ref: 88a65daa2947477ce8af7a4174087deaeff4a6c1
       - name: Checkout dracon-warden
         uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-warden-secret-encrypt-age-git-filter
           path: dracon-warden
-          ref: d3dfbde84847fde3e03f02d6aa7640cb063b8151
+          ref: 861800696f8bb03fa127f88531736374ab39bc63
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -203,19 +203,19 @@ jobs:
         with:
           repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
           path: dracon-sync
-          ref: b43e098c0ca71be878745e23661fd33dbf8e82ae
+          ref: d93559f59d8120e33a6a0d8937757608f4f701d6
       - name: Checkout dracon-system
         uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-system-disk-process-guard-doctor
           path: dracon-system
-          ref: 65786d3d001edfb3f7fd89ba046baa425668ba14
+          ref: 88a65daa2947477ce8af7a4174087deaeff4a6c1
       - name: Checkout dracon-warden
         uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-warden-secret-encrypt-age-git-filter
           path: dracon-warden
-          ref: d3dfbde84847fde3e03f02d6aa7640cb063b8151
+          ref: 861800696f8bb03fa127f88531736374ab39bc63
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -253,19 +253,19 @@ jobs:
         with:
           repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
           path: dracon-sync
-          ref: b43e098c0ca71be878745e23661fd33dbf8e82ae
+          ref: d93559f59d8120e33a6a0d8937757608f4f701d6
       - name: Checkout dracon-system
         uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-system-disk-process-guard-doctor
           path: dracon-system
-          ref: 65786d3d001edfb3f7fd89ba046baa425668ba14
+          ref: 88a65daa2947477ce8af7a4174087deaeff4a6c1
       - name: Checkout dracon-warden
         uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-warden-secret-encrypt-age-git-filter
           path: dracon-warden
-          ref: d3dfbde84847fde3e03f02d6aa7640cb063b8151
+          ref: 861800696f8bb03fa127f88531736374ab39bc63
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
