@@ -43,13 +43,20 @@ def git(repo: Path, *args: str) -> str:
 
 def discover_repos() -> list[Path]:
     repos: set[Path] = set()
-    for d in sorted(DEV.iterdir()):
+    candidates = [d for d in sorted(DEV.iterdir()) if d.is_dir()]
+    # second level under known nesting roots (meta-repo utilities, plugin
+    # workspaces, org subdirs) — matches the daemon's recursive discovery
+    for top in list(candidates):
+        if (top / ".git").exists() or (top / ".git").is_file():
+            candidates.extend(d for d in sorted(top.iterdir()) if d.is_dir())
+    for d in candidates:
         if (d / ".git").exists():
             repos.add(d)
     if PLATFORM_GAMES.is_dir():
         for env in sorted(PLATFORM_GAMES.iterdir()):
             if not env.is_dir():
-                continue            for game in sorted(env.iterdir()):
+                continue
+            for game in sorted(env.iterdir()):
                 if game.is_dir() and (game / ".git").exists():
                     repos.add(game)
     return sorted(repos)
