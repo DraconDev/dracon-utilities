@@ -4,57 +4,28 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
-    dracon-sync-src = {
-      url = "github:DraconDev/dracon-sync-background-auto-commit-multi-remote/main";
-      flake = false;
-    };
-    dracon-system-src = {
-      url = "github:DraconDev/dracon-system-disk-process-guard-doctor/main";
-      flake = false;
-    };
-    dracon-warden-src = {
-      url = "github:DraconDev/dracon-warden-secret-encrypt-age-git-filter/main";
-      flake = false;
-    };
   };
 
   outputs = {
     self,
     nixpkgs,
     flake-utils,
-    dracon-sync-src,
-    dracon-system-src,
-    dracon-warden-src,
   }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; };
 
-        # Reconstruct the plain workspace expected by Cargo.  The parent repo
-        # is intentionally meta-only, so its three standalone members arrive
-        # as separate flake inputs.
-        #
+        # CHANGED 2026-08-22 (monorepo conversion): the utilities live in
+        # this repo under dracon-{sync,system,warden}/, so the merged tree
+        # is just the repo itself — no external -src inputs to splice.
         # Layout inside mergedSrc:
         #   dracon-utilities/   <- workspace root (Cargo.toml, Cargo.lock, crates)
-        #   dracon-utilities/dracon-sync/   <- standalone workspace member
-        #   dracon-utilities/dracon-system/ <- standalone workspace member
-        #   dracon-utilities/dracon-warden/ <- standalone workspace member
-        mergedSrc = pkgs.runCommand "dracon-merged-src" {
-          # Force rebuild when inputs change
-          inherit dracon-sync-src dracon-system-src dracon-warden-src;
-        } ''
+        #   dracon-utilities/dracon-sync/   <- workspace member
+        #   dracon-utilities/dracon-system/ <- workspace member
+        #   dracon-utilities/dracon-warden/ <- workspace member
+        mergedSrc = pkgs.runCommand "dracon-merged-src" {} ''
           mkdir -p $out/dracon-utilities
-          cp -r ${./.}/. $out/dracon-utilities/
-          # The flake source may include local nested checkouts when it is
-          # evaluated from a dirty worktree. Make the copied tree writable
-          # before replacing those paths with the pinned standalone inputs.
-          chmod -R u+w $out/dracon-utilities
-          rm -rf $out/dracon-utilities/dracon-sync
-          rm -rf $out/dracon-utilities/dracon-system
-          rm -rf $out/dracon-utilities/dracon-warden
-          cp -r ${dracon-sync-src} $out/dracon-utilities/dracon-sync
-          cp -r ${dracon-system-src} $out/dracon-utilities/dracon-system
-          cp -r ${dracon-warden-src} $out/dracon-utilities/dracon-warden
+          cp -r ${self}/. $out/dracon-utilities/
           # Make writable for buildRustPackage (Cargo needs to write target/, .cargo/)
           chmod -R u+w $out
         '';
