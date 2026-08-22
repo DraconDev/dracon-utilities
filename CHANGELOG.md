@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **2026-08-22 — utilities are now git submodules**: `dracon-sync`,
+  `dracon-system`, `dracon-warden` registered in `.gitmodules`
+  (gitdirs absorbed into `.git/modules/`), so the GitHub meta repo
+  shows the source trees and a plain clone fetches everything.
+  Worktree paths unchanged; flake/CI pins unchanged and still
+  authoritative.
+
+
 ### Added
 
 - **dracon-warden v0.113.5 local release candidate** (2026-08-19): the
