@@ -1,184 +1,140 @@
 # Dracon Utilities
 
-Monorepo for the three Dracon system CLI utilities — `dracon-sync`,
-`dracon-system`, and `dracon-warden` — plus the shared Cargo workspace,
-CI/Nix wiring, installer, and operational documentation.
+Three small Rust CLI tools that look after a Linux development machine:
+one keeps your git repos committed and backed up, one keeps your disk
+and memory from falling over, and one stops secrets from landing in
+your git history. They run as ordinary user-level systemd services —
+no root required.
 
-All three source trees live in this repository (since 2026-08-22,
-imported via subtree merges so commit history stays connected).
-Binaries install to `~/.local/bin/`, run as user-level systemd services
-where appropriate, and keep operational state outside the git tree
-under `~/.dracon/`.
+| Tool | The problem it solves | In one line |
+|------|-----------------------|-------------|
+| [`dracon-sync`](#dracon-sync) | "I edited files all day and never committed." | Watches your repos, auto-commits changes with deterministic messages, pushes to GitHub/GitLab/wherever |
+| [`dracon-system`](#dracon-system) | "My disk filled up mid-build and everything froze." | Guards disk & memory pressure, cleans known space hogs, diagnoses storage issues |
+| [`dracon-warden`](#dracon-warden) | "I nearly pushed my API key to GitHub." | Transparently encrypts secret-shaped files (age) so they're safe at rest in git but plaintext in your editor |
 
-## Latest versions (2026-08-22)
+Everything here is one Cargo workspace: `cargo test` at the repo root
+builds and tests all three (~1000 tests).
 
-| Utility | Version | Notes |
-|---------|---------|-------|
-| `dracon-sync` | **0.113.53** | Watched-repo-vanished CONCERN; cold-render parallelism fix; probe-timeout false-BROKEN fix |
-| `dracon-system` | **0.112.38** | Active-build detection + storage-cleanup protected-path fixes |
-| `dracon-warden` | **0.113.5** | Release candidate built & installed; registry publication remains an operator step |
+## Try it in 60 seconds
 
-Per-crate details live in each directory's `CHANGELOG.md` /
-`release-notes-*.md`. Releases are tagged on this monorepo going
-forward; the historical standalone repositories
-(`DraconDev/dracon-sync-background-auto-commit-multi-remote`,
-`dracon-system-disk-process-guard-doctor`,
-`dracon-warden-secret-encrypt-age-git-filter`) remain as **frozen
-mirrors** of pre-merge history and are no longer updated.
+```bash
+git clone https://github.com/DraconDev/dracon-utilities.git
+cd dracon-utilities
+cargo build --release --locked
+
+./target/release/dracon-system doctor      # health check of this machine
+./target/release/dracon-sync status        # what sync would watch
+```
+
+## Install
+
+```bash
+./install.sh                                # binaries -> ~/.local/bin
+systemctl --user enable --now dracon-sync.service        # background auto-commit
+systemctl --user enable --now dracon-system-guard.service # background guard
+```
+
+`dracon-warden` is not a service — after install, run
+`dracon-warden setup-hooks --global` once to arm its git hooks, then
+`dracon-warden keygen` to create the machine's age keypair.
+
+Each tool then reads its TOML config from `~/.dracon/utilities/`
+(examples ship in each tool's directory). Nothing tracked by git ever
+lives outside the repo tree; state goes to `~/.dracon/` and
+`~/.local/state/dracon/`.
+
+## The tools in practice
+
+### `dracon-sync`
+
+You work; it commits. Give it watch roots (`~/Dev`, say) and it
+discovers every git repo beneath them, waits for edits to settle,
+commits with deterministic diff-based messages, and pushes to origin
+plus any configured mirrors. It classifies push failures
+(`STUCK`/`BLOCKED`/`BROKEN`) instead of silently retrying forever, and
+flags repos that vanish from disk.
+
+```bash
+dracon-sync daemon              # continuous loop (what the service runs)
+dracon-sync repos               # live report of every watched repo
+dracon-sync sync-now ~/Dev/my-project
+dracon-sync health
+```
+
+More: [`dracon-sync/README.md`](dracon-sync/README.md)
+
+### `dracon-system`
+
+A watchdog for the machine itself. When disk or memory pressure crosses
+warn/critical thresholds it can clean regenerable junk (build dirs,
+caches), deprioritize memory hogs so your desktop stays responsive, and
+bias the kernel's out-of-memory killer toward the actual offenders.
+Also does one-shot diagnostics: storage hotspots, symlink management,
+zram status.
+
+```bash
+dracon-system doctor            # deterministic diagnostics pass
+dracon-system storage ~/Dev     # where did my disk go?
+dracon-system guard clean       # reclaim space (dry-run first)
+dracon-system guard daemon      # continuous monitoring (the service)
+```
+
+More: [`dracon-system/README.md`](dracon-system/README.md)
+
+### `dracon-warden`
+
+Git filter-based encryption using [age](https://age-encryption.org/).
+Files matching secret patterns (`.env`, `*.key`, …) are encrypted on
+commit and decrypted on checkout, so the working tree stays normal
+while the remote holds only ciphertext. Global hooks back this up by
+scanning every push for secret-shaped content and blocking risky ones.
+
+```bash
+dracon-warden keygen            # machine age keypair
+dracon-warden setup-hooks --global
+dracon-warden status            # what's protected on this machine
+```
+
+More: [`dracon-warden/README.md`](dracon-warden/README.md)
 
 ## Repository layout
 
 ```
 dracon-utilities/
-├── dracon-sync/      # background auto-commit multi-remote git sync daemon
+├── dracon-sync/      # auto-commit multi-remote git sync daemon
 ├── dracon-system/    # disk/process guard, storage & diagnostics
 ├── dracon-warden/    # age-based git secret encryption (hooks + CLI)
 │   └── src/security/ #   embedded dracon-security crate
 ├── .github/workflows/ci.yml  # lint / test / release-build / deny / nix
-├── flake.nix         # Nix build (single-checkout; no external src inputs)
+├── flake.nix         # optional Nix build path
 ├── scripts/          # release, checks, audit tooling
-└── AGENTS.md         # how agents/operators work in this repo
-```
-
-## Build & test
-
-```bash
-git clone https://github.com/DraconDev/dracon-utilities.git
-cd dracon-utilities
-
-cargo build --release --locked          # all three binaries -> target/release/
-cargo test --workspace --locked         # full suite (~1000 tests)
-cargo clippy --workspace --locked -- -D warnings
-cargo deny check                        # advisories / licenses / bans
-nix flake check                         # optional Nix build path
-```
-
-Install:
-
-```bash
-./install.sh
-systemctl --user restart dracon-sync.service dracon-system-guard.service
-```
-
-Each utility is also independently buildable:
-`cargo build --release --locked -p dracon-{sync,system,warden}` from the
-repo root.
-
-## Governance & daily checks
-
-- [`AGENTS.md`](AGENTS.md) — repo architecture history, daemon policies,
-  commit discipline, and forbidden actions.
-- Daily systemd timer (`dracon-nested-pins-check.timer`, 09:00) runs
-  `scripts/check-repo-identities.py`: every repo's effective git identity
-  must be canonical (`DraconDev <dracsharp@gmail.com>`) or its deliberate
-  `<name>-dev` loop identity.
-- Audit baseline: [`AUDIT_FULL_2026-08-21.md`](AUDIT_FULL_2026-08-21.md)
-  (0 HIGH; remediation status tracked inside).
-
-## What Each Utility Does
-
-### `dracon-sync`
-
-`dracon-sync` watches configured git repositories, waits for changes to settle, commits deterministic diff-based messages, and pushes to origin and optional mirrors.
-
-Common commands:
-
-```bash
-dracon-sync status          # Show policy path, roots, and discovered repos
-dracon-sync repos           # One-shot repo report
-dracon-sync health          # Daemon health check
-dracon-sync daemon          # Run continuous sync loop
-dracon-sync sync-now ~/Dev/my-project
-dracon-sync sync-now --warns       # handle current WARN rows now
-dracon-sync config validate
-```
-
-See [`dracon-sync/README.md`](dracon-sync/README.md) for configuration, mirrors, commit messages, repair commands, and release pipeline behavior.
-
-### `dracon-system`
-
-`dracon-system` protects local machines from disk/process pressure and provides storage, link, zram, and service diagnostics.
-
-Common commands:
-
-```bash
-dracon-system status        # Show core path and service status
-dracon-system doctor        # Run deterministic diagnostics
-dracon-system storage ~/Dev # Analyze storage hotspots
-dracon-system guard daemon  # Run continuous monitoring
-dracon-system link status   # Check configured symlinks
-dracon-system zram --status
-```
-
-See [`dracon-system/README.md`](dracon-system/README.md) for thresholds, cleanup behavior, process renice policy, and deployment examples.
-
-### `dracon-warden`
-
-`dracon-warden` encrypts secret-shaped content at rest in git while keeping normal plaintext files in the working tree. It uses git clean/smudge filters and global or local hooks as the primary enforcement layer.
-
-Common commands:
-
-```bash
-dracon-warden status        # Show resolved policy and repo roots
-dracon-warden keygen        # Generate a machine age keypair
-dracon-warden setup-hooks --global
-dracon-warden once
-dracon-warden scrub-markers
-dracon-warden resmudge
-```
-
-See [`dracon-warden/README.md`](dracon-warden/README.md) for the encryption model, plaintext-sibling escape hatch, recovery tools, and safety notes.
-
-## Configuration
-
-Each utility reads its own TOML policy under `~/.dracon/utilities/`:
-
-| Utility | Policy | Example |
-|---------|--------|---------|
-| `dracon-sync` | `~/.dracon/utilities/sync/dracon-sync.toml` | [`dracon-sync/dracon-sync.example.toml`](dracon-sync/dracon-sync.example.toml) |
-| `dracon-system` | `~/.dracon/utilities/system/dracon-system.toml` | [`dracon-system/dracon-system.example.toml`](dracon-system/dracon-system.example.toml) |
-| `dracon-warden` | `~/.dracon/utilities/warden/dracon-warden.toml` | [`dracon-warden/dracon-warden.example.toml`](dracon-warden/dracon-warden.example.toml) |
-
-Operational state lives outside this repository, for example:
-
-```text
-~/.local/state/dracon/
-├── dracon-sync-incidents.jsonl
-├── dracon-sync-stuck-push-repos.json
-├── dracon-system-guard.log
-└── visibility-sync/
-```
-
-## Services
-
-| Service | Binary | Purpose |
-|---------|--------|---------|
-| `dracon-sync.service` | `dracon-sync daemon` | Git sync automation |
-| `dracon-system-guard.service` | `dracon-system guard daemon` | Disk/process protection |
-
-Useful commands:
-
-```bash
-systemctl --user status dracon-sync.service dracon-system-guard.service
-journalctl --user -u dracon-sync -f
-journalctl --user -u dracon-system-guard -f
-systemctl --user restart dracon-sync.service dracon-system-guard.service
+└── AGENTS.md         # policies for agents/operators working here
 ```
 
 ## Development
 
 ```bash
-# Reliable full test run
-export DRACON_SYNC_GIT_BIN=/run/current-system/sw/bin/git
-cargo test --workspace -- --test-threads=1
-
-# Quality gates
-cargo fmt -p dracon-sync -p dracon-system -p dracon-warden -- --check
-cargo clippy -p dracon-sync -p dracon-system -p dracon-warden --all-targets --no-deps
-cargo build --release -p dracon-sync -p dracon-system -p dracon-warden
+export DRACON_SYNC_GIT_BIN=/run/current-system/sw/bin/git  # NixOS only
+cargo test --workspace --locked
+cargo clippy --workspace --locked -- -D warnings
 cargo deny check
-./scripts/verify-spec.sh
+nix flake check                 # optional
 ```
+
+Per-tool builds: `cargo build --release --locked -p dracon-{sync,system,warden}`.
+
+## Releases
+
+Latest: **v0.113.53** (2026-08-22) — see
+[Releases](https://github.com/DraconDev/dracon-utilities/releases).
+Current component versions: `dracon-sync` 0.113.53 ·
+`dracon-system` 0.112.38 · `dracon-warden` 0.113.5 (RC).
+Details per tool in each directory's `CHANGELOG.md`.
+
+> History note: before 2026-08-22 each utility lived in its own repo
+> (`DraconDev/dracon-sync-background-auto-commit-multi-remote`,
+> `...-disk-process-guard-doctor`, `...-secret-encrypt-age-git-filter`).
+> Those remain as frozen mirrors; all development happens here now.
 
 ## Documentation
 
@@ -186,16 +142,11 @@ cargo deny check
 |----------|---------|
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Documentation map and release status |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Service architecture and deterministic commit protocol |
-| [docs/OPERATIONS.md](docs/OPERATIONS.md) | Systemd, incident response, troubleshooting |
-| [docs/design/cli-print-style.md](docs/design/cli-print-style.md) | Human-facing CLI output conventions |
-| [docs/design/warden-plaintext-sibling.md](docs/design/warden-plaintext-sibling.md) | Warden plaintext escape hatch threat model |
-| [docs/design/github-feature-repos.md](docs/design/github-feature-repos.md) | Historical façade-repo design and its replacement |
-| [dracon-sync/README.md](dracon-sync/README.md) | Sync daemon usage and configuration |
-| [dracon-system/README.md](dracon-system/README.md) | System guard usage and configuration |
-| [dracon-warden/README.md](dracon-warden/README.md) | Repo encryption usage and configuration |
+| [docs/OPERATIONS.md](docs/OPERATIONS.md) | Systemd units, incident response, troubleshooting |
+| [AGENTS.md](AGENTS.md) | Repo architecture history, daemon policies, commit discipline |
 | [SECURITY.md](SECURITY.md) | Security reporting policy |
-| [CHANGELOG.md](CHANGELOG.md) | Version history |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution workflow |
+| [CHANGELOG.md](CHANGELOG.md) | Version history |
 
 ## License
 
