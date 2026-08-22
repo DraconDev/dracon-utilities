@@ -1,0 +1,48 @@
+[package]
+name = "dracon-warden"
+version = "0.113.5"
+edition = "2021"
+license = "AGPL-3.0-only"
+description = "Git filter encryption and repository hardening for secrets at rest"
+readme = "README.md"
+repository = "https://github.com/DraconDev/dracon-warden-secret-encrypt-age-git-filter"
+homepage = "https://github.com/DraconDev/dracon-warden-secret-encrypt-age-git-filter"
+documentation = "https://docs.rs/dracon-warden"
+keywords = ["git", "secret", "encrypt", "age", "filter"]
+categories = ["command-line-utilities"]
+exclude = [".github/", "docs/", "*.md", "!README.md", "Cargo.lock", "target/"]
+
+[dependencies]
+age = "0.10"
+anyhow = "1.0"
+chrono = "0.4"
+comfy-table = "7"
+clap = { version = "4.5", features = ["derive"] }
+globset = "0.4"
+hostname = "0.4"
+rand = "0.8"
+secrecy = "0.8"
+zeroize = "1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+walkdir = "2"
+dirs = "6.0"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "process", "time", "signal", "sync"] }
+# CHANGED 2026-07-21 (v0.112.32, audit H9/F4.2): depend on the LOCAL
+# security crate source (path) instead of the published crates.io
+# v0.3.0. The binary previously built the published crate, so fixes
+# to the local `src/security/` source never reached the binary — the
+# H9 whole-file binary-smudge corruption fix lives in that source.
+# `path` works for both the monorepo workspace build and the
+# standalone dracon-warden repo (src/security is tracked inside it).
+# Keep `version` so a future crates.io publish can revert to the
+# registry form by dropping `path`.
+dracon-security-kit = { package = "dracon-security", version = "0.3.1", path = "src/security" }
+
+tempfile = "3"
+
+[dev-dependencies]
+
+# This manifest is maintained in the standalone dracon-warden repository.
+# The parent dracon-utilities workspace consumes this directory by path.
