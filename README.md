@@ -1,121 +1,79 @@
 # Dracon Utilities
 
-Public release repository for the Dracon system service CLI utilities. These tools install to `~/.local/bin/`, run as user-level system services where appropriate, and keep operational state outside the git tree.
+Monorepo for the three Dracon system CLI utilities — `dracon-sync`,
+`dracon-system`, and `dracon-warden` — plus the shared Cargo workspace,
+CI/Nix wiring, installer, and operational documentation.
 
-This is the meta workspace and release-documentation repository. The three
-utilities are standalone git repositories nested below this directory; their
-published `dracon-git` and `dracon-system-lib` dependencies come from
-crates.io, so no `dracon-libs` checkout is required.
+All three source trees live in this repository (since 2026-08-22,
+imported via subtree merges so commit history stays connected).
+Binaries install to `~/.local/bin/`, run as user-level systemd services
+where appropriate, and keep operational state outside the git tree
+under `~/.dracon/`.
 
-## Latest versions (2026-08-19; Warden candidate prepared locally)
+## Latest versions (2026-08-22)
 
-| Utility | Version | What shipped | Release notes |
-|---------|---------|--------------|---------------|
-| `dracon-sync` | **v0.113.50** | Standalone daemon repository; see its changelog for the latest release notes | [dracon-sync/CHANGELOG.md](dracon-sync/CHANGELOG.md) |
-| `dracon-warden` | **v0.113.5** | Standalone encryption and repository-hardening repository; local release candidate built and installed | [dracon-warden/CHANGELOG.md](dracon-warden/CHANGELOG.md) |
-| `dracon-system` | **v0.112.37** | Standalone disk/process guard repository | [dracon-system/CHANGELOG.md](dracon-system/CHANGELOG.md) |
+| Utility | Version | Notes |
+|---------|---------|-------|
+| `dracon-sync` | **0.113.53** | Watched-repo-vanished CONCERN; cold-render parallelism fix; probe-timeout false-BROKEN fix |
+| `dracon-system` | **0.112.38** | Active-build detection + storage-cleanup protected-path fixes |
+| `dracon-warden` | **0.113.5** | Release candidate built & installed; registry publication remains an operator step |
 
-The Warden v0.113.5 candidate is source-complete and built locally from the
-locked checkout; registry publication, tag creation, and a forge release are
-still separate operator-approved steps. The workspace gate is `cargo test
---workspace --locked`, with the additional format, build, deny, and clippy
-checks documented in `AGENTS.md`.
+Per-crate details live in each directory's `CHANGELOG.md` /
+`release-notes-*.md`. Releases are tagged on this monorepo going
+forward; the historical standalone repositories
+(`DraconDev/dracon-sync-background-auto-commit-multi-remote`,
+`dracon-system-disk-process-guard-doctor`,
+`dracon-warden-secret-encrypt-age-git-filter`) remain as **frozen
+mirrors** of pre-merge history and are no longer updated.
 
-## Install
+## Repository layout
 
-The 3 utilities can be installed independently via `cargo install` from [crates.io](https://crates.io):
-
-```bash
-cargo install dracon-sync     # Background git sync daemon
-cargo install dracon-system   # Disk, process, guard, doctor
-cargo install dracon-warden   # Secret, encrypt, age, git-filter
+```
+dracon-utilities/
+├── dracon-sync/      # background auto-commit multi-remote git sync daemon
+├── dracon-system/    # disk/process guard, storage & diagnostics
+├── dracon-warden/    # age-based git secret encryption (hooks + CLI)
+│   └── src/security/ #   embedded dracon-security crate
+├── .github/workflows/ci.yml  # lint / test / release-build / deny / nix
+├── flake.nix         # Nix build (single-checkout; no external src inputs)
+├── scripts/          # release, checks, audit tooling
+└── AGENTS.md         # how agents/operators work in this repo
 ```
 
-Or build all 3 from a checkout of this meta workspace:
+## Build & test
 
 ```bash
 git clone https://github.com/DraconDev/dracon-utilities.git
 cd dracon-utilities
-# The parent tracks the standalone repositories by path; clone them first.
-git clone https://github.com/DraconDev/dracon-sync-background-auto-commit-multi-remote.git dracon-sync
-git clone https://github.com/DraconDev/dracon-system-disk-process-guard-doctor.git dracon-system
-git clone https://github.com/DraconDev/dracon-warden-secret-encrypt-age-git-filter.git dracon-warden
-cargo build --release --locked
-# Binaries at target/release/dracon-{sync,system,warden}
+
+cargo build --release --locked          # all three binaries -> target/release/
+cargo test --workspace --locked         # full suite (~1000 tests)
+cargo clippy --workspace --locked -- -D warnings
+cargo deny check                        # advisories / licenses / bans
+nix flake check                         # optional Nix build path
 ```
 
-Each long-name repository is also independently buildable:
+Install:
 
 ```bash
-git clone https://github.com/DraconDev/dracon-sync-background-auto-commit-multi-remote.git
-cd dracon-sync-background-auto-commit-multi-remote
-cargo build --release --locked
-```
-
-## Utilities
-
-| Utility | crates.io | Purpose | Runtime |
-|---------|-----------|---------|---------|
-| [`dracon-sync`](dracon-sync/README.md) | [crates.io](https://crates.io/crates/dracon-sync) | Background, auto-commit, multi-remote git sync for developer workspaces | systemd user service |
-| [`dracon-system`](dracon-system/README.md) | [crates.io](https://crates.io/crates/dracon-system) | Disk, process, guard, doctor — local machine diagnostics and watchdog | systemd user service |
-| [`dracon-warden`](dracon-warden/README.md) | [crates.io](https://crates.io/crates/dracon-warden) | Secret, encrypt, age, git-filter — repository hardening and smudge/clean encryption | git hooks + CLI |
-
-### Standalone utility repositories
-
-Each utility has its own standalone repository on GitHub and GitLab. Codeberg
-is retired from the active mirror set. The standalone repositories contain the
-implementation, tests, examples, and release metadata; this parent repository
-provides the shared workspace, installer, CI, and operational documentation.
-
-- [`DraconDev/dracon-sync-background-auto-commit-multi-remote`](https://github.com/DraconDev/dracon-sync-background-auto-commit-multi-remote) (also on [GitLab](https://gitlab.com/DraconDev/dracon-sync-background-auto-commit-multi-remote))
-- [`DraconDev/dracon-system-disk-process-guard-doctor`](https://github.com/DraconDev/dracon-system-disk-process-guard-doctor) (also on [GitLab](https://gitlab.com/DraconDev/dracon-system-disk-process-guard-doctor))
-- [`DraconDev/dracon-warden-secret-encrypt-age-git-filter`](https://github.com/DraconDev/dracon-warden-secret-encrypt-age-git-filter) (also on [GitLab](https://gitlab.com/DraconDev/dracon-warden-secret-encrypt-age-git-filter))
-
-The names are deliberately descriptive so they are self-explanatory in search
-results. The daemon commits each nested repository independently; there is no
-façade-generation script or parent post-commit mirror step.
-
-## Repository architecture
-
-This is a 4-repo system with distinct roles. Each repo has one job:
-
-| Repo | Role | Contains | Updated by |
-|------|------|----------|------------|
-| `DraconDev/dracon-utilities` (this repo) | **Meta workspace** | Workspace manifest, installer, CI, policy docs, and audit records | Operator + daemon for this repo |
-| `DraconDev/dracon-sync-background-auto-commit-multi-remote` | **Standalone source/install target** | `dracon-sync` source, tests, config, and release metadata | Daemon watches and pushes this repo |
-| `DraconDev/dracon-system-disk-process-guard-doctor` | **Standalone source/install target** | `dracon-system` source, tests, config, and release metadata | Daemon watches and pushes this repo |
-| `DraconDev/dracon-warden-secret-encrypt-age-git-filter` | **Standalone source/install target** | `dracon-warden` plus its embedded security crate | Daemon watches and pushes this repo |
-
-Each nested utility repository is a real install target. Users can choose
-`cargo install dracon-{sync,system,warden}` from crates.io, clone one of the
-standalone repositories, or clone this meta workspace plus its three nested
-members.
-
-Releases are cut from the relevant nested repository with its local
-`scripts/release.sh`. The parent workspace is for coordinated build and audit
-checks; it is not a source-mirroring layer.
-
-## Quick Start
-
-```bash
-# Clone the public release repository
-git clone https://github.com/DraconDev/dracon-utilities.git
-cd dracon-utilities
-
-# Restore the three nested standalone repositories
-git clone https://github.com/DraconDev/dracon-sync-background-auto-commit-multi-remote.git dracon-sync
-git clone https://github.com/DraconDev/dracon-system-disk-process-guard-doctor.git dracon-system
-git clone https://github.com/DraconDev/dracon-warden-secret-encrypt-age-git-filter.git dracon-warden
-
-# Install all utilities
 ./install.sh
-
-# Restart services after installation
-systemctl --user restart dracon-sync.service
-systemctl --user restart dracon-system-guard.service
+systemctl --user restart dracon-sync.service dracon-system-guard.service
 ```
 
-`dracon-warden` is installed by `install.sh` and enabled through `dracon-warden setup-hooks --global`; it does not run as a daemon.
+Each utility is also independently buildable:
+`cargo build --release --locked -p dracon-{sync,system,warden}` from the
+repo root.
+
+## Governance & daily checks
+
+- [`AGENTS.md`](AGENTS.md) — repo architecture history, daemon policies,
+  commit discipline, and forbidden actions.
+- Daily systemd timer (`dracon-nested-pins-check.timer`, 09:00) runs
+  `scripts/check-repo-identities.py`: every repo's effective git identity
+  must be canonical (`DraconDev <dracsharp@gmail.com>`) or its deliberate
+  `<name>-dev` loop identity.
+- Audit baseline: [`AUDIT_FULL_2026-08-21.md`](AUDIT_FULL_2026-08-21.md)
+  (0 HIGH; remediation status tracked inside).
 
 ## What Each Utility Does
 
