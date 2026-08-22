@@ -1,0 +1,616 @@
+//! Git process operations — spawn, timeout, kill, and capture output.
+
+use anyhow::{Context, Result};
+use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
+use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::process::Command as TokioCommand;
+use tokio::sync::mpsc;
+
+/// Progress output extends the idle timeout, but it must not keep a network
+/// operation alive forever when a remote emits an endless stream of plausible
+/// progress lines. Four idle windows is generous for large pushes while still
+/// giving the daemon a deterministic upper bound.
+const PROGRESS_TIMEOUT_MULTIPLIER: u64 = 4;
+
+fn progress_hard_timeout_secs(idle_timeout_secs: u64) -> u64 {
+    idle_timeout_secs.saturating_mul(PROGRESS_TIMEOUT_MULTIPLIER)
+}
+
+/// Kill a git child process group using TERM then KILL.
+///
+/// Git push/pull spawn helper processes (ssh, remote-https, pack-objects).
+/// Put those children in their own process group before spawning, then kill the
+/// group on timeout so a timed-out operation cannot keep running in the daemon
+/// cgroup and overlap with the next retry.
+///
+/// F47 (2026-07-19): the previous 200ms SIGTERM→SIGKILL gap was
+/// tight for processes that need cleanup time (large git filter-repo
+/// unpacking, etc.). Now: SIGTERM, wait 2s for graceful cleanup, then
+/// SIGKILL. The wait is asynchronous so a timed-out Git operation does
+/// not block a Tokio worker thread while its process group exits.
+#[cfg(unix)]
+async fn kill_process_group(pid: u32) {
+    let pid_s = format!("-{pid}");
+    // Use `setsid` + `kill` shell-out to send signals to the
+    // process group created by `process_group(0)` in
+    // `configure_git_process_group`. The shell-out form is
+    // portable across glibc/musl/distros; libc::killpg would
+    // require a new direct dependency.
+    let term_pid = pid_s.clone();
+    let term_ok = tokio::task::spawn_blocking(move || {
+        std::process::Command::new("kill")
+            .args(["-TERM", term_pid.as_str()])
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+    })
+    .await
+    .unwrap_or(false);
+    if !term_ok {
+        eprintln!(
+            "⚠️ kill_process_group: SIGTERM to pgid {} failed (kill missing or no perm)",
+            pid
+        );
+        return;
+    }
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    let _ = tokio::task::spawn_blocking(move || {
+        let _ = std::process::Command::new("kill")
+            .args(["-KILL", pid_s.as_str()])
+            .output();
+    })
+    .await;
+}
+
+#[cfg(not(unix))]
+async fn kill_process_group(_pid: u32) {}
+
+#[cfg(unix)]
+fn configure_git_process_group(cmd: &mut TokioCommand) {
+    cmd.process_group(0);
+}
+
+#[cfg(not(unix))]
+fn configure_git_process_group(_cmd: &mut TokioCommand) {}
+
+/// Return true when a git stderr line indicates push/pull progress.
+///
+/// The daemon uses per-operation idle timeouts for git network operations. A
+/// large but active pack can legitimately run longer than the base timeout, so
+/// progress output extends the deadline instead of aborting a healthy push.
+pub(crate) fn is_git_push_progress_line(line: &str) -> bool {
+    // F48 (2026-07-18): the previous predicate used loose substring
+    // matches like `delta` and `bytes` which fired on unrelated
+    // stderr (e.g. `error: cannot merge — delta-branch merge`),
+    // extending the deadline on adversarial input. Tighten to the
+    // patterns git actually emits on progress paths.
+    use std::sync::OnceLock;
+    static RE: OnceLock<regex::Regex> = OnceLock::new();
+    let re = RE.get_or_init(|| {
+        regex::Regex::new(
+            r"(?xi)               # case-insensitive, multi-line (anchors per line)
+            ^\s*(?:                 # line-start, optional indent
+                (?:counting|writing|compressing|receiving|resolving)\s+objects:\s+\d+% |
+                Total\s+\d+.*\(\S+\s+\d+/\d+\) |
+                \d+\s*KiB\s*\|\s*\d+\.\d+\s+MiB/s |
+                \d+%?\s*\(\d+/\d+\),\s*\d+\.\d+\s+KiB\s*\|\s*\d+\.\d+\s+MiB/s |
+                (?:\d+ bytes|\d+\.\d+\s+\w+)\s*\|
+            )
+            |^remote:\s+\S", // any 'remote: ...' line emitted by server-side hooks.
+        )
+        .expect("static regex compiles")
+    });
+    re.is_match(line)
+}
+
+fn child_status_result(
+    status: std::process::ExitStatus,
+    label: &str,
+    workdir: &Path,
+    stderr_output: String,
+) -> Result<()> {
+    if status.success() {
+        Ok(())
+    } else if stderr_output.is_empty() {
+        Err(anyhow::anyhow!(
+            "{} failed in {} with status {}",
+            label,
+            workdir.display(),
+            status
+        ))
+    } else {
+        Err(anyhow::anyhow!(
+            "{} failed in {} with status {}: {}",
+            label,
+            workdir.display(),
+            status,
+            stderr_output
+        ))
+    }
+}
+
+async fn run_child_inner<F>(
+    mut child: tokio::process::Child,
+    workdir: &Path,
+    timeout_secs: u64,
+    label: &str,
+    mut progress_predicate: Option<F>,
+) -> Result<()>
+where
+    F: FnMut(&str) -> bool + Send + 'static,
+{
+    let pid = child.id();
+    let stderr_handle = child.stderr.take();
+    let (progress_tx, mut progress_rx) = mpsc::unbounded_channel::<Instant>();
+    let stderr_task = tokio::spawn(async move {
+        let mut stderr_output = String::new();
+        let mut stderr_truncated = false;
+        const MAX_STDERR_BYTES: usize = 1024 * 1024;
+        if let Some(mut stderr) = stderr_handle {
+            let mut lines = BufReader::new(&mut stderr).lines();
+            loop {
+                // F50 (2026-07-18): a broken pipe (subprocess OOM-killed,
+                // pipe closed early) returns Err; the previous
+                // `while let Ok(Some(line))` silently dropped the
+                // error. Surface the pipe break so the caller's
+                // diagnostic distinguishes pipe error from timeout.
+                match lines.next_line().await {
+                    Ok(Some(line)) => {
+                        if let Some(is_progress) = progress_predicate.as_mut() {
+                            if is_progress(&line) {
+                                let _ = progress_tx.send(Instant::now());
+                            }
+                        }
+                        if stderr_output.len() < MAX_STDERR_BYTES {
+                            if !stderr_output.is_empty() {
+                                stderr_output.push('\n');
+                            }
+                            let remaining = MAX_STDERR_BYTES.saturating_sub(stderr_output.len());
+                            let mut end = remaining.min(line.len());
+                            while end > 0 && !line.is_char_boundary(end) {
+                                end -= 1;
+                            }
+                            stderr_output.push_str(&line[..end]);
+                            if end < line.len() {
+                                stderr_truncated = true;
+                            }
+                        } else {
+                            stderr_truncated = true;
+                        }
+                    }
+                    Ok(None) => break,
+                    Err(e) => {
+                        eprintln!(
+                            "stderr pipe error during git op (likely child crashed): {}",
+                            e
+                        );
+                        stderr_output.push_str(&format!("<stderr pipe error: {}>", e));
+                        break;
+                    }
+                }
+            }
+        }
+        if stderr_truncated {
+            stderr_output.push_str("\n<stderr truncated at 1 MiB>");
+        }
+        stderr_output
+    });
+
+    let started_at = Instant::now();
+    let hard_deadline = started_at + Duration::from_secs(progress_hard_timeout_secs(timeout_secs));
+    let mut deadline = started_at + Duration::from_secs(timeout_secs);
+    // F49 (2026-07-19): the previous 250ms poll was longer than
+    // needed for try_wait accuracy; reduce to 100ms. The progress
+    // wakeup is already event-driven via progress_rx in the
+    // tokio::select! below; this poll is just the safety net to
+    // catch child exit between progress events.
+    let poll_interval = Duration::from_millis(100);
+
+    loop {
+        if let Some(status) = child
+            .try_wait()
+            .map_err(|e| anyhow::anyhow!("{} failed in {}: {}", label, workdir.display(), e))?
+        {
+            let stderr_output = stderr_task
+                .await
+                .unwrap_or_else(|e| format!("stderr capture failed: {e}"));
+            return child_status_result(status, label, workdir, stderr_output);
+        }
+
+        let effective_deadline = std::cmp::min(deadline, hard_deadline);
+        let remaining = effective_deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            if let Some(pid) = pid {
+                kill_process_group(pid).await;
+            }
+            let _ = child.start_kill();
+            let _ = child.wait().await;
+            let _ = stderr_task.await;
+            return Err(anyhow::anyhow!(
+                "{} timeout in {} after {}s idle ({}s hard cap)",
+                label,
+                workdir.display(),
+                timeout_secs,
+                progress_hard_timeout_secs(timeout_secs)
+            ));
+        }
+
+        tokio::select! {
+            Some(_) = progress_rx.recv() => {
+                deadline = std::cmp::min(
+                    Instant::now() + Duration::from_secs(timeout_secs),
+                    hard_deadline,
+                );
+            }
+            _ = tokio::time::sleep(remaining.min(poll_interval)) => {}
+        }
+    }
+}
+
+/// Run a child process with a timeout, capturing stderr on failure.
+pub(crate) async fn run_child(
+    child: tokio::process::Child,
+    workdir: &Path,
+    timeout_secs: u64,
+    label: &str,
+) -> Result<()> {
+    run_child_inner(
+        child,
+        workdir,
+        timeout_secs,
+        label,
+        None::<fn(&str) -> bool>,
+    )
+    .await
+}
+
+/// Run a child process with a progress-aware idle timeout.
+async fn run_child_with_progress<F>(
+    child: tokio::process::Child,
+    workdir: &Path,
+    timeout_secs: u64,
+    label: &str,
+    progress_predicate: F,
+) -> Result<()>
+where
+    F: FnMut(&str) -> bool + Send + 'static,
+{
+    run_child_inner(
+        child,
+        workdir,
+        timeout_secs,
+        label,
+        Some(progress_predicate),
+    )
+    .await
+}
+
+fn spawn_git_command(repo: &Path, args: &[&str], op_label: &str) -> Result<tokio::process::Child> {
+    let label = format!("git {}", op_label);
+    let mut cmd = crate::policy::tokio_git_command();
+    cmd.args(args)
+        .current_dir(repo)
+        .kill_on_drop(true)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::piped());
+    configure_git_process_group(&mut cmd);
+    cmd.spawn()
+        .with_context(|| format!("failed to spawn {} in {}", label, repo.display()))
+}
+
+fn spawn_git_command_env(
+    repo: &Path,
+    args: &[&str],
+    op_label: &str,
+    env: &[(&str, &str)],
+) -> Result<tokio::process::Child> {
+    let label = format!("git {}", op_label);
+    let mut cmd = crate::policy::tokio_git_command();
+    cmd.args(args)
+        .current_dir(repo)
+        .kill_on_drop(true)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::piped());
+    for (k, v) in env {
+        cmd.env(k, v);
+    }
+    configure_git_process_group(&mut cmd);
+    cmd.spawn()
+        .with_context(|| format!("failed to spawn {} in {}", label, repo.display()))
+}
+
+/// Run a git command with a timeout using the tokio git command builder.
+pub(crate) async fn run_git_with_timeout(
+    repo: &Path,
+    args: &[&str],
+    timeout_secs: u64,
+    op_label: &str,
+) -> Result<()> {
+    let label = format!("git {}", op_label);
+    let child = spawn_git_command(repo, args, op_label)?;
+    run_child(child, repo, timeout_secs, &label).await
+}
+
+/// ADDED 2026-07-21 (v0.112.33, audit M13/F2.4): run a std git
+/// command to completion and require exit status 0, including stderr
+/// in the error. The recurring `.status().with_context(...)?`
+/// pattern only surfaces SPAWN failure — a non-zero exit from the
+/// git process is silently treated as success (~6 call sites,
+/// including `consolidate_to_main` proceeding to `branch -D master`
+/// on a failed `git checkout main`).
+pub(crate) fn std_git_checked(
+    cmd: &mut std::process::Command,
+    context: &str,
+) -> anyhow::Result<()> {
+    let output = cmd
+        .output()
+        .with_context(|| format!("{} (spawn failed)", context))?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(anyhow::anyhow!(
+            "{} (exit {}): {}",
+            context,
+            output.status,
+            stderr.trim()
+        ))
+    }
+}
+
+/// Run a git command with extra environment variables and a timeout.
+pub(crate) async fn run_git_with_timeout_env(
+    repo: &Path,
+    args: &[&str],
+    timeout_secs: u64,
+    op_label: &str,
+    env: &[(&str, &str)],
+) -> Result<()> {
+    let label = format!("git {}", op_label);
+    let child = spawn_git_command_env(repo, args, op_label, env)?;
+    run_child(child, repo, timeout_secs, &label).await
+}
+
+/// Run a git push/pull with a progress-aware idle timeout.
+pub(crate) async fn run_git_with_timeout_env_progress(
+    repo: &Path,
+    args: &[&str],
+    timeout_secs: u64,
+    op_label: &str,
+    env: &[(&str, &str)],
+) -> Result<()> {
+    let label = format!("git {}", op_label);
+    let child = spawn_git_command_env(repo, args, op_label, env)?;
+    run_child_with_progress(child, repo, timeout_secs, &label, is_git_push_progress_line).await
+}
+#[cfg(unix)]
+pub(crate) async fn git_askpass_script(token: &str) -> Result<PathBuf> {
+    use std::os::unix::fs::OpenOptionsExt;
+    let nano = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let tmp_path = std::env::temp_dir().join(format!(
+        "dracon-git-askpass-{}-{}.sh",
+        std::process::id(),
+        nano
+    ));
+
+    // F41 fix (2026-07-18): create the file atomically with mode
+    // 0o700 (O_EXCL | O_NOFOLLOW). The previous flow wrote the file
+    // with default umask (typically 0o666) and then tightened
+    // permissions afterwards — the file was world-readable between
+    // the write and chmod. The caller should still `unlink` the
+    // returned path via the AskpassScript guard (see below) so the
+    // credential doesn't linger in /tmp.
+    let _ = tokio::fs::remove_file(&tmp_path).await; // Best-effort: ignore ENOENT.
+
+    // Shell-quote the token (POSIX single-quote escape). For
+    // alnum-only tokens (the realistic case — PATs of any forge)
+    // this is a no-op. Tokens with `'` break the inner quoting;
+    // Forgejo/GitLab allow this in some legacy schemes but we treat
+    // it as a hard error rather than risk malformed shell.
+    if token.contains('\'') {
+        anyhow::bail!("git_askpass_script: token contains a single quote (refused; F59)");
+    }
+    let script = format!("#!/bin/sh\nprintf '%s\\n' '{token}'\n");
+
+    // Atomic create with mode 0o700.
+    {
+        use std::fs::OpenOptions;
+        let mut openopts = OpenOptions::new();
+        openopts
+            .write(true)
+            .create_new(true)
+            .truncate(false)
+            .custom_flags(libc_o_excl_o_nofollow())
+            .mode(0o700);
+        let mut f = openopts.open(&tmp_path).with_context(|| {
+            format!(
+                "failed to create GIT_ASKPASS script at {}",
+                tmp_path.display()
+            )
+        })?;
+        use std::io::Write;
+        f.write_all(script.as_bytes()).with_context(|| {
+            format!(
+                "failed to write GIT_ASKPASS script to {}",
+                tmp_path.display()
+            )
+        })?;
+    }
+
+    Ok(tmp_path)
+}
+
+/// Combine `O_EXCL | O_NOFOLLOW` as a libc `c_int` for
+/// `OpenOptions::custom_flags`. Avoids a hard dependency on the
+/// `libc` crate — just the bit values we need. Stable across the
+/// platforms we support (Linux x86_64/aarch64, macOS).
+#[cfg(unix)]
+fn libc_o_excl_o_nofollow() -> i32 {
+    // O_EXCL = 0x80 on Linux, 0x4 on macOS — but OpenOptionsExt on
+    // macOS doesn't honour `mode()` or `O_NOFOLLOW` reliably, so we
+    // restrict to Linux constants and gate the whole function.
+    #[cfg(target_os = "linux")]
+    {
+        0x80 | 0x20000
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        // Fallback: just O_EXCL (no O_NOFOLLOW). The chmod race fix
+        // still works because the file is created with mode 0o700.
+        0x80
+    }
+}
+
+/// RAII guard that unlinks the askpass script on drop. F41:
+/// caller-side cleanup of the `/tmp/dracon-git-askpass-...` file.
+///
+///   let path = git_askpass_script(&token).await?;
+///   let _guard = AskpassScript::new(path.clone());
+///   // …git push with GIT_ASKPASS=path…
+///   // dropped at scope exit; `path` is unlinked.
+pub(crate) struct AskpassScript {
+    path: PathBuf,
+}
+
+impl AskpassScript {
+    pub(crate) fn new(path: PathBuf) -> Self {
+        Self { path }
+    }
+}
+
+impl Drop for AskpassScript {
+    fn drop(&mut self) {
+        // Best-effort synchronous unlink. Ignore errors (ENOENT,
+        // EBUSY on Windows-rare races). The file is created with
+        // 0o700 owned by the daemon user; the unlink is safe.
+        let _ = std::fs::remove_file(&self.path);
+    }
+}
+
+#[cfg(not(unix))]
+pub(crate) async fn git_askpass_script(_token: &str) -> Result<PathBuf> {
+    anyhow::bail!("GIT_ASKPASS helper is only implemented on Unix")
+}
+
+/// Run a git command and capture its stdout as a string.
+pub(crate) fn run_git_capture_output(repo: &Path, args: &[&str], op_label: &str) -> Result<String> {
+    let output = crate::policy::std_git_command()
+        .args(args)
+        .current_dir(repo)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .output()
+        .with_context(|| format!("failed to run git {} in {}", op_label, repo.display()))?;
+    if !output.status.success() {
+        anyhow::bail!("git {} failed in {}", op_label, repo.display());
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+/// Test helper: returns whether `git filter-repo` is on PATH.
+/// Used by F31 regression test to skip when filter-repo is absent.
+#[cfg(test)]
+pub(crate) fn filter_repo_available_for_tests() -> bool {
+    use std::process::Command;
+    Command::new("git")
+        .args(["filter-repo", "--version"])
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_git_push_progress_line;
+
+    #[test]
+    fn test_git_push_progress_predicate_detects_pack_progress() {
+        assert!(is_git_push_progress_line(
+            "Compressing objects:  50% (123/246)"
+        ));
+        assert!(is_git_push_progress_line(
+            "Writing objects:  10% (1/10), 1.23 KiB | 1.23 MiB/s"
+        ));
+        assert!(is_git_push_progress_line(
+            "remote: Resolving deltas: 100% (10/10)"
+        ));
+        assert!(!is_git_push_progress_line("fatal: could not read Username"));
+    }
+
+    #[test]
+    fn test_f48_tightened_progress_predicate() {
+        // F48 regression: the new predicate must NOT extend the
+        // deadline on error messages that happen to contain `delta`
+        // or `bytes`.
+        assert!(!is_git_push_progress_line(
+            "error: cannot merge without a merge base (use --allow-unrelated-histories for a delta-branch merge strategy)"
+        ));
+        assert!(!is_git_push_progress_line("[trace] 0 bytes allocated"));
+        assert!(!is_git_push_progress_line(
+            "fatal: protocol error: bad bandle 42"
+        ));
+        // And it MUST still match the legitimate patterns.
+        assert!(is_git_push_progress_line(
+            "remote: Total 42 (delta 1), reused 0 (delta 0)"
+        ));
+        assert!(is_git_push_progress_line("remote: Processing 1234"));
+    }
+
+    #[test]
+    fn progress_timeout_has_a_bounded_hard_ceiling() {
+        assert_eq!(super::progress_hard_timeout_secs(0), 0);
+        assert_eq!(super::progress_hard_timeout_secs(60), 240);
+        assert_eq!(super::progress_hard_timeout_secs(u64::MAX), u64::MAX);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn test_git_askpass_script_atomic_0o700_create_and_cleanup() {
+        use super::{git_askpass_script, AskpassScript};
+        use std::os::unix::fs::PermissionsExt;
+
+        // F41 regression: the file must be created with mode 0o700
+        // atomically (no world-readable window) and cleaned up by
+        // the Drop guard.
+        let path = git_askpass_script("ghp_abc123XYZtestToken00000")
+            .await
+            .expect("script create");
+        let meta = tokio::fs::metadata(&path).await.expect("metadata");
+        let mode = meta.permissions().mode();
+        // Mode should be EXACTLY 0o700 (no world-read, no group-read).
+        assert_eq!(
+            mode & 0o777,
+            0o700,
+            "askpass script created with mode {:o} (expected 0o700); the world-readable race window is back",
+            mode
+        );
+
+        // Drop the cleanup guard and verify the file is unlinked.
+        let cleanup_path = path.clone();
+        {
+            let _guard = AskpassScript::new(cleanup_path);
+            assert!(
+                tokio::fs::metadata(&path).await.is_ok(),
+                "file exists in scope"
+            );
+        }
+        // After drop, file should be gone.
+        assert!(
+            tokio::fs::metadata(&path).await.is_err(),
+            "askpass script was not unlinked after Drop"
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn test_git_askpass_script_rejects_single_quote() {
+        // F59: tokens with single quotes break POSIX shell quoting;
+        // we refuse them outright rather than risk shell injection.
+        let result = super::git_askpass_script("abc'def").await;
+        assert!(result.is_err(), "single-quote token must be rejected");
+    }
+}

@@ -1,0 +1,589 @@
+//! Classify each watched repo by its structural relationship to other
+//! watched repos so the `dracon-sync repos` table can render a single
+//! `🔗 ROLE` column that makes the topology visible at a glance.
+//!
+//! The three roles are:
+//!
+//! - **Parent** — the repo's `.gitmodules` declares ≥1 submodule and
+//!   the daemon treats it as a parent (e.g. `dracon-platform` with
+//!   `parent (10 submods)`).
+//! - **Submod** — the repo's working tree is itself a submodule of
+//!   another watched parent (e.g. `junk-runner` with
+//!   `submod (of dracon-platform/web/games/wip/junk-runner)`).
+//! - **Standalone** — no submodule relationship to any other watched
+//!   repo (e.g. `avid`).
+//!
+//! When a repo is BOTH a parent AND a submod-of-parent (rare today
+//! but possible in future topologies), the priority rule is:
+//! **`Submod` wins over `Parent` wins over `Standalone`**.
+//!
+//! Detection uses only existing primitives in `git/discovery.rs`:
+//! [`list_submodules`] for parent-of detection, and a derived check
+//! that walks each watched repo's `.gitmodules` to find a submod
+//! whose `path` ends at the row's basename for submod-of-parent
+//! detection. No shelling out to `git submodule status`.
+
+use std::path::PathBuf;
+
+use crate::git::list_submodules;
+
+/// Which structural role a single repo plays in the daemon's topology.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum RoleKind {
+    /// Repo owns ≥1 submodule. `count` is `list_submodules(...).len()`.
+    Parent(usize),
+    /// Repo is a submodule of another watched parent.
+    /// `parent_basename` is the parent's directory name (not full path).
+    /// `sub_path` is the relative path from the parent's root to the
+    /// submodule checkout (e.g. `web/games/wip/junk-runner`).
+    Submod {
+        parent_basename: String,
+        sub_path: String,
+    },
+    /// Repo has no submodule relationship with any other watched repo.
+    Standalone,
+}
+
+impl RoleKind {
+    /// Render the role as a short, single-line label for the table cell.
+    ///
+    /// CHANGED 2026-07-19 (goal `4555eaf6`): shortened the submod
+    /// label to drop the redundant `submod (of <parent_basename>/`
+    /// prefix. The parent's identity is already implicit from the
+    /// row grouping (the parent row sits above its submods in the
+    /// table, sorted by discovery order) and from the REPO column
+    /// (each row's REPO name is the submod's own basename, e.g.
+    /// `hegemon`). Repeating the parent name in every submod row
+    /// doubled the ROLE cell width for no operational value.
+    ///
+    /// Now a submod of `dracon-platform/web/games/wip/hegemon` is
+    /// rendered as `wip/hegemon` (just the part of the path below
+    /// the parent's `web/games/` segment — the `wip/` vs `released/`
+    /// tier marker is informative because the daemon has separate
+    /// policies for the two). Standalones and parents are unchanged.
+    ///
+    /// If a submod path doesn't start with `web/games/<tier>/` (e.g.
+    /// a future topology where submods sit outside the
+    /// canonical games directory), we fall back to the full path
+    /// below the parent to keep the cell unambiguous.
+    pub(crate) fn label(&self) -> String {
+        match self {
+            // Compact parent label: `parent·10` instead of
+            // `parent (10 submods)`. The "submods" word is implied
+            // by the submod rows that visually sit under the parent
+            // in the table (rendered by `classify_roles` which groups
+            // submods directly below their parent). Saves 11 chars
+            // and keeps ROLE column to ≤ 12 chars in all cases.
+            RoleKind::Parent(n) => format!("parent·{n}"),
+            RoleKind::Submod {
+                parent_basename: _,
+                sub_path,
+            } => {
+                // sub_path looks like `web/games/wip/hegemon` or
+                // `web/games/released/one-mil-girls`. Strip the
+                // canonical `web/games/` prefix when present so the
+                // cell stays compact and the `wip`/`released` tier
+                // marker is visible.
+                if let Some(stripped) = sub_path.strip_prefix("web/games/") {
+                    stripped.to_string()
+                } else {
+                    sub_path.clone()
+                }
+            }
+            RoleKind::Standalone => "standalone".to_string(),
+        }
+    }
+
+    // NOTE: `detail()` method removed 2026-07-11 (audit
+    // AUDIT-3-UTILITIES-2026-07-10.md CONCERN #6). It had no callers
+    // anywhere in the codebase. The shorter `label()` form is what
+    // shows up in the table cell.
+}
+
+/// Classify the role of each row in `rows`. The returned vector has the
+/// same length and order as `rows` (one role per row).
+///
+/// `rows` is `&[RepoReportRow]` and only `row.repo` (the absolute path
+/// of the watched repo's working tree) is read — no other fields are
+/// needed for the role decision.
+pub(crate) fn classify_roles(rows: &[crate::report::RepoReportRow]) -> Vec<RoleKind> {
+    let abs_paths: Vec<PathBuf> = rows.iter().map(|r| PathBuf::from(r.repo_path())).collect();
+
+    // For each row, precompute:
+    //  - Is this row a parent? (use list_submodules on its path)
+    //  - For each OTHER row, does this row's .gitmodules declare a
+    //    submod whose name (or path-tail) matches the current row's
+    //    basename? That tells us this row is a Submod of <other row>
+    //    even when the submod is also checked out as a standalone
+    //    at a different path.
+    //
+    // We do this with O(N*M) work where N=rows and M=submods-per-row;
+    // for the current 26-row watch set that's <100 comparisons.
+
+    let mut results: Vec<RoleKind> = Vec::with_capacity(rows.len());
+
+    for (i, _row) in rows.iter().enumerate() {
+        let my_path = &abs_paths[i];
+        let my_basename = my_path
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
+
+        // 1. Check parent role: does my .gitmodules declare any submods?
+        let my_subs = list_submodules(my_path);
+        let parent_role = if !my_subs.is_empty() {
+            Some(RoleKind::Parent(my_subs.len()))
+        } else {
+            None
+        };
+
+        // 2. Check submod role: do any OTHER rows' .gitmodules declare
+        //    a submod whose full relative-path matches my abs_path
+        //    when joined with their parent? The submod's `name` in
+        //    .gitmodules is conventionally derived from the repo's
+        //    directory name. The `path` tail (last `/`-segment) is
+        //    the actual nested path, e.g. `web/games/wip/polis` → tail
+        //    `polis`.
+        //
+        // F55 (2026-07-19): the previous code matched by basename
+        // only, which collides if two watched repos share a basename
+        // (e.g. both `Cargo.toml` or `dracon-sync` as the daemon
+        // source dir vs the nested standalone). The new logic prefers
+        // the full relative-path equality check first; falls back to
+        // basename only as a last resort (kept for backwards-compat
+        // with submod entries that use a bare `name` field).
+        let mut full_path_role: Option<RoleKind> = None;
+        let mut fallback_role: Option<RoleKind> = None;
+        for (j, other_row) in rows.iter().enumerate() {
+            if i == j {
+                continue;
+            }
+            let other_path = &abs_paths[j];
+            let other_subs = list_submodules(other_path);
+            for entry in &other_subs {
+                // First try: full relative-path equality.
+                let expected_full = other_path.join(&entry.path);
+                let full_path_matches = expected_full == *my_path;
+
+                // Fallback: name equality (legacy format).
+                let name_matches = entry.name == my_basename;
+
+                // Fallback: path-tail equality (last `/`-segment).
+                let last_segment = entry.path.rsplit('/').next().unwrap_or(&entry.path);
+                let path_tail_matches = !my_basename.is_empty() && last_segment == my_basename;
+
+                let parent_basename = other_path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| other_row.repo_path().to_string());
+                let role = RoleKind::Submod {
+                    parent_basename,
+                    sub_path: entry.path.clone(),
+                };
+                if full_path_matches {
+                    // Keep scanning parents only until an exact path is
+                    // found; an earlier basename fallback must not shadow
+                    // the actual nested checkout.
+                    full_path_role = Some(role);
+                    break;
+                } else if fallback_role.is_none() && (name_matches || path_tail_matches) {
+                    fallback_role = Some(role);
+                }
+            }
+            if full_path_role.is_some() {
+                break;
+            }
+        }
+
+        let submod_role = full_path_role.or(fallback_role);
+
+        // 3. Priority: submod > parent > standalone.
+        let final_role = submod_role.or(parent_role).unwrap_or(RoleKind::Standalone);
+        results.push(final_role);
+    }
+
+    results
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+//
+// These tests use only the public surface of the classifier plus the
+// existing `list_submodules` primitive. They build minimal in-memory
+// fixtures in `tempfile::tempdir()` (no external repositories
+// required) and don't touch disk beyond the temp dir.
+//
+// Tests verify:
+//   1. Standalone repo (no .gitmodules) → Standalone
+//   2. Parent repo (.gitmodules declares 3 submods) → Parent(3)
+//   3. Submod-of-parent repo (row is at <parent>/<path>) → Submod
+//   4. Dual-role priority: a repo that is BOTH a parent AND a
+//      submod-of-parent resolves to Submod.
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::path::Path;
+    use std::process::Command;
+    use tempfile::tempdir;
+
+    /// Initialize a bare git repo at `path`, returning the HEAD SHA.
+    /// This is enough scaffolding for `list_submodules` to read
+    /// `.gitmodules` and find the parent's index.
+    fn init_repo(path: &Path) -> String {
+        Command::new("git")
+            .args(["init", "-q", "--initial-branch=main"])
+            .arg(path)
+            .output()
+            .expect("git init");
+        // Disable hooks so globally-installed warden hooks don't reject
+        // commits in temp test repos that lack `.gitattributes` with
+        // `filter=dracon`. See AUDIT-3-UTILITIES-2026-07-10.md CONCERN #4.
+        Command::new("git")
+            .args(["-C"])
+            .arg(path)
+            .args(["config", "core.hooksPath", "/dev/null"])
+            .output()
+            .expect("git config core.hooksPath");
+        Command::new("git")
+            .args(["-C"])
+            .arg(path)
+            .args(["config", "user.email", "test@example.com"])
+            .output()
+            .expect("git config user.email");
+        Command::new("git")
+            .args(["-C"])
+            .arg(path)
+            .args(["config", "user.name", "Test"])
+            .output()
+            .expect("git config user.name");
+        // Need a commit for `git rev-parse HEAD` to succeed.
+        Command::new("git")
+            .args(["-C"])
+            .arg(path)
+            .args(["commit", "--no-verify", "--allow-empty", "-m", "init", "-q"])
+            .output()
+            .expect("git commit");
+        let head_out = Command::new("git")
+            .args(["-C"])
+            .arg(path)
+            .args(["rev-parse", "HEAD"])
+            .output()
+            .expect("git rev-parse");
+        String::from_utf8_lossy(&head_out.stdout).trim().to_string()
+    }
+
+    /// Stage fake gitlink entries in the parent's index. Without
+    /// index entries, `list_submodules` will return entries with
+    /// empty SHAs (the cross-reference returns ""). For these tests
+    /// we only care about the path/name being correct, so empty SHA
+    /// is fine — `RoleKind::Parent(n)` only requires non-empty count,
+    /// and `RoleKind::Submod` is keyed by path equality.
+    fn stage_gitlink(parent: &Path, sub_path: &str, sha: &str) {
+        let status = Command::new("git")
+            .args(["-C"])
+            .arg(parent)
+            .args(["update-index", "--add", "--cacheinfo"])
+            .arg(format!("160000,{},{}", sha, sub_path))
+            .status()
+            .expect("git update-index");
+        assert!(status.success(), "git update-index failed for {sub_path}");
+    }
+
+    #[test]
+    fn classify_role_for_standalone_repo() {
+        let tmp = tempdir().unwrap();
+        let repo = tmp.path().join("standalone");
+        fs::create_dir_all(&repo).unwrap();
+        init_repo(&repo);
+
+        // No .gitmodules → no parent role; no other watched rows → no
+        // submod role. Result: Standalone.
+        let row = crate::report::RepoReportRow::for_tests(&repo.display().to_string());
+        let rows = vec![row];
+        let roles = classify_roles(&rows);
+        assert_eq!(roles.len(), 1);
+        assert_eq!(roles[0], RoleKind::Standalone);
+        assert_eq!(roles[0].label(), "standalone");
+    }
+
+    #[test]
+    fn classify_role_for_parent_repo() {
+        let tmp = tempdir().unwrap();
+        let parent_path = tmp.path().join("myparent");
+        fs::create_dir_all(&parent_path).unwrap();
+        let head = init_repo(&parent_path);
+
+        let gitmodules = "[submodule \"child-a\"]\n\
+                          \tpath = sub/a\n\
+                          \turl = git@example.com:a.git\n\
+                          [submodule \"child-b\"]\n\
+                          \tpath = sub/b\n\
+                          \turl = git@example.com:b.git\n\
+                          [submodule \"child-c\"]\n\
+                          \tpath = sub/c\n\
+                          \turl = git@example.com:c.git\n";
+        fs::write(parent_path.join(".gitmodules"), gitmodules).unwrap();
+        stage_gitlink(&parent_path, "sub/a", &head);
+        stage_gitlink(&parent_path, "sub/b", &head);
+        stage_gitlink(&parent_path, "sub/c", &head);
+
+        let row = crate::report::RepoReportRow::for_tests(&parent_path.display().to_string());
+        let rows = vec![row];
+        let roles = classify_roles(&rows);
+        assert_eq!(roles.len(), 1);
+        assert_eq!(roles[0], RoleKind::Parent(3));
+        // 2026-07-19 (goal `4555eaf6`): parent label format changed
+        // from `parent (N submods)` (20 chars) to `parent·N` (9 chars)
+        // to fit the 14-col ROLE column on narrow terminals.
+        assert_eq!(roles[0].label(), "parent·3");
+    }
+
+    #[test]
+    fn classify_role_for_submod_repo() {
+        let tmp = tempdir().unwrap();
+        // Parent at <tmp>/myparent with one submod declared at sub/child.
+        let parent_path = tmp.path().join("myparent");
+        fs::create_dir_all(&parent_path).unwrap();
+        let head = init_repo(&parent_path);
+
+        let gitmodules = "[submodule \"child\"]\n\
+                          \tpath = sub/child\n\
+                          \turl = git@example.com:child.git\n";
+        fs::write(parent_path.join(".gitmodules"), gitmodules).unwrap();
+        stage_gitlink(&parent_path, "sub/child", &head);
+
+        // Real sub-repo at <parent>/sub/child with its own .git so the
+        // classify_roles submod-of-parent path resolution succeeds.
+        let child_dir = parent_path.join("sub/child");
+        fs::create_dir_all(&child_dir).unwrap();
+        init_repo(&child_dir);
+
+        let row_parent =
+            crate::report::RepoReportRow::for_tests(&parent_path.display().to_string());
+        let row_child = crate::report::RepoReportRow::for_tests(&child_dir.display().to_string());
+        let rows = vec![row_parent, row_child];
+        let roles = classify_roles(&rows);
+
+        assert_eq!(roles.len(), 2);
+        // Parent row → Parent role.
+        assert_eq!(roles[0], RoleKind::Parent(1));
+        // Child row → Submod role pointing at the parent.
+        match &roles[1] {
+            RoleKind::Submod {
+                parent_basename,
+                sub_path,
+            } => {
+                assert_eq!(parent_basename, "myparent");
+                assert_eq!(sub_path, "sub/child");
+            }
+            other => panic!("expected Submod, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn priority_submod_over_parent_when_dual_role() {
+        let tmp = tempdir().unwrap();
+        // Grandparent at <tmp>/grand with a sub called "middle".
+        let grand = tmp.path().join("grand");
+        fs::create_dir_all(&grand).unwrap();
+        let head = init_repo(&grand);
+
+        let grand_gitmodules = "[submodule \"middle\"]\n\
+                                \tpath = sub/middle\n\
+                                \turl = git@example.com:middle.git\n";
+        fs::write(grand.join(".gitmodules"), grand_gitmodules).unwrap();
+        stage_gitlink(&grand, "sub/middle", &head);
+
+        // Middle is at <grand>/sub/middle and ALSO declares its
+        // own submods (so it is a parent too — making it dual-role).
+        let middle = grand.join("sub/middle");
+        fs::create_dir_all(&middle).unwrap();
+        let middle_head = init_repo(&middle);
+
+        let middle_gitmodules = "[submodule \"leaf\"]\n\
+                                 \tpath = leaf\n\
+                                 \turl = git@example.com:leaf.git\n";
+        fs::write(middle.join(".gitmodules"), middle_gitmodules).unwrap();
+        stage_gitlink(&middle, "leaf", &middle_head);
+
+        // Leaf at <middle>/leaf — must be a submod of "middle".
+        let leaf = middle.join("leaf");
+        fs::create_dir_all(&leaf).unwrap();
+        init_repo(&leaf);
+
+        let rows = vec![
+            crate::report::RepoReportRow::for_tests(&grand.display().to_string()),
+            crate::report::RepoReportRow::for_tests(&middle.display().to_string()),
+            crate::report::RepoReportRow::for_tests(&leaf.display().to_string()),
+        ];
+        let roles = classify_roles(&rows);
+
+        // Grand: Parent only (no submod-of for grand here).
+        assert_eq!(roles[0], RoleKind::Parent(1));
+        // Middle: BOTH Parent AND Submod-of-grand → Submod wins.
+        match &roles[1] {
+            RoleKind::Submod {
+                parent_basename,
+                sub_path,
+            } => {
+                assert_eq!(parent_basename, "grand");
+                assert_eq!(sub_path, "sub/middle");
+            }
+            other => panic!("expected Submod for middle, got {:?}", other),
+        }
+        // Leaf: Submod-of-middle.
+        match &roles[2] {
+            RoleKind::Submod {
+                parent_basename,
+                sub_path,
+            } => {
+                assert_eq!(parent_basename, "middle");
+                assert_eq!(sub_path, "leaf");
+            }
+            other => panic!("expected Submod for leaf, got {:?}", other),
+        }
+    }
+
+    /// F55 (2026-07-19): when two watched repos share a basename
+    /// but live at different paths, full-path equality must
+    /// distinguish them. The previous basename-only matcher would
+    /// have misclassified a sibling-foo standalone as a submod of
+    /// any other parent that declared a submod named `foo`.
+    #[test]
+    fn f55_full_path_distinguishes_same_basename_repos() {
+        let dir = tempdir().unwrap();
+        let parent = dir.path().join("parent");
+        let sibling = dir.path().join("sibling-foo");
+        let nested = parent.join("nested-foo");
+        fs::create_dir_all(&parent).unwrap();
+        fs::create_dir_all(&sibling).unwrap();
+        fs::create_dir_all(&nested).unwrap();
+        // Parent's .gitmodules declares a submod `nested-foo`.
+        fs::write(
+            parent.join(".gitmodules"),
+            "[submodule \"nested-foo\"]\n\tpath = nested-foo\n\turl = https://example.com/foo.git\n"
+        ).unwrap();
+        let rows = vec![
+            crate::report::RepoReportRow::for_tests(&parent.to_string_lossy()),
+            crate::report::RepoReportRow::for_tests(&sibling.to_string_lossy()),
+            crate::report::RepoReportRow::for_tests(&nested.to_string_lossy()),
+        ];
+        let roles = classify_roles(&rows);
+        // parent is a Parent(1).
+        assert!(matches!(roles[0], RoleKind::Parent(1)));
+        // sibling-foo at /tmp/.../sibling-foo is STANDALONE
+        // (parent's .gitmodules path=nested-foo resolves to
+        // /tmp/.../parent/nested-foo, NOT /tmp/.../sibling-foo).
+        assert!(
+            matches!(roles[1], RoleKind::Standalone),
+            "expected standalone, got {:?}",
+            roles[1]
+        );
+        // nested-foo at /tmp/.../parent/nested-foo IS a submod of parent.
+        assert!(
+            matches!(roles[2], RoleKind::Submod { .. }),
+            "expected submod, got {:?}",
+            roles[2]
+        );
+    }
+
+    #[test]
+    fn full_path_match_beats_earlier_basename_fallback() {
+        let dir = tempdir().unwrap();
+        let fallback_parent = dir.path().join("fallback-parent");
+        let actual_parent = dir.path().join("actual-parent");
+        let target = actual_parent.join("nested/target");
+        for path in [&fallback_parent, &actual_parent, &target] {
+            fs::create_dir_all(path).unwrap();
+        }
+        let fallback_head = init_repo(&fallback_parent);
+        let actual_head = init_repo(&actual_parent);
+        init_repo(&target);
+
+        // The first parent has only a basename match for `target`; the
+        // second parent contains the actual checkout and therefore has the
+        // authoritative full-path match.
+        fs::write(
+            fallback_parent.join(".gitmodules"),
+            "[submodule \"target\"]\n\tpath = other/target\n\turl = example:target.git\n",
+        )
+        .unwrap();
+        stage_gitlink(&fallback_parent, "other/target", &fallback_head);
+        fs::write(
+            actual_parent.join(".gitmodules"),
+            "[submodule \"target\"]\n\tpath = nested/target\n\turl = example:target.git\n",
+        )
+        .unwrap();
+        stage_gitlink(&actual_parent, "nested/target", &actual_head);
+
+        let rows = vec![
+            crate::report::RepoReportRow::for_tests(&fallback_parent.display().to_string()),
+            crate::report::RepoReportRow::for_tests(&actual_parent.display().to_string()),
+            crate::report::RepoReportRow::for_tests(&target.display().to_string()),
+        ];
+        let roles = classify_roles(&rows);
+        match &roles[2] {
+            RoleKind::Submod {
+                parent_basename,
+                sub_path,
+            } => {
+                assert_eq!(parent_basename, "actual-parent");
+                assert_eq!(sub_path, "nested/target");
+            }
+            other => panic!("expected exact-path submod, got {:?}", other),
+        }
+    }
+
+    /// Goal `4555eaf6` (2026-07-19): the ROLE column should render
+    /// submod labels compactly. For a submod of
+    /// `dracon-platform/web/games/wip/hegemon` the label is just
+    /// `wip/hegemon` (the part of the path below the canonical
+    /// `web/games/` prefix). For non-standard layouts (e.g. a
+    /// future topology where submods sit outside `web/games/`)
+    /// the full sub_path is used as a fallback.
+    #[test]
+    fn label_compact_submod_strips_web_games_prefix() {
+        let r = RoleKind::Submod {
+            parent_basename: "dracon-platform".to_string(),
+            sub_path: "web/games/wip/hegemon".to_string(),
+        };
+        assert_eq!(r.label(), "wip/hegemon");
+    }
+
+    #[test]
+    fn label_compact_submod_keeps_released_tier() {
+        let r = RoleKind::Submod {
+            parent_basename: "dracon-platform".to_string(),
+            sub_path: "web/games/released/one-mil-girls".to_string(),
+        };
+        assert_eq!(r.label(), "released/one-mil-girls");
+    }
+
+    #[test]
+    fn label_compact_submod_falls_back_when_no_web_games_prefix() {
+        // Hypothetical future layout where submods live outside
+        // `web/games/`. We should not silently produce a
+        // confusingly short label — fall back to the full sub_path.
+        let r = RoleKind::Submod {
+            parent_basename: "myparent".to_string(),
+            sub_path: "packages/my-sub".to_string(),
+        };
+        assert_eq!(r.label(), "packages/my-sub");
+    }
+
+    #[test]
+    fn label_parent_unchanged() {
+        // 2026-07-19 (goal `4555eaf6`): changed to compact `parent·N`
+        // to fit the 14-col ROLE column on narrow terminals (was
+        // `parent (N submods)` = 20 chars which wrapped to 2 lines).
+        assert_eq!(RoleKind::Parent(10).label(), "parent·10");
+        assert_eq!(RoleKind::Parent(1).label(), "parent·1");
+    }
+
+    #[test]
+    fn label_standalone_unchanged() {
+        assert_eq!(RoleKind::Standalone.label(), "standalone");
+    }
+}
