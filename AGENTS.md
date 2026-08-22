@@ -7,13 +7,21 @@
 
 ## Repository architecture (READ THIS FIRST)
 
-`dracon-utilities` is a **meta-only repo**. It tracks **no Rust
-source** — only meta files: `AGENTS.md`, `CHANGELOG.md`, the audit
-docs (`AUDIT-*.md`, `AUDIT_REPOS_*.md`, archived `release-notes-v0.112.*.md`),
-`.cargo/config.toml`, the workspace `Cargo.toml`/`Cargo.lock`, and
-`.pi/goals/**`.
+`dracon-utilities` is a **monorepo** (since 2026-08-22). It tracks the
+full Rust source of all three utilities under `dracon-sync/`,
+`dracon-system/`, `dracon-warden/` (imported via subtree merges, so
+commit history stays connected), plus meta files: `AGENTS.md`,
+`CHANGELOG.md`, the audit docs (`AUDIT-*.md`, `AUDIT_REPOS_*.md`),
+`.cargo/config.toml`, and the workspace `Cargo.toml`/`Cargo.lock`.
 
-The 3 utilities live in **nested git submodules** under this
+History: standalone nested repos (until 2026-08-22) → submodules for
+one day → full monorepo. The standalone GitHub repos remain as frozen
+mirrors; utility releases are tagged on THIS repo going forward.
+
+To edit a utility, work directly in its directory here; the daemon
+commits this parent repo, which now carries the source.
+
+The 3 utilities live in directories under this
 directory, each with its own `.git/`, its own remotes
 (codeberg/github/gitlab), its own history, tags, and CHANGELOG:
 
@@ -30,6 +38,10 @@ submodule or symlink the source. To edit a utility, `cd`
 into its nested directory and work there; the daemon commits each
 nested repo independently.
 
+> **SUPERSEDED 2026-08-22, same day — full monorepo conversion**:
+> source was imported into this repo via subtree merges and CI/Nix
+> rewired to self-contained builds. Kept for the record:
+>
 > **CHANGED 2026-08-22 (submodule conversion)**: the three utilities
 > are now registered as **proper git submodules** of the meta repo
 > (`.gitmodules` + gitlinks; gitdirs absorbed into `.git/modules/`).

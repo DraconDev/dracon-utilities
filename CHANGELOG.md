@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **2026-08-22 — full monorepo conversion**: the three utilities now
+  LIVE in this repo (`dracon-sync/`, `dracon-system/`, `dracon-warden/`
+  as real tracked source trees, imported via subtree merges so history
+  stays connected). GitHub shows browsable code; CI builds from a
+  single checkout; the Nix flake dropped its three `-src` inputs.
+  The standalone GitHub repos become frozen mirrors. Utility releases
+  are tagged on this repo going forward. (Same-day submodule
+  registration superseded; gitdir bundles archived under
+  `~/dracon/backups/submodule-gitdirs-20260822/`.)
+
+
+### Changed
+
 - **2026-08-22 — utilities are now git submodules**: `dracon-sync`,
   `dracon-system`, `dracon-warden` registered in `.gitmodules`
   (gitdirs absorbed into `.git/modules/`), so the GitHub meta repo
