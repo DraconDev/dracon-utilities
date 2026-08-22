@@ -27,7 +27,7 @@ jobs:
         with:
           repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
           path: dracon-sync
-          ref: d93559f59d8120e33a6a0d8937757608f4f701d6
+          ref: 549283e24660f78fc5206574792eda7e8519f267
       - name: Checkout dracon-system
         uses: actions/checkout@v4
         with:
@@ -81,7 +81,7 @@ jobs:
         with:
           repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
           path: dracon-sync
-          ref: d93559f59d8120e33a6a0d8937757608f4f701d6
+          ref: 549283e24660f78fc5206574792eda7e8519f267
       - name: Checkout dracon-system
         uses: actions/checkout@v4
         with:
@@ -128,7 +128,7 @@ jobs:
         with:
           repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
           path: dracon-sync
-          ref: d93559f59d8120e33a6a0d8937757608f4f701d6
+          ref: 549283e24660f78fc5206574792eda7e8519f267
       - name: Checkout dracon-system
         uses: actions/checkout@v4
         with:
@@ -203,7 +203,7 @@ jobs:
         with:
           repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
           path: dracon-sync
-          ref: d93559f59d8120e33a6a0d8937757608f4f701d6
+          ref: 549283e24660f78fc5206574792eda7e8519f267
       - name: Checkout dracon-system
         uses: actions/checkout@v4
         with:
@@ -253,7 +253,7 @@ jobs:
         with:
           repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
           path: dracon-sync
-          ref: d93559f59d8120e33a6a0d8937757608f4f701d6
+          ref: 549283e24660f78fc5206574792eda7e8519f267
       - name: Checkout dracon-system
         uses: actions/checkout@v4
         with:
