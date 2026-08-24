@@ -394,7 +394,7 @@ Evidence: endless-td's loop agent adapted correctly ON ITS OWN
 - `dracon-sync repair concerns --apply` — apply a fix for a known concern
 - `systemctl --user status dracon-sync.service` — daemon health
 - `dracon-sync pause` / `dracon-sync resume` — freeze/unfreeze sync
-  (daemon keeps RUNNING, skips cycles; 24h TTL self-heals forgotten pauses)
+  (daemon keeps RUNNING, skips cycles; 1h hard TTL + 30m watchdog auto-clear)
 - `dracon-sync maintenance -- <cmd...>` — pause → run command → ALWAYS
   resume (v0.113.44+). The sanctioned wrapper for git surgery on
   daemon-owned repos.
@@ -415,19 +415,25 @@ Sanctioned quiesce paths:
    exit code. Use for single git operations (merge --abort, rebase,
    reset).
 2. **`dracon-sync pause` / `dracon-sync resume`** — for interactive
-   multi-step work. A forgotten `resume` self-heals: freeze markers
-   older than 24h are auto-cleared by the daemon.
+   multi-step work. A forgotten `resume` self-heals: `dracon-freeze-
+   watchdog.timer` (every 2m) warns at 10m and auto-clears at 30m;
+   the daemon hard-clears any surviving marker at 1h.
 
 Why pause beats stop: the service never goes down (health stays
 green), freeze takes effect within one pulse interval (default 1s),
-and the 24h TTL makes "forgot to resume" self-correcting.
+and the 30m watchdog + 1h hard TTL makes "forgot to resume" self-
+correcting. **CHANGED 2026-08-24**: 24h → 1h after a 3.5h forgotten
+pause (14 repos PENDING) — see `dracon-sync` 0.113.54.
 
-**Mechanical backstop**: `dracon-sync-watchdog.timer` (user systemd,
-2-min period) restarts the service if it is inactive and no
-`~/.dracon/dracon-sync.maintenance-hold` marker exists. Genuine
-multi-minute downtime (release installs, hardware work) must touch
-the hold marker first and remove it afterwards. See
-`docs/design/daemon-quiesce-policy-2026-08-07.md`.
+**Mechanical backstops**:
+- `dracon-sync-watchdog.timer` (2m) restarts the service if it is
+  inactive and no `~/.dracon/dracon-sync.maintenance-hold` marker
+  exists. Genuine multi-minute downtime must touch the hold marker
+  first and remove it afterwards.
+- `dracon-freeze-watchdog.timer` (2m, since 2026-08-24) warns at 10m
+  and auto-clears a stale freeze marker at 30m (daemon hard-clears
+  at 1h). It logs to the journal and sends `notify-send` if
+  available. See `docs/design/daemon-quiesce-policy-2026-08-07.md`.
 
 ## Guard service resilience & memory limiting (2026-08-10, v0.112.36)
 

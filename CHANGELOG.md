@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.113.54] - 2026-08-24
+
+### Fixed
+
+- **Freeze handling hardened**: see `dracon-sync` 0.113.54 — TTL 24 h → 1 h
+  and a new 2-minute freeze watchdog (warn 10 m / auto-clear 30 m) after
+  the 2026-08-24 3.5 h freeze. `dracon-sync` tests also fixed for the
+  monorepo layout.
+
 ## [0.113.53] - 2026-08-22
 
 ### Changed
