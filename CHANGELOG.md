@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.112.39] - 2026-08-25
+
+### Added
+
+- **`clean_tmp` — /tmp hygiene for the guard** (`dracon-system`): the
+  2026-08-25 disk incident found 207 GiB accumulated in `/tmp`
+  (418 stale puppeteer/playwright profiles, `pi-bash-*.log` scratch
+  logs, stale audit clones) that no existing cleanup kind covered.
+  New knobs: `clean_tmp` (default true), `tmp_search_paths`
+  (default "/tmp"), `tmp_min_age_hours` (default 24). Age-based
+  TOP-LEVEL entry cleanup; skips symlinks, protected paths, and any
+  entry currently held open by a process (via `/proc/*/fd`).
+- **`trash_min_age_days` (default 7)** — `clean_trash` now purges only
+  trash entries older than the cutoff, keeping a recovery window
+  instead of emptying everything at once at the next action-level
+  event. Paired `.trashinfo` metadata is removed alongside entries;
+  credential guard unchanged. `0` preserves the old empty-everything
+  behavior.
+
+### Changed
+
+- **Proactive tier (>= `proactive_cleanup_percent`) now runs the cheap
+  non-rust kinds** (`/tmp`, trash, nix gc, docker prune), not just the
+  rust-target scan. Previously they waited for action level (85%),
+  too late on a disk filling 20–60 GiB/h. The heavy `~/Dev` rust scan
+  keeps its own cadence (`include_rust=false` path).
+
+### Tests
+
+- Workspace: 1419 passed (4 new: aged-trash purge, zero-age
+  empty-everything, tmp age/dry-run/open-fd behavior, policy defaults).
+
 ## [0.113.54] - 2026-08-24
 
 ### Fixed
