@@ -967,7 +967,7 @@ dependencies = [
 
 [[package]]
 name = "dracon-system"
-version = "0.112.39"
+version = "0.112.40"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1005,7 +1005,7 @@ dependencies = [
 
 [[package]]
 name = "dracon-warden"
-version = "0.113.5"
+version = "0.113.6"
 dependencies = [
  "age",
  "anyhow",
