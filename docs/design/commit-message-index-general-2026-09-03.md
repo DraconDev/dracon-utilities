@@ -1,6 +1,8 @@
 # Mechanical commit index: general improvements (2026-09-03)
 
-Status: **proposed** (no code changed).
+Status: **implemented** (2026-09-03, no new config, message-only —
+staging/push untouched). Implementation refinements vs the proposal are
+noted inline (§3A single-file scope, §3B DOCSONLY shape).
 Supersedes `commit-message-harness-trails-2026-09-03.md` (same day):
 per operator direction, harness-specific parsing (GLLA or otherwise) is
 OUT — this design covers only general, staged-diff-derived signals.
@@ -116,9 +118,13 @@ existing caps (`take(3)` files/dirs, `take(10)` tasks/new/del,
 Replace `in <top-3-first-components>` with the longest common
 directory prefix of staged paths, capped at 4 components:
 
-- single file `web/games/wip/polis/src/main.ts` → `in
-  web/games/wip/polis/src` (parent dir —today: `in web` + redundant
-  full path in the file list).
+- single file with a parent dir → scope is its **full path**
+  (`web/games/wip/polis/src/main.ts` → `in
+  web/games/wip/polis/src/main.ts`). Refinement vs the first draft
+  (which said parent dir): the `[top-files]` bracket would duplicate the
+  scope exactly, so it is dropped — and the full path keeps the filename
+  greppable (`1 file(s) in <path>` is complete: count + path + DELTA).
+  Root-level single files keep today's empty-scope + bracket rendering.
 - files under one subtree → that subtree.
 - files spanning top dirs (multi-crate) → common prefix is root →
   fall back to today's top-3 dir list, byte-identical behavior
@@ -136,14 +142,21 @@ bounded, harness-blind.
   gitlink paths (`is_gitlink`) and extensionless entries. Tells the
   next agent which toolchain/tests matter before opening the diff.
   Example: `EXT:svelte,ts,json`.
-- `DOCSONLY:<n>` — mirror of `TESTONLY:` (same abbreviation style)
-  when every staged file is `.md`/docs. 7.5% of platform commits.
-- `LOCK` — lockfile-only change (basename in
-  {`Cargo.lock`,`package-lock.json`,`bun.lock`,`pnpm-lock.yaml`,
-  `poetry.lock`,`go.sum`,`Gemfile.lock`} or endswith `.lock`).
-  Dependency bumps with no manifest edit are currently silent.
+- `DOCSONLY:<files>` — mirror of `TESTONLY:` (same parent/basename
+  abbreviation, take 5, `+Nmore`) when every staged text file is a doc
+  (`.md/.mdx/.rst/.txt/.adoc`, case-insensitive) and no binary is staged.
+  7.5% of platform commits. Any binary vetoes the token.
+- `LOCK` — bare token when every staged text file is a lockfile
+  (well-known basenames: `package-lock.json`, `bun.lock`,
+  `pnpm-lock.yaml`, `poetry.lock`, `go.sum`, `Gemfile.lock`, or any
+  `*.lock` incl. `Cargo.lock`) and no binary is staged.
+  Dependency bumps with no manifest edit are currently silent
+  (`detect_dependency_changes` only parses manifests). `changelog.md`
+  and friends never match (matched on lowercased basename).
 - Order: fixed, after `DELTA:` with the other metrics:
-  `… DELTA:+a/-r | EXT:… TEST:… BIN:… DOCSONLY…/TESTONLY… LOCK …`.
+  `… DELTA:+a/-r | EXT:… TEST:… BIN:… NEW:… DEL:… REN:… DEPS:…
+  … TESTONLY…/DOCSONLY… LOCK …` (relative order EXT→TEST→BIN and
+  TESTONLY→DOCSONLY→LOCK as sketched; full order in code).
 
 ### 3C. Rename awareness (fixes §2d)
 
