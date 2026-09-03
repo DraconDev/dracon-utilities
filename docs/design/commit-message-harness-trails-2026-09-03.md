@@ -1,5 +1,9 @@
 # Harness-trail commit pointers — design (2026-09-03)
 
+> **SUPERSEDED same day** by `commit-message-index-general-2026-09-03.md`:
+> per operator direction, harness-specific parsing (GLLA or otherwise) is OUT.
+> Kept for the record; do not implement.
+
 Status: **proposed** (no code changed). Implements the operator's direction:
 use whatever in-repo papertrail exists for better commits, generally across
 harnesses, with no AI in the commit path, commits shaped for AI first, and
