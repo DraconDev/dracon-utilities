@@ -2,7 +2,11 @@
 
 Deterministic by default. These tools do not depend on AI runtimes for commit messages, release decisions, or safety enforcement.
 
-Canonical library ownership is defined in `dracon-libs/docs/capability-boundaries.md`.
+Canonical library ownership is defined in `dracon-libs/docs/capability-boundaries.md`
+(external to this repo — `dracon-libs` does not ship here; neither do the
+transitional crates `dracon-security` and `dracon-persistence`, nor the separate
+`dracon-code` product and `dracon-ai` runtime crates, which are named below only
+to state they are out of scope for these three utilities).
 
 ## Canonical runtime owners
 

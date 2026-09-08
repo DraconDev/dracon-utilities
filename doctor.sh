@@ -45,7 +45,7 @@ echo ""
 echo "📁 Directory Structure"
 check "workspace manifest" "[ -f Cargo.toml ]"
 for utility in dracon-sync dracon-system dracon-warden; do
-    check "$utility nested repository" "[ -d \"$utility/.git\" ] && [ -f \"$utility/Cargo.toml\" ]"
+    check "$utility sources present" "[ -f \"$utility/Cargo.toml\" ]"
 done
 
 echo ""

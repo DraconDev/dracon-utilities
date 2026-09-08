@@ -2,7 +2,7 @@
 
 A map of the design docs, audits, and process records in this repo.
 The commit-all policy means these are all in git history; this index
-is so you don't have to read 116 files to find the one you need.
+is so you don't have to read 264 files to find the one you need.
 **Convention**: `docs/design/` = durable design + investigation docs;
 `docs/archive/` = superseded process iterations (kept for history);
 root `*.md` = canonical audits, release notes, and core files.
@@ -35,15 +35,18 @@ root `*.md` = canonical audits, release notes, and core files.
 | `docs/design/` | Durable design + investigation docs (indexed below) |
 | `docs/archive/` | Superseded process iterations (kept for history) |
 
-## Canonical audits (root)
+## Canonical audits (root + archive)
+
+Pre-2026-08 audits live in `docs/archive/audits-2026-07/`; root holds only
+`AUDIT_FULL_2026-07-26.md` and the August rechecks.
 
 | File | What it is |
 |---|---|
-| `AUDIT-3-UTILITIES-2026-07-10.md` | The original 3-utility audit — **load-bearing**: ~24 code comments cite its CONCERN #4/#6 |
-| `AUDIT_FULL_2026-07-18.md` | Full audit (daemon + all repos) → remediated in v0.112.19–21 |
-| `AUDIT_FULL_2026-07-18-POSTFIX.md` | Post-remediation recheck of the 07-18 audit |
-| `AUDIT_FULL_2026-07-21.md` | The audit that drove v0.112.31–34 (failure-visibility + warden + MEDIUM sweep) |
-| `AUDIT_REPOS_2026-07-10.md`, `AUDIT_REPOS_2026-07-17.md` | Fleet repo-health audits |
+| `docs/archive/audits-2026-07/AUDIT-3-UTILITIES-2026-07-10.md` | The original 3-utility audit — **load-bearing**: ~24 code comments cite its CONCERN #4/#6 |
+| `docs/archive/audits-2026-07/AUDIT_FULL_2026-07-18.md` | Full audit (daemon + all repos) → remediated in v0.112.19–21 |
+| `docs/archive/audits-2026-07/AUDIT_FULL_2026-07-18-POSTFIX.md` | Post-remediation recheck of the 07-18 audit |
+| `docs/archive/audits-2026-07/AUDIT_FULL_2026-07-21.md` | The audit that drove v0.112.31–34 (failure-visibility + warden + MEDIUM sweep) |
+| `docs/archive/audits-2026-07/AUDIT_REPOS_2026-07-10.md`, `docs/archive/audits-2026-07/AUDIT_REPOS_2026-07-17.md` | Fleet repo-health audits |
 
 ## Policy & principles
 
@@ -211,8 +214,10 @@ root `*.md` = canonical audits, release notes, and core files.
 Superseded process iterations kept for history (not for reading):
 - `audits-2026-07/` — the 7 `AUDIT-3-UTILITIES-*` process iterations
   (FINAL, FULL, INDEPENDENT, RECHECK×2, RERUN, FILTER-REPO) from
-  running the 2026-07-10 audit seven ways. The canonical original is
-  `AUDIT-3-UTILITIES-2026-07-10.md` at root.
+  running the 2026-07-10 audit seven ways, plus the `AUDIT_FULL_2026-07-18*`,
+  `AUDIT_FULL_2026-07-21`, and `AUDIT_REPOS_*` audits indexed above.
+  The canonical original is
+  `docs/archive/audits-2026-07/AUDIT-3-UTILITIES-2026-07-10.md`.
 - `release-notes/` — 32 per-version release notes (v0.112.5–12, 15–39).
   Pure duplication of `CHANGELOG.md` entries; archived 2026-07-23. The
   v0.112.13 and v0.112.14 notes remain at `dracon-sync/`.

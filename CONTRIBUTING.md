@@ -4,16 +4,18 @@ Thank you for contributing to Dracon Utilities. This repository publishes determ
 
 ## What Belongs Here
 
-This repository coordinates three standalone CLI repositories and owns their
+This repository is the monorepo for three CLI utilities and owns their
 workspace build, installer, CI, and operational documentation:
 
-- `dracon-sync` — git sync automation
-- `dracon-system` — disk/process/storage diagnostics and guard behavior
-- `dracon-warden` — git filter encryption and repo hardening
+- `dracon-sync` — git sync automation (`dracon-sync/`)
+- `dracon-system` — disk/process/storage diagnostics and guard behavior (`dracon-system/`)
+- `dracon-warden` — git filter encryption and repo hardening (`dracon-warden/`)
 
-The implementation for each utility lives in its nested standalone git repo.
-The published `dracon-git` and `dracon-system-lib` crates provide shared
-library functionality; do not add a local `dracon-libs` path dependency.
+Each utility's implementation lives directly in its tracked directory here
+(imported via subtree merges on 2026-08-22, so history stays connected).
+The standalone GitHub repos of the same names are frozen mirrors — work in
+this repo, not in clones of those. The published `dracon-git` crate provides
+shared library functionality; do not add a local `dracon-libs` path dependency.
 
 ## License
 
@@ -31,10 +33,9 @@ All contributions are licensed under [AGPL-3.0-only](./LICENSE). By submitting a
 ## Setup
 
 ```bash
-# Restore the nested standalone repositories (the parent is meta-only)
-git clone https://github.com/DraconDev/dracon-sync-background-auto-commit-multi-remote.git dracon-sync
-git clone https://github.com/DraconDev/dracon-system-disk-process-guard-doctor.git dracon-system
-git clone https://github.com/DraconDev/dracon-warden-secret-encrypt-age-git-filter.git dracon-warden
+# Clone the monorepo and work in its tracked utility directories
+ git clone https://github.com/DraconDev/dracon-utilities.git
+ cd dracon-utilities
 
 # Optional local diagnostics
 ./doctor.sh
@@ -45,12 +46,13 @@ git clone https://github.com/DraconDev/dracon-warden-secret-encrypt-age-git-filt
 Run these from the repository root:
 
 ```bash
-export DRACON_SYNC_GIT_BIN=/run/current-system/sw/bin/git
+# DRACON_SYNC_GIT_BIN is NixOS-only (points at the system git); skip elsewhere.
+[ -e /run/current-system/sw/bin/git ] && export DRACON_SYNC_GIT_BIN=/run/current-system/sw/bin/git
 
 cargo fmt -p dracon-sync -p dracon-system -p dracon-warden -- --check
-cargo clippy -p dracon-sync -p dracon-system -p dracon-warden --all-targets --no-deps
-cargo test --workspace -- --test-threads=1
-cargo build --release -p dracon-sync -p dracon-system -p dracon-warden
+cargo clippy --workspace --locked --all-targets --no-deps -- -D warnings
+cargo test --workspace --locked
+cargo build --release --locked -p dracon-sync -p dracon-system -p dracon-warden
 cargo deny check
 ./scripts/verify-spec.sh
 ./scripts/check-nested-pins.py
@@ -58,7 +60,7 @@ cargo deny check
 ./install.sh --dry-run
 ```
 
-Use `--test-threads=1` for the full workspace test run. Some tests mutate process-wide state such as `PATH` or environment variables, and serial execution avoids flaky races.
+If you hit flaky races locally (some tests mutate process-wide state such as `PATH` or environment variables), re-run the failing crate serially with `-- --test-threads=1` to confirm.
 
 When a nested utility advances, run `scripts/check-nested-pins.py --check-local`
 after updating the CI checkout refs and `flake.lock`. The check also verifies

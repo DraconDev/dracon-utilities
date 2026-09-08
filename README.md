@@ -13,7 +13,7 @@ no root required.
 | [`dracon-warden`](#dracon-warden) | "I nearly pushed my API key to GitHub." | Transparently encrypts secret-shaped files (age) so they're safe at rest in git but plaintext in your editor |
 
 Everything here is one Cargo workspace: `cargo test` at the repo root
-builds and tests all three (~1000 tests).
+builds and tests all three (~1400 tests).
 
 ## Try it in 60 seconds
 
@@ -32,6 +32,12 @@ cargo build --release --locked
 ./install.sh                                # binaries -> ~/.local/bin
 systemctl --user enable --now dracon-sync.service        # background auto-commit
 systemctl --user enable --now dracon-system-guard.service # background guard
+./uninstall.sh                              # remove binaries and services (configs kept unless --purge)
+
+`install.sh` stops the services while it works, refreshes the user
+service units from the repo, installs the warden git hooks globally,
+and restarts the services afterwards (see `./install.sh --help`;
+`--no-restart` and `--binaries-only` opt out of parts of this).
 ```
 
 `dracon-warden` is not a service — after install, run
@@ -125,10 +131,10 @@ Per-tool builds: `cargo build --release --locked -p dracon-{sync,system,warden}`
 
 ## Releases
 
-Latest: **v0.113.53** (2026-08-22) — see
+Latest component releases: **2026-09-01** — see
 [Releases](https://github.com/DraconDev/dracon-utilities/releases).
-Current component versions: `dracon-sync` 0.113.53 ·
-`dracon-system` 0.112.38 · `dracon-warden` 0.113.5 (RC).
+Current component versions: `dracon-sync` 0.113.55 ·
+`dracon-system` 0.112.40 · `dracon-warden` 0.113.6.
 Details per tool in each directory's `CHANGELOG.md`.
 
 > History note: before 2026-08-22 each utility lived in its own repo
