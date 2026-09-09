@@ -12,7 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > [`dracon-warden/CHANGELOG.md`](dracon-warden/CHANGELOG.md).
 > This root file is no longer updated (its latest entries are 2026-08-24/25
 > and lag the per-utility logs); record new changes in the
-> relevant utility's changelog.
+> relevant utility's changelog. The 2026-09-09 dracon-system F63
+> package-cache apply-safety change is recorded in
+> [`dracon-system/CHANGELOG.md`](dracon-system/CHANGELOG.md).
 
 ## [0.112.39] - 2026-08-25
 
