@@ -1,6 +1,11 @@
-# Docs index — dracon-utilities
+# Design index — dracon-utilities
 
-A map of the design docs, audits, and process records in this repo.
+An index of the durable design docs, audits, and process records under
+`docs/design/` and `docs/archive/`.
+For the user-facing documentation map (install, operations,
+contributing, security, version history), see
+[`docs/ROADMAP.md`](ROADMAP.md) — it is the single map; this file
+indexes only the design/history layer so no tree is mapped twice.
 The commit-all policy means these are all in git history; this index
 is so you don't have to read 264 files to find the one you need.
 **Convention**: `docs/design/` = durable design + investigation docs;
@@ -12,28 +17,6 @@ root `*.md` = canonical audits, release notes, and core files.
 > it is the operator-facing authority, not this index.
 
 ---
-
-## Core files (root)
-
-| File | What it is |
-|---|---|
-| `AGENTS.md` | Operator + agent authority: commit policy, daemon behavior, forbidden actions, test discipline |
-| `CHANGELOG.md` | Meta-repo changelog (all three utilities + daemon) |
-| `README.md` | Repo overview |
-| `CONTRIBUTING.md` | How to contribute |
-| `SECURITY.md` | Security policy |
-| `UTILITY_BOUNDARIES.md` | Where one utility ends and another begins |
-
-## Top-level docs (`docs/`)
-
-| File | What it is |
-|---|---|
-| `docs/ARCHITECTURE.md` | The 3 CLI binaries + systemd service layout |
-| `docs/OPERATIONS.md` | Systemd services, incident response, troubleshooting |
-| `docs/ROADMAP.md` | Documentation roadmap |
-| `docs/README.md` | This index |
-| `docs/design/` | Durable design + investigation docs (indexed below) |
-| `docs/archive/` | Superseded process iterations (kept for history) |
 
 ## Canonical audits (root + archive)
 
@@ -225,5 +208,5 @@ Superseded process iterations kept for history (not for reading):
 
 ---
 
-*Generated 2026-07-23 (docs cleanup). If a doc you need is missing
+*Generated 2026-07-23 (docs cleanup); shrunk to design-index-only 2026-09-09 (D5: user-facing map lives in `ROADMAP.md`). If a doc you need is missing
 here, it's in git history (commit-all policy) or `docs/archive/`.*

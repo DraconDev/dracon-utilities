@@ -144,15 +144,10 @@ Details per tool in each directory's `CHANGELOG.md`.
 
 ## Documentation
 
-| Document | Purpose |
-|----------|---------|
-| [docs/ROADMAP.md](docs/ROADMAP.md) | Documentation map and release status |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Service architecture and deterministic commit protocol |
-| [docs/OPERATIONS.md](docs/OPERATIONS.md) | Systemd units, incident response, troubleshooting |
-| [AGENTS.md](AGENTS.md) | Repo architecture history, daemon policies, commit discipline |
-| [SECURITY.md](SECURITY.md) | Security reporting policy |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution workflow |
-| [CHANGELOG.md](CHANGELOG.md) | Version history |
+[docs/ROADMAP.md](docs/ROADMAP.md) is the single documentation map —
+start there for install, operations, contributing, security, and
+version history. Durable design investigations are indexed separately
+in [docs/README.md](docs/README.md) (design index).
 
 ## License
 
