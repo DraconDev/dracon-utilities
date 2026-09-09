@@ -56,9 +56,9 @@ systemctl --user restart dracon-system-guard.service
 - `dracon-system-guard.service`: `PrivateTmp=false` intentionally, with
   `/tmp` added to `ReadWritePaths`; its `clean_tmp` policy targets the host
   `/tmp`, so a private namespace would make that cleanup ineffective.
-- `clean_tmp` validates `tmp_search_paths` against an explicit `/tmp` and
-  `/var/tmp` allowlist (including descendants) before scanning or deleting;
-  arbitrary home roots such as `~` are refused.
+- `clean_tmp` validates `tmp_search_paths` as a canonical descendant of the
+  explicit `/tmp` root before scanning or deleting; arbitrary home roots such
+  as `~` are refused.
 
 ### Pre-start Cleanup
 
