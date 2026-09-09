@@ -950,6 +950,7 @@ dependencies = [
  "dirs",
  "dracon-git",
  "futures",
+ "libc",
  "notify-rust",
  "parking_lot",
  "proptest",
