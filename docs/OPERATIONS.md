@@ -230,8 +230,11 @@ cleans reclaimable Rust targets, Trash, Nix generations, caches,
 cargo/rustc, npm, pip, and go operations (including common wrappers),
 rechecks immediately before each recursive delete, and skips the
 corresponding cache; unavailable process metadata or a failed process
-listing fails that cleanup step closed. A bare invocation selects all six
-cleanup targets and previews by default; add `--apply` to execute, or select
+listing fails that cleanup step closed. The recheck is necessarily a
+process snapshot rather than a lock shared by external package managers, so
+it narrows (but cannot eliminate) an operation started after that final check.
+A bare invocation selects all six cleanup targets and previews by default; add
+`--apply` to execute, or select
 a subset with `--rust`, `--trash`, `--nix`, `--caches`, `--node-modules`, and
 `--docker`. `--all` selects every target and additionally enables Docker's
 all-unused-images mode.
