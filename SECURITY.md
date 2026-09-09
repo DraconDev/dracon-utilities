@@ -6,7 +6,7 @@ Security updates are provided for the latest release on the default branch.
 
 ## Reporting a Vulnerability
 
-Please report suspected vulnerabilities privately to the repository maintainers using the repository's private vulnerability reporting feature, if available.
+Please report suspected vulnerabilities privately to the repository maintainers via [GitHub private vulnerability reporting](https://github.com/DraconDev/dracon-utilities/security/advisories/new) — this channel is enabled on this repository (verified 2026-09-09).
 
 Do not open a public issue for an unpatched vulnerability. Include:
 
