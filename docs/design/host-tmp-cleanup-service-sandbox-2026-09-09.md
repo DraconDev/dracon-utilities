@@ -41,7 +41,12 @@ weaken the service boundary more broadly and is not needed.
 - `/tmp` is an explicit `ReadWritePaths` entry; and
 - the default guard policy enables `clean_tmp` and selects `/tmp`.
 
-This production unit/config check proves that the service namespace and the
-cleanup policy refer to the same host path. After installing the updated unit,
+The same invariant is checked for the declarative deployment in
+`scripts/check-flake.sh`. Its `nix eval` harness evaluates
+`homeManagerModules.dracon` with `services.dracon.system.enable = true` and
+fails unless the generated `dracon-system-guard.Service` has
+`PrivateTmp = false` and `/tmp` in `ReadWritePaths`. This production
+configuration check proves that both deployment paths expose the namespace
+that the cleanup policy targets. After installing the updated unit,
 operators should run `systemctl --user daemon-reload` and restart the guard
 service before expecting the existing process to use the new namespace.

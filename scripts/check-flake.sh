@@ -29,3 +29,39 @@ printf '%s\n' "$output" \
     | sed '/^warning: The check omitted these incompatible systems:/d' \
     | sed "/^Use '--all-systems' to check all\.$/d"
 echo "PASS: Nix flake checks passed (Home Manager output warning is intentional and documented)."
+
+# Evaluate the Home Manager module with systemd service options supplied by a
+# minimal test harness.  This checks the generated service, not just the
+# standalone unit shipped beside dracon-system.
+service_check="$(nix eval --impure --raw --expr '
+let
+  flake = builtins.getFlake (toString ./.);
+  pkgs = import flake.inputs.nixpkgs { system = builtins.currentSystem; };
+  lib = pkgs.lib;
+  evaluated = lib.evalModules {
+    modules = [
+      flake.homeManagerModules.dracon
+      {
+        options.systemd.user.services = lib.mkOption {
+          type = lib.types.attrsOf lib.types.anything;
+          default = {};
+        };
+        config._module.args.pkgs = pkgs;
+        config.services.dracon.system.enable = true;
+        config.services.dracon.sync.enable = false;
+      }
+    ];
+  };
+  service = evaluated.config.systemd.user.services.dracon-system-guard.Service;
+in
+  if service.PrivateTmp != false then
+    throw "dracon-system-guard must share the host temporary namespace"
+  else if !(builtins.elem "/tmp" service.ReadWritePaths) then
+    throw "dracon-system-guard must explicitly permit host /tmp"
+  else
+    "PASS: generated dracon-system-guard exposes host /tmp cleanup"
+' 2>&1)" || {
+    printf '%s\n' "$service_check"
+    exit 1
+}
+printf '%s\n' "$service_check"
