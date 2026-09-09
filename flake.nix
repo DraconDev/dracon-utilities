@@ -210,8 +210,10 @@
                   "PATH=%h/.local/bin:/run/wrappers/bin:%h/.nix-profile/bin:%h/.local/state/nix/profile/bin:/etc/profiles/per-user/%u/bin:/nix/var/nix/profiles/default/bin:/run/current-system/sw/bin"
                 ];
                 ExecStart = "${cfg.system.package}/bin/dracon-system guard daemon";
+                # A disabled policy exits cleanly; only failures/crashes restart.
                 Restart = "on-failure";
                 RestartSec = "10";
+                # 78 = EX_CONFIG for malformed/unreadable startup policy; 2 = usage.
                 RestartPreventExitStatus = "2 78";
                 MemoryMax = "250M";
                 CPUQuota = "20%";
