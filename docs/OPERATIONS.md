@@ -52,7 +52,10 @@ systemctl --user restart dracon-system-guard.service
 - `NoNewPrivileges=true`
 - `ProtectSystem=strict`
 - `ProtectHome=read-only` (with explicit `ReadWritePaths`)
-- `PrivateTmp=true`
+- `dracon-sync.service`: `PrivateTmp=true`
+- `dracon-system-guard.service`: `PrivateTmp=false` intentionally, with
+  `/tmp` added to `ReadWritePaths`; its `clean_tmp` policy targets the host
+  `/tmp`, so a private namespace would make that cleanup ineffective.
 
 ### Pre-start Cleanup
 
