@@ -219,8 +219,10 @@
                 NoNewPrivileges = true;
                 ProtectSystem = "strict";
                 ProtectHome = "read-only";
-                ReadWritePaths = [ "%h/.dracon" "%h/Dev" "%h/.local/state/dracon" "%h/.local/share/Trash" "%h/.cargo" "%h/.cache" "%h/.npm" ];
-                PrivateTmp = true;
+                # clean_tmp targets the host /tmp; keep the service sandboxed
+                # elsewhere while granting only this required write path.
+                ReadWritePaths = [ "%h/.dracon" "%h/Dev" "%h/.local/state/dracon" "%h/.local/share/Trash" "%h/.cargo" "%h/.cache" "%h/.npm" "/tmp" ];
+                PrivateTmp = false;
               };
               Install = {
                 WantedBy = [ "default.target" ];
