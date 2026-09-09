@@ -58,8 +58,12 @@ in
     throw "dracon-system-guard must share the host temporary namespace"
   else if !(builtins.elem "/tmp" service.ReadWritePaths) then
     throw "dracon-system-guard must explicitly permit host /tmp"
+  else if service.Restart != "on-failure" then
+    throw "dracon-system-guard must not restart after clean policy disablement"
+  else if service.RestartPreventExitStatus != "2 78" then
+    throw "dracon-system-guard must prevent usage and EX_CONFIG restarts"
   else
-    "PASS: generated dracon-system-guard exposes host /tmp cleanup"
+    "PASS: generated dracon-system-guard exposes safe cleanup/restart policy"
 ' 2>&1)" || {
     printf '%s\n' "$service_check"
     exit 1
