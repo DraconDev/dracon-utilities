@@ -32,6 +32,13 @@ also make the configured cleanup a no-op against the disk pressure it was
 introduced to address. Delegating deletion to an unsandboxed helper would
 weaken the service boundary more broadly and is not needed.
 
+The F65 follow-up keeps the cleanup namespace explicit at the policy layer as
+well: `tmp_search_paths` may name only canonical descendants of `/tmp` or
+`/var/tmp`. Roots are validated before any scan, and each candidate is checked
+against the validated root before an apply deletion, so a configuration such
+as `tmp_search_paths = "~"` cannot turn this host namespace into recursive
+home-directory cleanup.
+
 ## Verification
 
 `dracon-system/src/tests.rs` includes the shipped
