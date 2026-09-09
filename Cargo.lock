@@ -923,6 +923,7 @@ dependencies = [
  "curve25519-dalek",
  "dirs",
  "ed25519-dalek",
+ "globset",
  "log",
  "once_cell",
  "proptest",
