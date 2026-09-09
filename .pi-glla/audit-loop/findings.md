@@ -85,3 +85,45 @@ system CleanTargets tmp absence (CLI surface scope, not a bug).
 - [x] FIX: HIGH [F49]: merge driver re-encrypts via git's %A TEMP path so the protected-patterns gate misses and clean writes PLAINTEXT into %A — git commits it (decrypt ignores path, encrypt is path-gated: asymmetric); %A/%B are temp files, not worktree files as the comment claims (dracon-warden/src/main.rs:2428, dracon-warden/src/security/src/lib.rs:1400) — fixed in 0df86fcdb
 - [x] FIX: MED [F50]: RepoKey holds 32-byte AES-GCM keys with no Zeroize/ZeroizeOnDrop while TeamKey has it — key material lingers after drop (dracon-warden/src/security/src/modules/keys.rs:12 vs :42) — fixed in e8f8b5bfa
 - [x] FIX: LOW [F51]: resmudge silently continues past files over STREAM_IO_MAX_BYTES with no warning — large ciphertext files stay unrestored indefinitely (dracon-warden/src/main.rs:2077) — fixed in e8f8b5bfa
+
+## Code pass (2026-09-09, collect-only)
+
+Source: 3 parallel read-only scouts (dracon-sync, dracon-system,
+dracon-warden+security), followed by source verification. Existing F1–F51 and
+D1–D8 were excluded. One scout claim (unused `anyhow::Result` import in
+`dracon-system/src/doctor.rs`) was dropped: the import is used by
+`cmd_doctor`'s `Result<()>` return type. No code was changed in this pass.
+
+### dracon-sync
+
+- [ ] FIX: MEDIUM [F52]: startup cleanup checks only `repo/.git/index.lock`, so it misses stale locks in linked worktrees and nested submodules whose `.git` is a pointer file; later `IndexLock::acquire` sees the real resolved lock and skips the checkout indefinitely (dracon-sync/src/daemon.rs:3118)
+- [ ] FIX: HIGH [F53]: startup lock cleanup treats any `fuser` spawn/permission/error as “not in use” and removes the lock; an unavailable or failing `fuser` can therefore delete an active Git index lock and allow concurrent index writes (dracon-sync/src/daemon.rs:3125)
+- [ ] FIX: MEDIUM [F54]: `ever_pushed` reads refs below the checkout’s literal `.git`, so linked worktrees/submodules with remote refs in the common gitdir appear never-pushed and can pass the 900-second gone guard into unwanted mirror creation (dracon-sync/src/report.rs:6689)
+- [ ] FIX: HIGH [F55]: `standard_files[].target = "."` passes the lexical safety check; with overwrite enabled, `ensure_standard_files` removes the repository directory recursively before the copy fails, deleting the checkout and `.git` (dracon-sync/src/policy.rs:110, dracon-sync/src/standard_files.rs:77)
+- [ ] FIX: MEDIUM [F56]: standard-file target checks are lexical only; a tracked symlink directory such as `.github -> /tmp/out` lets daemon/CLI scaffold writes (and overwrite deletes) resolve outside the repository (dracon-sync/src/standard_files.rs:39, dracon-sync/src/main.rs:1877)
+- [ ] FIX: LOW [F57]: publish-upstream setup reports success after `git config` exits nonzero because it checks process spawn rather than `ExitStatus::success`; unwritable/read-only gitdirs remain unconfigured and are retried misleadingly (dracon-sync/src/daemon.rs:421)
+
+### dracon-system
+
+- [ ] FIX: HIGH [F58]: `nix_keep_generations` passes `5` to `nix-env --delete-generations`, which deletes generation 5 rather than keeping the last five; apply then runs `nix-collect-garbage -d`, which deletes all old profile generations despite the keep setting (dracon-system/src/main.rs:3035)
+- [ ] FIX: HIGH [F59]: the shipped guard service has `PrivateTmp=true`, so its default `/tmp` cleanup sees only the service-private namespace and cannot reclaim stale host `/tmp` entries that filled the monitored root filesystem (dracon-system/dracon-system-guard.service:33)
+- [ ] FIX: MEDIUM [F60]: bare `dracon-system guard clean` is documented as reclaiming/previewing all cleanup targets but `resolve_clean_targets` returns no targets unless `--all` or an individual flag is supplied; it exits successfully after doing nothing (dracon-system/src/main.rs:6193)
+- [ ] FIX: MEDIUM [F61]: `Restart=always` with only exit statuses 2 and 78 prevented means a valid `enabled=false` policy exits 0 and a malformed policy exits 1, causing the shipped guard service to restart every 10 seconds instead of remaining disabled or surfacing a stable error (dracon-system/dracon-system-guard.service:13)
+- [ ] FIX: MEDIUM [F62]: auto-renice computes an absolute target from policy tiers without taking the current process nice value into account; a process already at nice 10 can be reset to target nice 5, raising its priority contrary to the “lower priority” contract (dracon-system/src/main.rs:1398)
+- [ ] FIX: MEDIUM [F63]: active-build protection covers Rust target cleanup but package-cache cleanup has no activity check and can recursively remove cargo/npm/pip/go caches during an active build when apply is enabled (dracon-system/src/main.rs:2317, dracon-system/src/main.rs:2694)
+- [ ] FIX: MEDIUM [F64]: `/tmp` open-path protection scans `/proc/*/fd` but not `/proc/<pid>/cwd`; a process chdir’d into an old top-level tmp directory with no open fd can have that directory recursively removed (dracon-system/src/main.rs:4079)
+- [ ] FIX: MEDIUM [F65]: configurable `tmp_search_paths` accepts arbitrary roots, and guard deletion rejects only exact system roots; `tmp_search_paths="~"` can therefore recursively remove sufficiently old top-level home entries under apply (dracon-system/src/main.rs:4256, dracon-system/src/safety.rs:80)
+- [ ] FIX: MEDIUM [F66]: the documented `guard_log_file = "~/.local/state/dracon/..."` is passed directly to `PathBuf` in logging and rotation without tilde expansion, so telemetry writes to a literal relative `~` path or fails under the service (dracon-system/src/main.rs:1235, dracon-system/dracon-system.example.toml:64)
+- [ ] FIX: LOW [F67]: `status` honors `DRACON_SYSTEM_POLICY` when loading policy but always reports the canonical policy path/existence, so an active valid override is displayed as missing or misidentified (dracon-system/src/main.rs:5096, dracon-system/src/main.rs:5145)
+- [ ] FIX: LOW [F68]: `events --json` prints `(no matching events)` when the filtered result is empty, violating the advertised JSONL output and breaking consumers that parse every line as JSON (dracon-system/src/events.rs:153)
+- [ ] FIX: LOW [F69]: persistent events append to `~/.dracon/events.jsonl` without size rotation, while the guard emits errors on repeated cycles and `events` reads the entire file before tailing; a persistent failure can grow the disk-protection daemon’s own log without bound (dracon-system/src/events.rs:60)
+
+### dracon-warden + security
+
+- [ ] FIX: HIGH [F70]: shipped `repo_roots`/`discover_roots` values such as `"~/.dracon"` and `"~/Dev"` are passed to `PathBuf` without tilde expansion, silently filtering out the intended roots and making once/repair/resmudge operate on zero repositories (dracon-warden/src/main.rs:467)
+- [ ] FIX: MEDIUM [F71]: discovery is documented as recursive but `discover_git_repos` reads only immediate children of each root, omitting nested repositories such as nested game/submodule checkouts from hardening and repair (dracon-warden/src/main.rs:137, dracon-warden/dracon-warden.example.toml:16)
+- [ ] FIX: HIGH [F72]: protected patterns such as the shipped `secrets/*` and `.ssh/*` generate Git filter attributes but `path_is_protected` does not implement single-star path globs, so clean passes matching secret files through plaintext (dracon-warden/src/main.rs:719, dracon-warden/src/security/src/modules/filter.rs:57)
+- [ ] FIX: HIGH [F73]: hardening reads tracked `.gitignore`/`.gitattributes` symlinks with `fs::read_to_string`; a checkout-controlled link to a local secret can be read and preserved into the generated repository file before auto-commit/push (dracon-warden/src/main.rs:1241)
+- [ ] FIX: MEDIUM [F74]: repair’s Git-index-driven resmudge and env-header backfill loops read/write tracked paths without rejecting symlinks, so a committed link can decrypt or rewrite an external file during `repair --apply` (dracon-warden/src/main.rs:2064, dracon-warden/src/main.rs:2190)
+- [ ] FIX: MEDIUM [F75]: owner public-key publication follows a repository-controlled target symlink on `fs::read`/`fs::write`, allowing hardening to overwrite an external writable file with the local public key (dracon-warden/src/main.rs:963)
+- [ ] FIX: MEDIUM [F76]: local hook setup and generated foreign-hook chaining use `repo/.git/hooks` directly; linked worktrees and nested submodules expose `.git` as a pointer file, so `setup-hooks --local` fails and existing local hooks are skipped (dracon-warden/src/main.rs:2746, dracon-warden/src/main.rs:2773)
