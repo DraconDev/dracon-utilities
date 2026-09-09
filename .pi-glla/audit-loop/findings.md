@@ -120,7 +120,7 @@ D1–D8 were excluded. One scout claim (unused `anyhow::Result` import in
 
 ### dracon-warden + security
 
-- [ ] FIX: HIGH [F70]: shipped `repo_roots`/`discover_roots` values such as `"~/.dracon"` and `"~/Dev"` are passed to `PathBuf` without tilde expansion, silently filtering out the intended roots and making once/repair/resmudge operate on zero repositories (dracon-warden/src/main.rs:467)
+- [x] FIX: HIGH [F70]: shipped `repo_roots`/`discover_roots` values such as `"~/.dracon"` and `"~/Dev"` are passed to `PathBuf` without tilde expansion, silently filtering out the intended roots and making once/repair/resmudge operate on zero repositories (dracon-warden/src/main.rs:467) — fixed in f09416740; home-relative root expansion and isolated-HOME discovery regression coverage in 31503f28c
 - [ ] FIX: MEDIUM [F71]: discovery is documented as recursive but `discover_git_repos` reads only immediate children of each root, omitting nested repositories such as nested game/submodule checkouts from hardening and repair (dracon-warden/src/main.rs:137, dracon-warden/dracon-warden.example.toml:16)
 - [ ] FIX: HIGH [F72]: protected patterns such as the shipped `secrets/*` and `.ssh/*` generate Git filter attributes but `path_is_protected` does not implement single-star path globs, so clean passes matching secret files through plaintext (dracon-warden/src/main.rs:719, dracon-warden/src/security/src/modules/filter.rs:57)
 - [ ] FIX: HIGH [F73]: hardening reads tracked `.gitignore`/`.gitattributes` symlinks with `fs::read_to_string`; a checkout-controlled link to a local secret can be read and preserved into the generated repository file before auto-commit/push (dracon-warden/src/main.rs:1241)
