@@ -38,3 +38,50 @@ each claim re-verified against source/CLI before listing. No fabricated findings
 - [x] DECIDED: verify private vulnerability reporting is on and assert it in SECURITY.md (2026-09-09) — was: DECIDE [D4]: SECURITY.md reporting relies solely on GitHub private vulnerability reporting with no contact fallback or SLA. Choice: add maintainer mailbox (cost: spam surface, must be monitored) vs assert private reporting is enabled (cost: reports go nowhere if it is ever off).
 - [x] DECIDED: ROADMAP is the map; shrink docs/README to design-index (2026-09-09) — was: DECIDE [D5]: docs/README.md and docs/ROADMAP.md overlap as docs maps. Choice: shrink docs/README to design-index only, ROADMAP as the map (cost: one rewrite, fix cross-links) vs keep both (cost: two maps drift).
 - [x] DECIDED: per-utility CHANGELOGs canonical; note it in root CHANGELOG (2026-09-09) — was: DECIDE [D6]: Root CHANGELOG.md no longer tracks per-component releases (sync 0.113.55 / system 0.112.40 / warden 0.113.6 tagged 2026-09-01 updated only per-utility CHANGELOGs). Choice: resume root entries per release (cost: dual-changelog upkeep) vs declare per-utility CHANGELOGs canonical and note it in root (cost: root history loses the headline trail).
+
+## Code pass (2026-09-09)
+
+Source: 3 parallel scouts (dracon-sync, dracon-system, dracon-warden+security),
+each claim re-verified against source before listing. Dropped after verification
+(documented-deliberate or no real failure): sync dead settling/dirty fields (intentional
+future-policy, CONCERN #6); warden keygen 12-char window (~40-bit entropy, needs ~1M
+machines to collide); warden pre-push modified-blob + SECRET_RE shape gaps (both
+documented trade-offs with rationale in hook comments); warden .plaintext CWD-relative
+(no demonstrated failure; merge half subsumed by F49); warden backfill contains/CRLF
+gates (safe-direction imprecision, no demonstrated failure); warden text_merge perms
+(tempdir is 0700 — files not world-visible); warden ~/.arcane/keys fallback (decrypt-only
+fallback under own $HOME, no exfil path); warden hygiene defaults narrower than example
+(security crate is generic/published — must not hardcode product game paths); warden
+xargs -r/mktemp (project is GNU/Linux-only per READMEs); warden revoke contains-match
+(full-key substring; deleting proofs signed by a revoked key is correct); warden binary
+inline-tag smudge (clean never creates inline tags in binaries — whole-file-or-passthrough);
+warden EnvironmentManager (pub API of published dracon-security crate — removal breaks
+semver); system resolve_bin hardcoded dracon path (harmless non-matching fallback entry);
+system CleanTargets tmp absence (CLI surface scope, not a bug).
+
+- [ ] FIX: HIGH [F28]: standard_files ~/ escape still open — is_safe allows ~/..., expand_tilde resolves under $HOME, so source="~/.ssh/id_rsa" copies a HOME key into every watched repo for auto-commit+push; SYNC-H5 comment names this exact attack yet the rule blesses ~ (dracon-sync/src/policy.rs:102, dracon-sync/src/standard_files.rs:37)
+- [ ] FIX: HIGH [F29]: documented per-repo auto_repair_concerns=false silently does nothing — knob is GLOBAL_ONLY, RepoPolicyOverride lacks the field, no deny_unknown_fields, daemon gates globally; AGENTS.md promises it protects sacred-history repos (dracon-sync/src/policy.rs:2071, dracon-sync/src/daemon.rs:3367)
+- [?] DECIDE [D7]: redact_origin_credentials preserves bare-token userinfo (https://TOKEN@host kept as "user") — choice: redact ALL userinfo incl. bare usernames (cost: loses username context in logs) vs keep verbatim (cost: token-as-username PATs leak into terminal/JSON reports) (dracon-sync/src/ownership.rs:462)
+- [ ] FIX: MED [F30]: pause/resume touch only marker 1 — frozen via marker 2 (~/.dracon/freeze/dracon-sync) or env reports "not paused"/false "resumed" while still frozen (dracon-sync/src/main.rs:905, dracon-sync/src/policy.rs:1841)
+- [ ] FIX: LOW [F31]: run_maintenance comment claims >24h freeze TTL, code is 1h since 2026-08-24 (dracon-sync/src/main.rs:46 vs dracon-sync/src/policy.rs:1864)
+- [ ] FIX: LOW [F32]: scale_push_timeout cap is identity (cap>=value always) + base*6 can overflow on absurd configs (dracon-sync/src/sync.rs:224)
+- [ ] FIX: LOW [F33]: daemon call-site comment describes removed standalone materialization (function is remote-config-only since 730eaf2a) (dracon-sync/src/daemon.rs:3733 vs dracon-sync/src/daemon.rs:3160)
+- [ ] FIX: LOW [F34]: kill_process_group returns early when SIGTERM fails so SIGKILL is never attempted, contradicting its own TERM-wait-KILL doc (dracon-sync/src/git/ops.rs:42)
+- [ ] FIX: LOW [F35]: integration tests default to NixOS-only /run/current-system/sw/bin/git with unwrap — non-NixOS cargo test panics (dracon-sync/tests/integration_test.rs:10)
+- [?] DECIDE [D8]: world-readable secret files warn-and-load — choice: refuse to load (cost: breaks deployed 644-secret setups until chmod) vs keep warn-and-load (cost: key material readable by other local users stays in use) (dracon-sync/src/secrets.rs:180)
+- [ ] FIX: MED [F36]: storage --kinds help lists (targets, trash, nix, caches, node_modules, docker) — zero overlap with real default kinds rust-build,node-deps,build-output,cache (dracon-system/src/main.rs:195 vs dracon-system/src/policy.rs:333)
+- [ ] FIX: MED [F37]: storage --json returns before the cleanup block — --cleanup/--apply silently ignored with exit 0 (dracon-system/src/main.rs:5353)
+- [ ] FIX: MED [F38]: .git backstop matches only file_name==".git" — /repo/.git/objects passes despite the defense-in-depth comment (dracon-system/src/main.rs:5623)
+- [ ] FIX: MED [F39]: log truncation uses strict check_safe_to_delete which rejects everything under /home and /var — the example's own log_dirs can never be truncated (dracon-system/src/main.rs:4859 vs dracon-system/src/safety.rs:24)
+- [ ] FIX: LOW [F40]: clean_tmp_paths symlink pre-filter uses entry.metadata() which follows symlinks, so is_symlink() is never true and the "Never follow" comment is false (dracon-system/src/main.rs:4131)
+- [ ] FIX: LOW [F41]: trash/tmp cutoff math (now - age) underflows and panics in debug on absurd min_age configs; normalize clamps neither knob (dracon-system/src/main.rs:2928, dracon-system/src/main.rs:4120)
+- [ ] FIX: LOW [F42]: SIGHUP corrupt-policy path logs/emits "using defaults" but keeps the old policy (dracon-system/src/main.rs:5975)
+- [ ] FIX: LOW [F43]: normalize_guard_policy never clamps disk_early_warn_percent — early>warn makes the early band permanently empty (dracon-system/src/main.rs:5110 vs dracon-system/src/main.rs:3401)
+- [ ] FIX: LOW [F44]: cmd_guard_clean calls docker_prune(apply, apply, ...) — --apply forces docker --all (deletes ALL unused images) with no opt-out, while the prune path ties --all to its own flag (dracon-system/src/main.rs:6258 vs dracon-system/src/main.rs:2617)
+- [ ] FIX: LOW [F45]: cmd_guard_prune no-flag path prints human-readable disk text even with --json, then also prints the JSON report — mixed output (dracon-system/src/main.rs:6052)
+- [ ] FIX: LOW [F46]: zram --algorithm help lists 4 algos, code accepts 7 incl. lzo-rle/deflate/842 (dracon-system/src/main.rs:226 vs dracon-system/src/zram.rs:17)
+- [ ] FIX: LOW [F47]: events --severity help advertises critical, EventSeverity has only Info/Warn/Error — nothing emitted can match it (dracon-system/src/main.rs:165 vs dracon-system/src/events.rs:16)
+- [ ] FIX: LOW [F48]: example.toml documents none of clean_tmp/tmp_search_paths/tmp_min_age_hours/trash_min_age_days/trash_credential_guard/process_stuck_after_secs/disk_rapid_fill_gbph/rust_target_max_age_days/clean_node_modules (dracon-system/dracon-system.example.toml vs dracon-system/src/policy.rs:175)
+- [ ] FIX: HIGH [F49]: merge driver re-encrypts via git's %A TEMP path so the protected-patterns gate misses and clean writes PLAINTEXT into %A — git commits it (decrypt ignores path, encrypt is path-gated: asymmetric); %A/%B are temp files, not worktree files as the comment claims (dracon-warden/src/main.rs:2428, dracon-warden/src/security/src/lib.rs:1400)
+- [ ] FIX: MED [F50]: RepoKey holds 32-byte AES-GCM keys with no Zeroize/ZeroizeOnDrop while TeamKey has it — key material lingers after drop (dracon-warden/src/security/src/modules/keys.rs:12 vs :42)
+- [ ] FIX: LOW [F51]: resmudge silently continues past files over STREAM_IO_MAX_BYTES with no warning — large ciphertext files stay unrestored indefinitely (dracon-warden/src/main.rs:2077)
