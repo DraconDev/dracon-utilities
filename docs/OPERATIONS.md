@@ -214,9 +214,11 @@ of any deliberate process termination.
 
 `guard clean` is **disk-space cleanup**, not process-mitigation rollback. It
 cleans reclaimable Rust targets, Trash, Nix generations, caches,
-`node_modules`, and Docker resources. It previews by default; add `--apply`
-to execute, or select targets with `--rust`, `--trash`, `--nix`, `--caches`,
-`--node-modules`, and `--docker`.
+`node_modules`, and Docker resources. A bare invocation selects all six
+cleanup targets and previews by default; add `--apply` to execute, or select
+a subset with `--rust`, `--trash`, `--nix`, `--caches`, `--node-modules`, and
+`--docker`. `--all` selects every target and additionally enables Docker's
+all-unused-images mode.
 
 ```bash
 dracon-system guard clean                 # Preview all cleanup targets
