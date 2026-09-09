@@ -29,7 +29,7 @@ dirs ~11G) and the VM tuning below removed the thrash pattern.
   age-based top-level `/tmp` cleanup with safe-root and open-path protection
   (the open-path collector scans `/proc/*/fd` and `/proc/*/cwd`; held
   entries are skipped even when old). Configured roots are restricted to
-  `/tmp` or `/var/tmp` (or descendants).
+  canonical descendants of `/tmp`.
 - `trash_min_age_days` (default 7): aged trash purge keeps a recovery
   window; `0` = old empty-everything behavior. `.trashinfo` files are
   purged alongside their entries.
