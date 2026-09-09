@@ -105,7 +105,7 @@ D1–D8 were excluded. One scout claim (unused `anyhow::Result` import in
 
 ### dracon-system
 
-- [x] FIX: HIGH [F58]: `nix_keep_generations` passes `5` to `nix-env --delete-generations`, which deletes generation 5 rather than keeping the last five; apply then runs `nix-collect-garbage -d`, which deletes all old profile generations despite the keep setting (dracon-system/src/main.rs:3035) — fixed in 2f6e7cbe6
+- [x] FIX: HIGH [F58]: `nix_keep_generations` passes `5` to `nix-env --delete-generations`, which deletes generation 5 rather than keeping the last five; apply then runs `nix-collect-garbage -d`, which deletes all old profile generations despite the keep setting (dracon-system/src/main.rs:3035) — fixed in 5a490f46b
 - [ ] FIX: HIGH [F59]: the shipped guard service has `PrivateTmp=true`, so its default `/tmp` cleanup sees only the service-private namespace and cannot reclaim stale host `/tmp` entries that filled the monitored root filesystem (dracon-system/dracon-system-guard.service:33)
 - [ ] FIX: MEDIUM [F60]: bare `dracon-system guard clean` is documented as reclaiming/previewing all cleanup targets but `resolve_clean_targets` returns no targets unless `--all` or an individual flag is supplied; it exits successfully after doing nothing (dracon-system/src/main.rs:6193)
 - [ ] FIX: MEDIUM [F61]: `Restart=always` with only exit statuses 2 and 78 prevented means a valid `enabled=false` policy exits 0 and a malformed policy exits 1, causing the shipped guard service to restart every 10 seconds instead of remaining disabled or surfacing a stable error (dracon-system/dracon-system-guard.service:13)
