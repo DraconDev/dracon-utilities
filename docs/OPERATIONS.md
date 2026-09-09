@@ -71,9 +71,11 @@ The sync service kills stale `dracon-git pulse` processes before starting to pre
 
 The guard emits `guard disabled in policy` and exits 0 when
 `[guard].enabled = false`; systemd therefore leaves that intentionally
-disabled service stopped. Malformed or unreadable startup policy is reported
-as status 78, avoiding a retry storm while still allowing crashes and runtime
-failures to restart. Fix the policy, then run
+disabled service stopped. A missing, malformed, or unreadable explicit
+startup policy is reported as status 78, avoiding a retry storm while still
+allowing crashes, abnormal
+signal termination, and runtime failures to restart. Deliberate SIGTERM/SIGINT
+shutdown is handled cleanly. Fix the policy, then run
 `systemctl --user reset-failed dracon-system-guard.service` (if needed) and
 restart the service.
 
