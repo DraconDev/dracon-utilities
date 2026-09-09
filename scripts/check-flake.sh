@@ -58,6 +58,8 @@ in
     throw "dracon-system-guard must share the host temporary namespace"
   else if !(builtins.elem "/tmp" service.ReadWritePaths) then
     throw "dracon-system-guard must explicitly permit host /tmp"
+  else if service.WorkingDirectory != "%h" then
+    throw "dracon-system-guard must anchor relative paths in the user home"
   else if service.Restart != "on-failure" then
     throw "dracon-system-guard must not restart after clean policy disablement"
   else if service.RestartPreventExitStatus != "2 78" then

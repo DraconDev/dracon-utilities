@@ -210,6 +210,8 @@
                   "PATH=%h/.local/bin:/run/wrappers/bin:%h/.nix-profile/bin:%h/.local/state/nix/profile/bin:/etc/profiles/per-user/%u/bin:/nix/var/nix/profiles/default/bin:/run/current-system/sw/bin"
                 ];
                 ExecStart = "${cfg.system.package}/bin/dracon-system guard daemon";
+                # Keep intentionally relative policy paths stable for the user service.
+                WorkingDirectory = "%h";
                 # A disabled policy exits cleanly; only failures/crashes restart.
                 Restart = "on-failure";
                 RestartSec = "10";
