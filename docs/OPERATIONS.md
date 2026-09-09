@@ -63,8 +63,8 @@ The sync service kills stale `dracon-git pulse` processes before starting to pre
 
 ### Restart Behavior
 
-- `Restart=on-failure` — restarts crashes, signal termination, and other
-  nonzero failures, but not a clean exit from a valid disabled policy
+- `Restart=on-failure` — restarts crashes, abnormal signal termination, and
+  other nonzero failures, but not a clean exit from a valid disabled policy
 - `RestartSec=5` (sync) / `10` (guard)
 - `RestartPreventExitStatus=2 78` — don't restart on CLI usage errors or the
   guard's startup policy status 78 (`EX_CONFIG`)
