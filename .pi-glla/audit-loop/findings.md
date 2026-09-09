@@ -101,7 +101,7 @@ D1–D8 were excluded. One scout claim (unused `anyhow::Result` import in
 - [ ] FIX: MEDIUM [F54]: `ever_pushed` reads refs below the checkout’s literal `.git`, so linked worktrees/submodules with remote refs in the common gitdir appear never-pushed and can pass the 900-second gone guard into unwanted mirror creation (dracon-sync/src/report.rs:6689)
 - [x] FIX: HIGH [F55]: `standard_files[].target = "."` passes the lexical safety check; with overwrite enabled, `ensure_standard_files` removes the repository directory recursively before the copy fails, deleting the checkout and `.git` (dracon-sync/src/policy.rs:110, dracon-sync/src/standard_files.rs:77) — fixed in 93d429ba9
 - [x] FIX: MEDIUM [F56]: standard-file target checks are lexical only; a tracked symlink directory such as `.github -> /tmp/out` lets daemon/CLI scaffold writes (and overwrite deletes) resolve outside the repository (dracon-sync/src/standard_files.rs:39, dracon-sync/src/main.rs:1877) — fixed in e4a4f339e
-- [ ] FIX: LOW [F57]: publish-upstream setup reports success after `git config` exits nonzero because it checks process spawn rather than `ExitStatus::success`; unwritable/read-only gitdirs remain unconfigured and are retried misleadingly (dracon-sync/src/daemon.rs:421)
+- [x] FIX: LOW [F57]: publish-upstream setup reports success after `git config` exits nonzero because it checks process spawn rather than `ExitStatus::success`; unwritable/read-only gitdirs remain unconfigured and are retried misleadingly (dracon-sync/src/daemon.rs:421) — fixed in 62de22618
 
 ### dracon-system
 
