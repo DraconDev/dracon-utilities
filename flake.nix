@@ -136,7 +136,9 @@
           options.services.dracon = {
             sync.enable = mkEnableOption "dracon-sync daemon (git sync automation)";
             system.enable = mkEnableOption "dracon-system guard daemon (disk/process protection)";
-            warden.enable = mkEnableOption "dracon-warden daemon (secret hardening)";
+            # No warden.enable: dracon-warden has no daemon — enforcement is via
+            # git hooks (dracon-warden setup-hooks --global). A warden systemd
+            # unit would ExecStart a nonexistent subcommand (removed 2026-09-09).
 
             sync.package = mkOption {
               type = types.package;
@@ -148,11 +150,8 @@
               default = draconPkgs.dracon-system;
               description = "dracon-system package to use";
             };
-            warden.package = mkOption {
-              type = types.package;
-              default = draconPkgs.dracon-warden;
-              description = "dracon-warden package to use";
-            };
+            # No warden.package: with no warden service, the binary comes from
+            # the dracon-warden package directly (nix build .#dracon-warden).
 
             sync.policyPath = mkOption {
               type = types.str;
@@ -228,37 +227,8 @@
               };
             };
 
-            # --- dracon-warden ---
-            systemd.user.services.dracon-warden = mkIf cfg.warden.enable {
-              Unit = {
-                Description = "Dracon Warden (lightweight runtime)";
-                Documentation = "https://github.com/DraconDev/dracon-utilities";
-                After = [ "default.target" ];
-              };
-              Service = {
-                Type = "simple";
-                Environment = [
-                  "PATH=%h/.local/bin:/run/wrappers/bin:%h/.nix-profile/bin:%h/.local/state/nix/profile/bin:/etc/profiles/per-user/%u/bin:/nix/var/nix/profiles/default/bin:/run/current-system/sw/bin"
-                ];
-                ExecStart = "${cfg.warden.package}/bin/dracon-warden daemon";
-                Restart = "on-failure";
-                RestartSec = "3";
-                RestartPreventExitStatus = "2 78";
-                Nice = "10";
-                CPUQuota = "10%";
-                MemoryHigh = "384M";
-                MemoryMax = "1G";
-                TasksMax = "64";
-                NoNewPrivileges = true;
-                ProtectSystem = "strict";
-                ProtectHome = "read-only";
-                ReadWritePaths = [ "%h/.dracon" "%h/Dev" "%h/.local/state/dracon" ];
-                PrivateTmp = true;
-              };
-              Install = {
-                WantedBy = [ "default.target" ];
-              };
-            };
+            # No dracon-warden service: warden has no daemon subcommand —
+            # enforcement is via git hooks (dracon-warden setup-hooks --global).
           };
         };
     };
