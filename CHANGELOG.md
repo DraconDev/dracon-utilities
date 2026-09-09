@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+> **Canonical-changelog policy (since the 2026-08-22 monorepo conversion):**
+> the per-utility changelogs are canonical —
+> [`dracon-sync/CHANGELOG.md`](dracon-sync/CHANGELOG.md),
+> [`dracon-system/CHANGELOG.md`](dracon-system/CHANGELOG.md),
+> [`dracon-warden/CHANGELOG.md`](dracon-warden/CHANGELOG.md).
+> This root file is a frozen historical record (its latest entries predate
+> the conversion) and is no longer updated; record new changes in the
+> relevant utility's changelog.
+
 ## [0.112.39] - 2026-08-25
 
 ### Added
