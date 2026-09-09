@@ -226,15 +226,14 @@ of any deliberate process termination.
 
 `guard clean` is **disk-space cleanup**, not process-mitigation rollback. It
 cleans reclaimable Rust targets, Trash, Nix generations, caches,
-`node_modules`, and Docker resources. Apply cache cleanup detects active
-cargo/rustc, npm, pip, and go operations (including common wrappers),
-rechecks immediately before each recursive delete, and skips the
-corresponding cache; unavailable process metadata or a failed process
-listing fails that cleanup step closed. The recheck is necessarily a
-process snapshot rather than a lock shared by external package managers, so
-it narrows (but cannot eliminate) an operation started after that final check.
-A bare invocation selects all six cleanup targets and previews by default; add
-`--apply` to execute, or select
+`node_modules`, and Docker resources. Package-cache apply deletion is
+intentionally refused because external package managers provide no lock shared
+with the guard; this is the only way to guarantee that an operation cannot
+start between detection and recursive deletion. Dry-run cache estimates still
+detect cargo/rustc, npm, pip, and go operations (including common wrappers) and
+skip the corresponding active cache; unavailable process metadata or a failed
+process listing fails that inspection closed. A bare invocation selects all six
+cleanup targets and previews by default; add `--apply` to execute, or select
 a subset with `--rust`, `--trash`, `--nix`, `--caches`, `--node-modules`, and
 `--docker`. `--all` selects every target and additionally enables Docker's
 all-unused-images mode.
