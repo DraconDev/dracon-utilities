@@ -96,7 +96,7 @@ D1–D8 were excluded. One scout claim (unused `anyhow::Result` import in
 
 ### dracon-sync
 
-- [ ] FIX: MEDIUM [F52]: startup cleanup checks only `repo/.git/index.lock`, so it misses stale locks in linked worktrees and nested submodules whose `.git` is a pointer file; later `IndexLock::acquire` sees the real resolved lock and skips the checkout indefinitely (dracon-sync/src/daemon.rs:3118)
+- [x] FIX: MEDIUM [F52]: startup cleanup checks only `repo/.git/index.lock`, so it misses stale locks in linked worktrees and nested submodules whose `.git` is a pointer file; later `IndexLock::acquire` sees the real resolved lock and skips the checkout indefinitely (dracon-sync/src/daemon.rs:3118) — fixed in 6f68a929a; startup and mid-checkout lock checks now use the resolved gitdir, with linked-worktree and nested-submodule cleanup regressions
 - [ ] FIX: HIGH [F53]: startup lock cleanup treats any `fuser` spawn/permission/error as “not in use” and removes the lock; an unavailable or failing `fuser` can therefore delete an active Git index lock and allow concurrent index writes (dracon-sync/src/daemon.rs:3125)
 - [ ] FIX: MEDIUM [F54]: `ever_pushed` reads refs below the checkout’s literal `.git`, so linked worktrees/submodules with remote refs in the common gitdir appear never-pushed and can pass the 900-second gone guard into unwanted mirror creation (dracon-sync/src/report.rs:6689)
 - [x] FIX: HIGH [F55]: `standard_files[].target = "."` passes the lexical safety check; with overwrite enabled, `ensure_standard_files` removes the repository directory recursively before the copy fails, deleting the checkout and `.git` (dracon-sync/src/policy.rs:110, dracon-sync/src/standard_files.rs:77) — fixed in 93d429ba9
