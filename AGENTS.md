@@ -7,19 +7,29 @@
 
 ## Repository architecture (READ THIS FIRST)
 
-`dracon-utilities` is a **monorepo** (since 2026-08-22). It tracks the
-full Rust source of all three utilities under `dracon-sync/`,
-`dracon-system/`, `dracon-warden/` (imported via subtree merges, so
-commit history stays connected), plus meta files: `AGENTS.md`,
-`CHANGELOG.md`, the audit docs (`AUDIT-*.md`, `AUDIT_REPOS_*.md`),
-`.cargo/config.toml`, and the workspace `Cargo.toml`/`Cargo.lock`.
+`dracon-utilities` is a **parent repo with three nested standalone
+repos** (since 2026-09-11; operator decision: regular repos inside a
+repo, explicitly NO submodules). The parent tracks only meta files:
+`AGENTS.md`, `CHANGELOG.md` (frozen 2026-08-25, historical record),
+audit docs (`AUDIT-*.md`, `AUDIT_REPOS_*.md`), `.cargo/config.toml`,
+`.github/workflows/ci.yml`, and the workspace `Cargo.toml`/`Cargo.lock`.
+It does NOT track utility source — `dracon-sync/`, `dracon-system/`,
+`dracon-warden/` are gitignored at the parent level (see `.gitignore`
+`NESTED STANDALONE REPOS` block).
 
 History: standalone nested repos (until 2026-08-22) → submodules for
-one day → full monorepo. The standalone GitHub repos remain as frozen
-mirrors; utility releases are tagged on THIS repo going forward.
+one day → full monorepo via subtree merges (2026-08-22..2026-09-11)
+→ back to nested standalone repos (2026-09-11). The monorepo-era
+commits survive in the parent's history; per-utility history
+continues in the nested repos (post-2026-08-22 monorepo commits were
+replayed onto the pre-monorepo standalone lineage via
+`git subtree split` + `rebase --onto`, so all forge pushes stayed
+fast-forward and original SHAs are preserved).
 
-To edit a utility, work directly in its directory here; the daemon
-commits this parent repo, which now carries the source.
+To edit a utility, `cd` into its nested directory and work there; the
+daemon commits each nested repo independently (it discovers them via
+its recursive watch-root scan — no parent gitlink advances, because
+there are no gitlinks).
 
 The 3 utilities live in directories under this
 directory, each with its own `.git/`, its own remotes
@@ -29,14 +39,20 @@ directory, each with its own `.git/`, its own remotes
 - `dracon-system/` → `codeberg:dracondev/dracon-system-disk-process-guard-doctor`
 - `dracon-warden/` → `codeberg:dracondev/dracon-warden-secret-encrypt-age-git-filter`
 
+Utility releases are tagged in the NESTED repos
+(`dracon-sync-vX.Y.Z`, …); the monorepo-era unprefixed `vX.Y.Z` tags
+stay on the parent as a historical record. Per-utility release notes
+live at the nested repo roots; superseded ones are archived under
+parent `docs/archive/release-notes/<utility>/`.
+
 The parent `Cargo.toml` is a plain `[workspace]` manifest listing the
 three utility crates plus the in-tree `dracon-warden/src/security`
 workspace member, so the AGENTS.md test-discipline commands (`cargo
 build --release --locked`, `cargo test --workspace --locked`, `cargo
-deny check`) work from the monorepo root by path — it does **not**
-submodule or symlink the source. To edit a utility, `cd`
-into its nested directory and work there; the daemon commits each
-nested repo independently.
+deny check`) work from a full checkout by path — cargo resolves
+nested repos as ordinary path members (git nesting is invisible to
+cargo). A bare parent clone without the nested checkouts does NOT
+build; CI checks out all four repos explicitly (see `ci.yml`).
 
 > **SUPERSEDED 2026-08-22, same day — full monorepo conversion**:
 > source was imported into this repo via subtree merges and CI/Nix
