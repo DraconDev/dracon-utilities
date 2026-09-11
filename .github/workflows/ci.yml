@@ -19,6 +19,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
+          ref: main
+          path: dracon-sync
+      - uses: actions/checkout@v4
+        with:
+          repository: DraconDev/dracon-system-disk-process-guard-doctor
+          ref: main
+          path: dracon-system
+      - uses: actions/checkout@v4
+        with:
+          repository: DraconDev/dracon-warden-secret-encrypt-age-git-filter
+          ref: main
+          path: dracon-warden
 
 
       - name: Install Rust toolchain
@@ -52,6 +67,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
+          ref: main
+          path: dracon-sync
+      - uses: actions/checkout@v4
+        with:
+          repository: DraconDev/dracon-system-disk-process-guard-doctor
+          ref: main
+          path: dracon-system
+      - uses: actions/checkout@v4
+        with:
+          repository: DraconDev/dracon-warden-secret-encrypt-age-git-filter
+          ref: main
+          path: dracon-warden
 
 
       - name: Install Rust toolchain
@@ -81,6 +111,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
+          ref: main
+          path: dracon-sync
+      - uses: actions/checkout@v4
+        with:
+          repository: DraconDev/dracon-system-disk-process-guard-doctor
+          ref: main
+          path: dracon-system
+      - uses: actions/checkout@v4
+        with:
+          repository: DraconDev/dracon-warden-secret-encrypt-age-git-filter
+          ref: main
+          path: dracon-warden
 
 
       - name: Install Rust toolchain
@@ -117,6 +162,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
+          ref: main
+          path: dracon-sync
+      - uses: actions/checkout@v4
+        with:
+          repository: DraconDev/dracon-system-disk-process-guard-doctor
+          ref: main
+          path: dracon-system
+      - uses: actions/checkout@v4
+        with:
+          repository: DraconDev/dracon-warden-secret-encrypt-age-git-filter
+          ref: main
+          path: dracon-warden
 
       - name: Install shellcheck
         run: sudo apt-get install -y shellcheck
@@ -138,6 +198,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
+          ref: main
+          path: dracon-sync
+      - uses: actions/checkout@v4
+        with:
+          repository: DraconDev/dracon-system-disk-process-guard-doctor
+          ref: main
+          path: dracon-system
+      - uses: actions/checkout@v4
+        with:
+          repository: DraconDev/dracon-warden-secret-encrypt-age-git-filter
+          ref: main
+          path: dracon-warden
 
 
       - name: Install Rust stable
@@ -170,6 +245,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
+          ref: main
+          path: dracon-sync
+      - uses: actions/checkout@v4
+        with:
+          repository: DraconDev/dracon-system-disk-process-guard-doctor
+          ref: main
+          path: dracon-system
+      - uses: actions/checkout@v4
+        with:
+          repository: DraconDev/dracon-warden-secret-encrypt-age-git-filter
+          ref: main
+          path: dracon-warden
 
 
       - name: Install Rust toolchain
@@ -192,6 +282,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
+          ref: main
+          path: dracon-sync
+      - uses: actions/checkout@v4
+        with:
+          repository: DraconDev/dracon-system-disk-process-guard-doctor
+          ref: main
+          path: dracon-system
+      - uses: actions/checkout@v4
+        with:
+          repository: DraconDev/dracon-warden-secret-encrypt-age-git-filter
+          ref: main
+          path: dracon-warden
 
       - name: Install Nix
         uses: cachix/install-nix-action@v30
