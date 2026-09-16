@@ -911,7 +911,7 @@ dependencies = [
 
 [[package]]
 name = "dracon-security"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "aes",
  "aes-gcm",
@@ -1007,7 +1007,7 @@ dependencies = [
 
 [[package]]
 name = "dracon-warden"
-version = "0.113.7"
+version = "0.113.8"
 dependencies = [
  "age",
  "anyhow",
