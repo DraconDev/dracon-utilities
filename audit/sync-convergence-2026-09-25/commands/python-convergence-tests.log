@@ -1,0 +1,27 @@
+test_boundary_digest_detects_same_size_rewrite (scripts.tests.test_sync_convergence.SyncConvergenceTests.test_boundary_digest_detects_same_size_rewrite) ... ok
+test_boundary_digest_does_not_archive_secret_content (scripts.tests.test_sync_convergence.SyncConvergenceTests.test_boundary_digest_does_not_archive_secret_content) ... ok
+test_detached_head_is_rejected (scripts.tests.test_sync_convergence.SyncConvergenceTests.test_detached_head_is_rejected) ... ok
+test_effective_remote_names_respect_repo_override (scripts.tests.test_sync_convergence.SyncConvergenceTests.test_effective_remote_names_respect_repo_override) ... ok
+test_evidence_actions_and_gates_are_recorded (scripts.tests.test_sync_convergence.SyncConvergenceTests.test_evidence_actions_and_gates_are_recorded) ... ok
+test_evidence_references_must_exist_inside_audit_directory (scripts.tests.test_sync_convergence.SyncConvergenceTests.test_evidence_references_must_exist_inside_audit_directory) ... ok
+test_evidence_shape_validation_rejects_missing_fields (scripts.tests.test_sync_convergence.SyncConvergenceTests.test_evidence_shape_validation_rejects_missing_fields) ... ok
+test_excluded_repository_has_no_effective_remotes (scripts.tests.test_sync_convergence.SyncConvergenceTests.test_excluded_repository_has_no_effective_remotes) ... ok
+test_expected_remote_identity_uses_policy_mapping (scripts.tests.test_sync_convergence.SyncConvergenceTests.test_expected_remote_identity_uses_policy_mapping) ... ok
+test_finalize_requires_live_checks_by_default (scripts.tests.test_sync_convergence.SyncConvergenceTests.test_finalize_requires_live_checks_by_default) ... ok
+test_generic_assignment_is_scoped_to_new_lines (scripts.tests.test_sync_convergence.SyncConvergenceTests.test_generic_assignment_is_scoped_to_new_lines) ... ok
+test_head_tree_handles_literal_glob_characters (scripts.tests.test_sync_convergence.SyncConvergenceTests.test_head_tree_handles_literal_glob_characters) ... ok
+test_internal_failure_cannot_be_recorded_as_external_blocker (scripts.tests.test_sync_convergence.SyncConvergenceTests.test_internal_failure_cannot_be_recorded_as_external_blocker) ... ok
+test_nested_repo_metadata_is_opaque_to_internal_writes (scripts.tests.test_sync_convergence.SyncConvergenceTests.test_nested_repo_metadata_is_opaque_to_internal_writes) ... ok
+test_offline_verifier_accepts_complete_local_evidence (scripts.tests.test_sync_convergence.SyncConvergenceTests.test_offline_verifier_accepts_complete_local_evidence) ... ok
+test_parent_gitlink_and_forward_ancestry (scripts.tests.test_sync_convergence.SyncConvergenceTests.test_parent_gitlink_and_forward_ancestry) ... ok
+test_private_key_marker_is_scoped_to_whole_tracked_file (scripts.tests.test_sync_convergence.SyncConvergenceTests.test_private_key_marker_is_scoped_to_whole_tracked_file) ... ok
+test_quiescence_requires_two_matching_boundaries (scripts.tests.test_sync_convergence.SyncConvergenceTests.test_quiescence_requires_two_matching_boundaries) ... ok
+test_redaction_and_remote_canonicalization (scripts.tests.test_sync_convergence.SyncConvergenceTests.test_redaction_and_remote_canonicalization) ... ok
+test_reflog_filter_ignores_old_resets_and_captures_new (scripts.tests.test_sync_convergence.SyncConvergenceTests.test_reflog_filter_ignores_old_resets_and_captures_new) ... ok
+test_remote_failure_classification_is_strict (scripts.tests.test_sync_convergence.SyncConvergenceTests.test_remote_failure_classification_is_strict) ... ok
+test_remote_snapshot_records_ancestor_relation (scripts.tests.test_sync_convergence.SyncConvergenceTests.test_remote_snapshot_records_ancestor_relation) ... ok
+
+----------------------------------------------------------------------
+Ran 22 tests in 29.939s
+
+OK

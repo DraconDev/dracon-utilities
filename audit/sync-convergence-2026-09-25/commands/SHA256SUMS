@@ -1,0 +1,5 @@
+35b0737c1e26020e6b41c48d6cdbd50d261d40a88b848dd19ee84762e1620e6b  audit/sync-convergence-2026-09-25/commands/cargo-build-release.log
+05686a6338fbf5cadf2f8895580fd2d63211516d2b04fa08ddc099570355d6ee  audit/sync-convergence-2026-09-25/commands/cargo-clippy-workspace.log
+f1a0fca39d4280363937aabd77783990ea6480bd9ca257816de3b68fc8efa845  audit/sync-convergence-2026-09-25/commands/cargo-deny.log
+03985b90c4ffe2c1e79b9b0927ec78073293cbaaa4dfa3a7dc34d2fde42951ac  audit/sync-convergence-2026-09-25/commands/cargo-test-workspace.log
+9d04f4ac78807ce02a21d783a0c4ba03148bdcb9ae0758c1647bf45e37804b23  audit/sync-convergence-2026-09-25/commands/python-convergence-tests.log
