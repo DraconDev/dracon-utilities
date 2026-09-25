@@ -200,6 +200,10 @@ class SyncConvergenceTests(unittest.TestCase):
         )
         self.fixture.git(parent, "update-ref", "refs/heads/main", parent_commit)
         self.assertEqual(sc._parent_gitlink(parent, child), child_head)
+        nested = sc.nested_repo_metadata(child, parent)
+        self.assertIsNotNone(nested)
+        self.assertEqual(nested["kind"], "nested-worktree")
+        self.assertEqual(nested["head"], child_head)
 
         before = sc.head_sha(child)
         (child / "forward.txt").write_text("forward\n", encoding="utf-8")

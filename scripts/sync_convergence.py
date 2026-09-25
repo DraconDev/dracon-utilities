@@ -528,6 +528,27 @@ def _path_metadata(path: Path, repo: Path) -> dict[str, Any] | None:
     return item
 
 
+def nested_repo_metadata(path: Path, repo: Path) -> dict[str, Any] | None:
+    if path.resolve() == repo.resolve() or not path.is_dir() or not (path / ".git").exists():
+        return None
+    try:
+        info = path.lstat()
+        child = git_repo_info(path)
+        return {
+            "path": str(path.relative_to(repo)),
+            "kind": "nested-worktree",
+            "head": head_sha(path),
+            "branch": attached_branch(path),
+            "status_sha256": bytes_sha256(git_status_bytes(path)),
+            "mtime_ns": info.st_mtime_ns,
+            "ctime_ns": info.st_ctime_ns,
+            "git_dir": child["git_dir"],
+            "common_dir": child["common_dir"],
+        }
+    except (ConvergenceError, OSError, ValueError):
+        return None
+
+
 def _walk_candidate_tree(
     root: Path, repo: Path, excluded_names: set[str]
 ) -> Iterable[Path]:
@@ -570,6 +591,10 @@ def fast_token(repo: Path, policy: dict[str, Any]) -> str:
             excluded_directory(part, excluded_names)
             for part in Path(relative).parts[:-1]
         ):
+            continue
+        nested = nested_repo_metadata(path, repo)
+        if nested is not None:
+            metadata.append(nested)
             continue
         if path.is_dir() and not path.is_symlink():
             try:
@@ -647,6 +672,10 @@ def boundary_content_digest(
     for relative in candidates:
         path = repo / relative
         if any(excluded_directory(part, excluded_names) for part in Path(relative).parts[:-1]):
+            continue
+        nested = nested_repo_metadata(path, repo)
+        if nested is not None:
+            records.append({key: value for key, value in nested.items() if key not in {"git_dir", "common_dir"}})
             continue
         if path.is_dir() and not path.is_symlink():
             files = list(_walk_candidate_tree(path, repo, excluded_names))
