@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import dataclasses
 import datetime as dt
+import difflib
 import fnmatch
 import hashlib
 import json
@@ -122,6 +123,7 @@ def run_command(
     cwd: Path | None = None,
     timeout: int = 120,
     env: dict[str, str] | None = None,
+    max_output_chars: int = 1_000_000,
 ) -> CommandResult:
     """Run a command without a shell and capture bounded text output."""
     rendered = tuple(os.fspath(item) for item in argv)
@@ -139,8 +141,8 @@ def run_command(
         return CommandResult(
             rendered,
             proc.returncode,
-            proc.stdout[-1_000_000:],
-            proc.stderr[-1_000_000:],
+            proc.stdout[-max_output_chars:],
+            proc.stderr[-max_output_chars:],
             int((time.monotonic() - started) * 1000),
         )
     except subprocess.TimeoutExpired as exc:
@@ -667,6 +669,59 @@ def fast_token(
     )
 
 
+def head_tracked_paths(repo: Path, head: str) -> set[str]:
+    tree = run_command(
+        ["git", "-C", repo, "ls-tree", "-r", "-z", "--name-only", head],
+        timeout=180,
+        max_output_chars=32_000_000,
+    )
+    if not tree.ok:
+        raise ConvergenceError(f"cannot list HEAD tree for {repo}")
+    return {
+        item.decode("utf-8", "surrogateescape")
+        for item in tree.stdout.encode("utf-8", "surrogateescape").split(b"\0")
+        if item
+    }
+
+
+def added_line_numbers(
+    repo: Path,
+    path: Path,
+    *,
+    head: str,
+    tracked_paths: set[str],
+) -> set[int] | None:
+    """Return current 1-based lines added relative to HEAD.
+
+    ``None`` means the path is untracked and every line must be scanned.
+    """
+    relative = str(path.relative_to(repo))
+    if relative not in tracked_paths:
+        return None
+    baseline_result = run_command(
+        ["git", "-C", repo, "show", f"{head}:{relative}"],
+        timeout=180,
+    )
+    if not baseline_result.ok:
+        raise ConvergenceError(
+            f"cannot read HEAD version of tracked candidate {relative} in {repo}"
+        )
+    baseline_text = baseline_result.stdout.encode("utf-8", "surrogateescape")
+    current_bytes = path.read_bytes()
+    baseline_lines = baseline_text.splitlines(keepends=True)
+    current_lines = current_bytes.splitlines(keepends=True)
+    matcher = difflib.SequenceMatcher(
+        a=baseline_lines,
+        b=current_lines,
+        autojunk=False,
+    )
+    added: set[int] = set()
+    for tag, _i1, _i2, j1, j2 in matcher.get_opcodes():
+        if tag != "equal":
+            added.update(range(j1 + 1, j2 + 1))
+    return added
+
+
 def boundary_content_digest(
     repo: Path,
     policy: dict[str, Any],
@@ -684,6 +739,8 @@ def boundary_content_digest(
     max_bytes = int(policy.get("max_stage_file_bytes", 100 * 1024 * 1024))
     records: list[dict[str, Any]] = []
     unsafe: list[dict[str, str]] = []
+    resolved_head = head or head_sha(repo)
+    tracked_paths = head_tracked_paths(repo, resolved_head)
 
     for relative in candidates:
         path = repo / relative
@@ -771,7 +828,26 @@ def boundary_content_digest(
             except OSError as exc:
                 unsafe.append({"path": relative_candidate, "reason": f"read failed: {exc}"})
                 continue
-            if PRIVATE_KEY_RE.search(content.decode("utf-8", "ignore")) or ASSIGNED_SECRET_BYTES_RE.search(content):
+            content_text = content.decode("utf-8", "ignore")
+            current_lines = content.splitlines(keepends=True)
+            try:
+                added_lines = added_line_numbers(
+                    repo,
+                    candidate,
+                    head=resolved_head,
+                    tracked_paths=tracked_paths,
+                )
+            except ConvergenceError as exc:
+                unsafe.append({"path": relative_candidate, "reason": str(exc)})
+                continue
+            if added_lines is None:
+                added_lines = set(range(1, len(current_lines) + 1))
+            added_text = b"".join(
+                line
+                for number, line in enumerate(current_lines, 1)
+                if number in added_lines
+            )
+            if PRIVATE_KEY_RE.search(content_text) or ASSIGNED_SECRET_BYTES_RE.search(added_text):
                 unsafe.append(
                     {
                         "path": relative_candidate,
@@ -802,7 +878,7 @@ def boundary_content_digest(
     index_digest = file_sha256(index_path) if index_path.is_file() else None
     payload = {
         "repo": info["path"],
-        "head": head or head_sha(repo),
+        "head": resolved_head,
         "branch": branch or attached_branch(repo),
         "status_sha256": bytes_sha256(status),
         "index_sha256": index_digest,

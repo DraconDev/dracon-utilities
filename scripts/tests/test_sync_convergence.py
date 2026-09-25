@@ -143,6 +143,51 @@ class SyncConvergenceTests(unittest.TestCase):
         self.assertTrue(details["unsafe_candidates"])
         self.assertNotIn("super-secret-value", json.dumps(details))
 
+    def test_head_tree_handles_literal_glob_characters(self) -> None:
+        path = self.fixture.write("keys/[slug]/+page.svelte", "unchanged\n")
+        self.fixture.git(self.fixture.repo, "add", "--", str(path.relative_to(self.fixture.repo)))
+        self.fixture.git(self.fixture.repo, "commit", "-qm", "literal path")
+        tracked = sc.head_tracked_paths(self.fixture.repo, sc.head_sha(self.fixture.repo))
+        self.assertIn("keys/[slug]/+page.svelte", tracked)
+
+    def test_generic_assignment_is_scoped_to_new_lines(self) -> None:
+        source = self.fixture.write(
+            "src/config.ts",
+            'export const api_key = "existing-example-value";\n',
+        )
+        self.fixture.git(self.fixture.repo, "add", "src/config.ts")
+        self.fixture.git(self.fixture.repo, "commit", "-qm", "existing assignment")
+        source.write_text(
+            'export const api_key = "existing-example-value";\nexport const mode = "safe";\n',
+            encoding="utf-8",
+        )
+        _, unchanged_details = sc.boundary_content_digest(
+            self.fixture.repo, self.policy
+        )
+        self.assertEqual(unchanged_details["unsafe_candidates"], [])
+        source.write_text(
+            'export const api_key = "existing-example-value";\nexport const mode = "safe";\n'
+            'export const token = "new-secret-value";\n',
+            encoding="utf-8",
+        )
+        _, added_details = sc.boundary_content_digest(self.fixture.repo, self.policy)
+        self.assertTrue(added_details["unsafe_candidates"])
+        self.assertNotIn("new-secret-value", json.dumps(added_details))
+
+    def test_private_key_marker_is_scoped_to_whole_tracked_file(self) -> None:
+        source = self.fixture.write(
+            "src/legacy.txt",
+            "-----BEGIN PRIVATE KEY-----\nexisting fixture marker\n",
+        )
+        self.fixture.git(self.fixture.repo, "add", "src/legacy.txt")
+        self.fixture.git(self.fixture.repo, "commit", "-qm", "legacy marker")
+        source.write_text(
+            "-----BEGIN PRIVATE KEY-----\nexisting fixture marker\nsafe change\n",
+            encoding="utf-8",
+        )
+        _, details = sc.boundary_content_digest(self.fixture.repo, self.policy)
+        self.assertTrue(details["unsafe_candidates"])
+
     def test_quiescence_requires_two_matching_boundaries(self) -> None:
         freeze = self.root / "freeze"
         freeze.write_text("paused\n", encoding="utf-8")
