@@ -157,6 +157,56 @@ def run_command(
         return CommandResult(rendered, 125, "", str(exc), int((time.monotonic() - started) * 1000))
 
 
+def read_git_blob(
+    repo: Path,
+    revision: str,
+    *,
+    max_bytes: int,
+    timeout: int = 180,
+) -> bytes:
+    """Read one immutable Git blob without text decoding or unbounded output."""
+    rendered = ("git", "-C", str(repo), "cat-file", "-s", revision)
+    size_result = run_command(rendered, timeout=timeout)
+    if not size_result.ok:
+        raise ConvergenceError(f"cannot size Git blob {revision} in {repo}")
+    try:
+        size = int(size_result.stdout.strip())
+    except ValueError as exc:
+        raise ConvergenceError(f"Git returned an invalid blob size for {revision} in {repo}") from exc
+    if size < 0 or size > max_bytes:
+        raise ConvergenceError(
+            f"HEAD version of tracked candidate {revision} in {repo} exceeds {max_bytes} bytes"
+        )
+
+    rendered = ("git", "-C", str(repo), "cat-file", "blob", revision)
+    try:
+        proc = subprocess.run(
+            rendered,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=timeout,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise ConvergenceError(f"timed out reading Git blob {revision} in {repo}") from exc
+    except OSError as exc:
+        raise ConvergenceError(f"cannot read Git blob {revision} in {repo}: {exc}") from exc
+    if proc.returncode != 0:
+        stderr = proc.stderr.decode("utf-8", "replace")
+        raise ConvergenceError(
+            f"cannot read Git blob {revision} in {repo}: {redact(stderr).strip()}"
+        )
+    if len(proc.stdout) > max_bytes:
+        raise ConvergenceError(
+            f"HEAD version of tracked candidate {revision} in {repo} exceeds {max_bytes} bytes"
+        )
+    if len(proc.stdout) != size:
+        raise ConvergenceError(
+            f"Git blob {revision} changed size while being read in {repo}"
+        )
+    return proc.stdout
+
+
 def require_command(
     argv: Sequence[str | os.PathLike[str]], *, cwd: Path | None = None, timeout: int = 120
 ) -> str:
@@ -689,6 +739,7 @@ def added_line_numbers(
     *,
     head: str,
     tracked_paths: set[str],
+    max_bytes: int,
 ) -> set[int] | None:
     """Return current 1-based lines added relative to HEAD.
 
@@ -697,21 +748,28 @@ def added_line_numbers(
     relative = str(path.relative_to(repo))
     if relative not in tracked_paths:
         return None
-    baseline_result = run_command(
-        ["git", "-C", repo, "show", f"{head}:{relative}"],
-        timeout=180,
+    baseline_text = read_git_blob(
+        repo,
+        f"{head}:{relative}",
+        max_bytes=max_bytes,
     )
-    if not baseline_result.ok:
-        raise ConvergenceError(
-            f"cannot read HEAD version of tracked candidate {relative} in {repo}"
-        )
-    baseline_text = baseline_result.stdout.encode("utf-8", "surrogateescape")
     current_bytes = path.read_bytes()
-    baseline_lines = baseline_text.splitlines(keepends=True)
     current_lines = current_bytes.splitlines(keepends=True)
+    if b"\0" in baseline_text or b"\0" in current_bytes:
+        return set(range(1, len(current_lines) + 1))
+    try:
+        decoded_baseline = baseline_text.decode("utf-8")
+        decoded_current = current_bytes.decode("utf-8")
+    except UnicodeDecodeError:
+        # Binary payloads cannot be meaningfully scoped to added text lines.
+        # Treat the whole current payload as changed so the byte-oriented secret
+        # guard still examines it, without attempting an expensive byte diff.
+        return set(range(1, len(current_lines) + 1))
+    baseline_lines = decoded_baseline.splitlines(keepends=True)
+    decoded_current_lines = decoded_current.splitlines(keepends=True)
     matcher = difflib.SequenceMatcher(
         a=baseline_lines,
-        b=current_lines,
+        b=decoded_current_lines,
         autojunk=False,
     )
     added: set[int] = set()
@@ -835,6 +893,7 @@ def boundary_content_digest(
                     candidate,
                     head=resolved_head,
                     tracked_paths=tracked_paths,
+                    max_bytes=max_bytes,
                 )
             except ConvergenceError as exc:
                 unsafe.append({"path": relative_candidate, "reason": str(exc)})

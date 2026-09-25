@@ -139,6 +139,18 @@ class SyncConvergenceTests(unittest.TestCase):
         second, second_details = sc.boundary_content_digest(self.fixture.repo, self.policy)
         self.assertNotEqual(first, second)
 
+    def test_boundary_digest_handles_binary_tracked_candidate(self) -> None:
+        path = self.fixture.repo / "frame.png"
+        path.write_bytes(b"\x89PNG\r\n\x1a\n" + b"baseline\x00\xff")
+        self.fixture.git(self.fixture.repo, "add", "frame.png")
+        self.fixture.git(self.fixture.repo, "commit", "-qm", "add binary frame")
+        first, first_details = sc.boundary_content_digest(self.fixture.repo, self.policy)
+        self.assertEqual(first_details["unsafe_candidates"], [])
+        path.write_bytes(b"\x89PNG\r\n\x1a\n" + b"rewritt3n\x00\xfe")
+        second, second_details = sc.boundary_content_digest(self.fixture.repo, self.policy)
+        self.assertEqual(second_details["unsafe_candidates"], [])
+        self.assertNotEqual(first, second)
+
     def test_boundary_digest_does_not_archive_secret_content(self) -> None:
         self.fixture.write("config.env", 'TOKEN="super-secret-value"\n')
         _, details = sc.boundary_content_digest(self.fixture.repo, self.policy)
