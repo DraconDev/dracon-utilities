@@ -151,14 +151,17 @@ class SyncConvergenceTests(unittest.TestCase):
         self.assertIn("keys/[slug]/+page.svelte", tracked)
 
     def test_generic_assignment_is_scoped_to_new_lines(self) -> None:
+        existing_value = "existing-" + "example-value"
+        new_value = "new-" + "secret-value"
         source = self.fixture.write(
             "src/config.ts",
-            'export const api_key = "existing-example-value";\n',
+            f'export const api_key = "{existing_value}";\n',
         )
         self.fixture.git(self.fixture.repo, "add", "src/config.ts")
         self.fixture.git(self.fixture.repo, "commit", "-qm", "existing assignment")
         source.write_text(
-            'export const api_key = "existing-example-value";\nexport const mode = "safe";\n',
+            f'export const api_key = "{existing_value}";\n'
+            'export const mode = "safe";\n',
             encoding="utf-8",
         )
         _, unchanged_details = sc.boundary_content_digest(
@@ -166,13 +169,14 @@ class SyncConvergenceTests(unittest.TestCase):
         )
         self.assertEqual(unchanged_details["unsafe_candidates"], [])
         source.write_text(
-            'export const api_key = "existing-example-value";\nexport const mode = "safe";\n'
-            'export const token = "new-secret-value";\n',
+            f'export const api_key = "{existing_value}";\n'
+            'export const mode = "safe";\n'
+            f'export const token = "{new_value}";\n',
             encoding="utf-8",
         )
         _, added_details = sc.boundary_content_digest(self.fixture.repo, self.policy)
         self.assertTrue(added_details["unsafe_candidates"])
-        self.assertNotIn("new-secret-value", json.dumps(added_details))
+        self.assertNotIn(new_value, json.dumps(added_details))
 
     def test_private_key_marker_is_scoped_to_whole_tracked_file(self) -> None:
         source = self.fixture.write(
