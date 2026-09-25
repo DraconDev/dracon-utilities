@@ -145,6 +145,30 @@
       "recorded_at": "2026-09-25T11:34:37.183078Z",
       "repository": "/home/dracon/Dev/dracon-platform/web/games/wip/junk-runner",
       "result": "blocked"
+    },
+    {
+      "evidence": [
+        "commands/adopt-dracon-home-freeze-event.log",
+        "commands/adopt-dracon-home-runtime-state.log"
+      ],
+      "head_after": "bc19cf0235816c8b8e9baaacd93cb79b4313905e",
+      "head_before": "33c46e9e497f0511b1cdc7f886dd0b3dc0b4316f",
+      "kind": "commit",
+      "recorded_at": "2026-09-25T11:36:07.953056Z",
+      "repository": "/home/dracon/.dracon",
+      "result": "ok"
+    },
+    {
+      "evidence": [
+        "commands/adopt-dracon-home-freeze-event.log",
+        "commands/adopt-dracon-home-runtime-state.log"
+      ],
+      "head_after": "bc19cf0235816c8b8e9baaacd93cb79b4313905e",
+      "head_before": "33c46e9e497f0511b1cdc7f886dd0b3dc0b4316f",
+      "kind": "push",
+      "recorded_at": "2026-09-25T11:36:08.053370Z",
+      "repository": "/home/dracon/.dracon",
+      "result": "ok"
     }
   ],
   "contract": {
@@ -1833,5 +1857,5 @@
   "result": "pending",
   "run_id": "sync-convergence-1790333909-3466843",
   "schema_version": 1,
-  "updated_at": "2026-09-25T11:34:37.183104Z"
+  "updated_at": "2026-09-25T11:36:08.053388Z"
 }
