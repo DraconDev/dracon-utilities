@@ -1,0 +1,16 @@
+   0.148s candidates=    3 unsafe= 0 /home/dracon/.dracon
+   6.786s candidates=  378 unsafe= 0 /home/dracon/Dev/dracon-platform
+   0.078s candidates=    0 unsafe= 0 /home/dracon/Dev/dracon-platform/web/games/released/come-get-me
+   0.079s candidates=    0 unsafe= 0 /home/dracon/Dev/dracon-platform/web/games/wip/capture-anime-girls
+   0.421s candidates=   27 unsafe= 0 /home/dracon/Dev/dracon-platform/web/games/wip/darklord
+   0.078s candidates=    0 unsafe= 0 /home/dracon/Dev/dracon-platform/web/games/wip/deathrun
+   0.093s candidates=    3 unsafe= 0 /home/dracon/Dev/dracon-platform/web/games/wip/doomtap
+   0.074s candidates=    0 unsafe= 0 /home/dracon/Dev/dracon-platform/web/games/wip/endless-td
+   0.064s candidates=    0 unsafe= 0 /home/dracon/Dev/dracon-platform/web/games/wip/football-forever
+   0.042s candidates=    0 unsafe= 0 /home/dracon/Dev/dracon-platform/web/games/wip/freeport
+   1.054s candidates=   96 unsafe= 0 /home/dracon/Dev/dracon-platform/web/games/wip/hegemon
+   0.125s candidates=    0 unsafe= 0 /home/dracon/Dev/dracon-platform/web/games/wip/hellhunter
+   0.136s candidates=    6 unsafe= 0 /home/dracon/Dev/dracon-platform/web/games/wip/junk-runner
+   1.321s candidates=    1 unsafe= 0 /home/dracon/Dev/dracon-strategy
+   0.449s candidates=    1 unsafe= 0 /home/dracon/Dev/pi-plugins/pi-goal-list-loop-audit
+boundary_seconds=10.953 repositories=15 candidates=515 unsafe=0

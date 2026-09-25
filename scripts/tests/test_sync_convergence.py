@@ -200,6 +200,21 @@ class SyncConvergenceTests(unittest.TestCase):
         self.assertEqual(second_details["unsafe_candidates"], [])
         self.assertNotEqual(first, second)
 
+    def test_boundary_digest_skips_baseline_diff_for_safe_tracked_file(self) -> None:
+        path = self.fixture.write("safe.txt", "baseline\n")
+        self.fixture.git(self.fixture.repo, "add", "safe.txt")
+        self.fixture.git(self.fixture.repo, "commit", "-qm", "safe baseline")
+        path.write_text("safe rewrite\n", encoding="utf-8")
+        original = sc.read_git_blob
+        sc.read_git_blob = lambda *args, **kwargs: self.fail(  # type: ignore[assignment]
+            "safe candidate must not retrieve a baseline blob"
+        )
+        try:
+            _, details = sc.boundary_content_digest(self.fixture.repo, self.policy)
+        finally:
+            sc.read_git_blob = original
+        self.assertEqual(details["unsafe_candidates"], [])
+
     def test_boundary_digest_does_not_archive_secret_content(self) -> None:
         self.fixture.write("config.env", 'TOKEN="super-secret-value"\n')
         _, details = sc.boundary_content_digest(self.fixture.repo, self.policy)

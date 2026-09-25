@@ -902,41 +902,45 @@ def boundary_content_digest(
                 unsafe.append({"path": relative_candidate, "reason": f"read failed: {exc}"})
                 continue
             content_text = content.decode("utf-8", "ignore")
-            current_lines = content.splitlines(keepends=True)
-            try:
-                added_lines = added_line_numbers(
-                    repo,
-                    candidate,
-                    head=resolved_head,
-                    tracked_paths=tracked_paths,
-                    max_bytes=max_bytes,
+            possible_private_key = PRIVATE_KEY_RE.search(content_text) is not None
+            possible_assigned_secret = ASSIGNED_SECRET_BYTES_RE.search(content) is not None
+            if possible_private_key or possible_assigned_secret:
+                current_lines = content.splitlines(keepends=True)
+                try:
+                    added_lines = added_line_numbers(
+                        repo,
+                        candidate,
+                        head=resolved_head,
+                        tracked_paths=tracked_paths,
+                        max_bytes=max_bytes,
+                    )
+                except ConvergenceError as exc:
+                    unsafe.append({"path": relative_candidate, "reason": str(exc)})
+                    continue
+                if added_lines is None:
+                    added_lines = set(range(1, len(current_lines) + 1))
+                added_text = b"".join(
+                    line
+                    for number, line in enumerate(current_lines, 1)
+                    if number in added_lines
                 )
-            except ConvergenceError as exc:
-                unsafe.append({"path": relative_candidate, "reason": str(exc)})
-                continue
-            if added_lines is None:
-                added_lines = set(range(1, len(current_lines) + 1))
-            added_text = b"".join(
-                line
-                for number, line in enumerate(current_lines, 1)
-                if number in added_lines
-            )
-            if PRIVATE_KEY_RE.search(content_text) or ASSIGNED_SECRET_BYTES_RE.search(added_text):
-                unsafe.append(
-                    {
-                        "path": relative_candidate,
-                        "reason": "credential-like content requires Warden/operator handling",
-                    }
-                )
-                records.append(
-                    {
-                        "path": relative_candidate,
-                        "kind": "credential-metadata",
-                        "size": stat_info.st_size,
-                        "mtime_ns": stat_info.st_mtime_ns,
-                    }
-                )
-                continue
+                added_assigned_secret = ASSIGNED_SECRET_BYTES_RE.search(added_text) is not None
+                if possible_private_key or added_assigned_secret:
+                    unsafe.append(
+                        {
+                            "path": relative_candidate,
+                            "reason": "credential-like content requires Warden/operator handling",
+                        }
+                    )
+                    records.append(
+                        {
+                            "path": relative_candidate,
+                            "kind": "credential-metadata",
+                            "size": stat_info.st_size,
+                            "mtime_ns": stat_info.st_mtime_ns,
+                        }
+                    )
+                    continue
             content_hash = bytes_sha256(content)
             records.append(
                 {
