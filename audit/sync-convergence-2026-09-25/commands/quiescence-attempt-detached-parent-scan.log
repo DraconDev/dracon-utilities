@@ -1,0 +1,18 @@
+quiescence observation 1: stable=1/3 elapsed=2s
+quiescence observation 2: stable=1/3 elapsed=15s
+quiescence observation 3: stable=1/3 elapsed=30s
+quiescence observation 4: stable=1/3 elapsed=44s
+quiescence observation 5: stable=1/3 elapsed=56s
+quiescence observation 6: stable=1/3 elapsed=69s
+quiescence observation 7: stable=1/3 elapsed=82s
+quiescence observation 8: stable=1/3 elapsed=95s
+quiescence observation 9: stable=1/3 elapsed=107s
+quiescence observation 10: stable=1/3 elapsed=120s
+quiescence observation 11: stable=1/3 elapsed=133s
+quiescence observation 12: stable=1/3 elapsed=146s
+quiescence observation 13: stable=1/3 elapsed=158s
+quiescence observation 14: stable=1/3 elapsed=171s
+quiescence observation 15: stable=1/3 elapsed=184s
+quiescence observation 16: stable=2/3 elapsed=197s
+quiescence observation 17: stable=3/3 elapsed=210s
+FAIL: unsafe adoption candidates in /home/dracon/Dev/dracon-platform: [{"path": "web/games/wip/hegemon-audit-final/.svelte-kit/env.d.ts", "reason": "secret-like path requires Warden/operator handling"}, {"path": "web/games/wip/hegemon-audit-final/docs/UI-OVERHAUL-PER-PAGE-2026-08-29.md", "reason": "credential-like content requires Warden/operator handling"}, {"path": "web/games/wip/hegemon-audit-final/src/lib/game/iter-269-f-high-smoke-route-marker.test.ts", "reason": "credential-like content requires Warden/operator handling"}, {"path": "web/games/wip/hegemon-audit-final/src/lib/game/iter-280-hypnosis-owner-side-key.test.ts", "reason": "secret-like path requires Warden/operator handling"}, {"path": "web/games/wip/hegemon-audit-final/vendor/@dracon/chrome/src/lib/chrome-env.ts", "reason": "secret-like path requires Warden/operator handling"}, {"path": "web/games/wip/hegemon-audit-final/vendor/@dracon/chrome/src/vite-env.d.ts", "reason": "secret-like path requires Warden/operator handling"}, {"path": "web/games/wip/hegemon-audit-final/vendor/@dracon/saves/src/turso.ts", "reason": "credential-like content requires Warden/operator handling"}, {"path": "web/games/wip/hegemon-audit-final/vite.config.ts", "reason": "credential-like content requires Warden/operator handling"}]

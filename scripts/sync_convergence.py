@@ -598,11 +598,19 @@ def nested_repo_metadata(path: Path, repo: Path) -> dict[str, Any] | None:
     try:
         info = path.lstat()
         child = git_repo_info(path)
+        head = head_sha(path)
+        branch: str | None
+        try:
+            branch = attached_branch(path)
+        except ConvergenceError:
+            # A detached checkout is still a real nested worktree. Keep it opaque
+            # to the parent while recording that it is not on an attached branch.
+            branch = None
         return {
             "path": str(path.relative_to(repo)),
             "kind": "nested-worktree",
-            "head": head_sha(path),
-            "branch": attached_branch(path),
+            "head": head,
+            "branch": branch,
             "mtime_ns": info.st_mtime_ns,
             "ctime_ns": info.st_ctime_ns,
             "git_dir": child["git_dir"],
