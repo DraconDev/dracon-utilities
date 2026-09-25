@@ -10,3 +10,5 @@ f70b5f8007eaf1414d53151217cab2183384ff688d3380cfe0420055cca15194  audit/sync-con
 2cfb540f8b03f443e2c596f0c0b6166df873afd82cb33678e22793065af20adb  audit/sync-convergence-2026-09-25/commands/quiescence-attempt-capture-race.log
 e166c0a0e151d3abfbc552dec8daa9171be8c441e712cc77aebaf2680cc3a056  audit/sync-convergence-2026-09-25/commands/quiescence-attempt-detached-nested.log
 e651749f501fec13ef9f04051ce9c50be927fcc7264fdcc74fc9c1c6b7aee975  audit/sync-convergence-2026-09-25/commands/quiescence-attempt-detached-parent-scan.log
+a2cd653e5da50d6d50bafb25423bd0cbd89a7c22c7db6ded8af8dda32ba49b0f  audit/sync-convergence-2026-09-25/commands/quiescence-attempt-five-transactions.log
+6be72823125b94c5342bda603df92aee579c3d45dae20ed1235361a8fd02d77e  audit/sync-convergence-2026-09-25/commands/quiescence-attempt-freeze-watchdog.log
