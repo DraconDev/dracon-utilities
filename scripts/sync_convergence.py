@@ -1483,10 +1483,22 @@ def validate_evidence_shape(evidence: dict[str, Any]) -> list[str]:
                     errors.append(f"repository record missing {field}: {record.get('path')}")
     if not isinstance(evidence.get("phases"), list) or not evidence["phases"]:
         errors.append("phases must be a non-empty array")
+    else:
+        for phase in evidence["phases"]:
+            refs = phase.get("evidence")
+            if phase.get("name") != "quiescent-snapshot" and (
+                not isinstance(refs, list) or not refs
+            ):
+                errors.append(f"phase {phase.get('name')} requires evidence references")
     if not isinstance(evidence.get("actions"), list):
         errors.append("actions must be an array")
     if not isinstance(evidence.get("gates"), dict):
         errors.append("gates must be an object")
+    else:
+        for name, gate in evidence["gates"].items():
+            refs = gate.get("evidence") if isinstance(gate, dict) else None
+            if not isinstance(refs, list) or not refs:
+                errors.append(f"gate {name} requires evidence references")
     if not isinstance(evidence.get("external_blockers"), list):
         errors.append("external_blockers must be an array")
     return errors
@@ -1772,7 +1784,7 @@ def verify_evidence(
             )
 
         row = current_rows.get(label)
-        if check_live_remotes:
+        if check_live_remotes and not repo_excluded_by_policy(policy, repo):
             if row is None:
                 errors.append(f"{label}: absent from dracon-sync repos --json")
             else:

@@ -355,6 +355,11 @@ class SyncConvergenceTests(unittest.TestCase):
                 evidence_refs=["commands/rebase.txt"],
             )
 
+    def test_excluded_repository_has_no_effective_remotes(self) -> None:
+        policy = dict(self.policy)
+        policy["exclude_repos"] = [str(self.fixture.repo)]
+        self.assertEqual(sc.effective_remote_names(policy, self.fixture.repo), [])
+
     def test_internal_failure_cannot_be_recorded_as_external_blocker(self) -> None:
         policy = self.fixture.policy()
         record = sc.capture_repository(self.fixture.repo, policy)
@@ -414,6 +419,28 @@ class SyncConvergenceTests(unittest.TestCase):
         errors = sc.validate_evidence_shape({"schema_version": 1})
         self.assertIn("missing top-level fields", " ".join(errors))
         self.assertIn("repositories must be a non-empty array", errors)
+        shaped = {
+            "schema_version": 1,
+            "run_id": "run",
+            "created_at": sc.iso_now(),
+            "updated_at": sc.iso_now(),
+            "contract": {
+                "forward_only": True,
+                "selected_paths": [str(self.fixture.repo)],
+                "policy_file": "policy.toml",
+                "policy_sha256": "0" * 64,
+                "freeze_marker": "freeze",
+                "remote_query_attempts": 3,
+            },
+            "phases": [{"name": "pre-resume", "started_at": sc.iso_now(), "ended_at": sc.iso_now()}],
+            "repositories": [{"path": str(self.fixture.repo)}],
+            "actions": [],
+            "gates": {"unit": {"command": "test", "status": "pass", "notes": "ok"}},
+            "external_blockers": [],
+            "result": "pending",
+        }
+        shaped_errors = sc.validate_evidence_shape(shaped)
+        self.assertTrue(any("requires evidence references" in error for error in shaped_errors))
 
     def test_evidence_references_must_exist_inside_audit_directory(self) -> None:
         evidence = {
