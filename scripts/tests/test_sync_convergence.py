@@ -150,6 +150,7 @@ class SyncConvergenceTests(unittest.TestCase):
         result = sc.wait_for_quiescence(
             records,
             self.policy,
+            selected_roots=[self.fixture.repo],
             freeze_marker=freeze,
             stable_samples=2,
             interval_seconds=0.01,
@@ -157,6 +158,10 @@ class SyncConvergenceTests(unittest.TestCase):
         )
         self.assertGreaterEqual(result["observations"], 3)
         self.assertIn(str(self.fixture.repo), result["fast_tokens"])
+        self.assertEqual(
+            [record["path"] for record in result["repositories"]],
+            [str(self.fixture.repo)],
+        )
 
     def test_remote_snapshot_records_ancestor_relation(self) -> None:
         record = sc.capture_repository(self.fixture.repo, self.policy)

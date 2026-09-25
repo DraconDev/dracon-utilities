@@ -491,18 +491,22 @@ def _safe_candidate_names(paths: Iterable[str]) -> list[str]:
     return sorted({path for path in paths if path and "\0" not in path})
 
 
-def changed_candidate_paths(repo: Path) -> list[str]:
+def candidate_paths_from_status(raw: bytes) -> list[str]:
+    """Extract every dirty/staged/untracked path from one porcelain-v2 scan."""
     paths: set[str] = set()
-    commands = [
-        ["git", "-C", repo, "diff", "--name-only", "-z"],
-        ["git", "-C", repo, "diff", "--cached", "--name-only", "-z"],
-        ["git", "-C", repo, "ls-files", "--others", "--exclude-standard", "-z"],
-    ]
-    for command in commands:
-        result = run_command(command, timeout=180)
-        if result.ok:
-            paths.update(item for item in result.stdout.split("\0") if item)
+    for record in parse_status_v2(raw):
+        path = record.get("path")
+        original = record.get("orig_path")
+        if isinstance(path, str) and path:
+            paths.add(path)
+        if isinstance(original, str) and original:
+            paths.add(original)
     return _safe_candidate_names(paths)
+
+
+def changed_candidate_paths(repo: Path) -> list[str]:
+    """Compatibility helper for callers that do not already hold status bytes."""
+    return candidate_paths_from_status(git_status_bytes(repo))
 
 
 def _path_metadata(path: Path, repo: Path) -> dict[str, Any] | None:
@@ -573,15 +577,22 @@ def _walk_candidate_tree(
                 yield path
 
 
-def fast_token(repo: Path, policy: dict[str, Any]) -> str:
+def fast_token(
+    repo: Path,
+    policy: dict[str, Any],
+    *,
+    status: bytes | None = None,
+    branch: str | None = None,
+    head: str | None = None,
+) -> str:
     """Cheap generation token that detects normal concurrent writes."""
     info = git_repo_info(repo)
     git_dir = Path(info["git_dir"])
     common_dir = Path(info["common_dir"])
-    branch = attached_branch(repo)
-    head = head_sha(repo)
-    status = git_status_bytes(repo)
-    candidates = changed_candidate_paths(repo)
+    branch = branch or attached_branch(repo)
+    head = head or head_sha(repo)
+    status = git_status_bytes(repo) if status is None else status
+    candidates = candidate_paths_from_status(status)
     excluded_names = policy_excluded_dir_names(policy)
 
     metadata: list[dict[str, Any]] = []
@@ -657,13 +668,18 @@ def fast_token(repo: Path, policy: dict[str, Any]) -> str:
 
 
 def boundary_content_digest(
-    repo: Path, policy: dict[str, Any]
+    repo: Path,
+    policy: dict[str, Any],
+    *,
+    status: bytes | None = None,
+    branch: str | None = None,
+    head: str | None = None,
 ) -> tuple[str, dict[str, Any]]:
     """Hash current eligible candidates and classify unsafe paths without reading secrets."""
     info = git_repo_info(repo)
     git_dir = Path(info["git_dir"])
-    status = git_status_bytes(repo)
-    candidates = changed_candidate_paths(repo)
+    status = git_status_bytes(repo) if status is None else status
+    candidates = candidate_paths_from_status(status)
     excluded_names = policy_excluded_dir_names(policy)
     max_bytes = int(policy.get("max_stage_file_bytes", 100 * 1024 * 1024))
     records: list[dict[str, Any]] = []
@@ -786,8 +802,8 @@ def boundary_content_digest(
     index_digest = file_sha256(index_path) if index_path.is_file() else None
     payload = {
         "repo": info["path"],
-        "head": head_sha(repo),
-        "branch": attached_branch(repo),
+        "head": head or head_sha(repo),
+        "branch": branch or attached_branch(repo),
         "status_sha256": bytes_sha256(status),
         "index_sha256": index_digest,
         "candidates": sorted(records, key=lambda item: item["path"]),
@@ -811,7 +827,9 @@ def capture_repository(repo: Path, policy: dict[str, Any]) -> dict[str, Any]:
     branch = attached_branch(repo)
     head = head_sha(repo)
     status = git_status_bytes(repo)
-    content_digest, content = boundary_content_digest(repo, policy)
+    content_digest, content = boundary_content_digest(
+        repo, policy, status=status, branch=branch, head=head
+    )
     ahead, behind = ahead_behind(repo, branch)
     fsck = run_command(
         ["git", "-C", repo, "fsck", "--connectivity-only", "--no-dangling"],
@@ -840,7 +858,9 @@ def capture_repository(repo: Path, policy: dict[str, Any]) -> dict[str, Any]:
             "operation": operation_state(repo),
         },
         "snapshot": {
-            "fast_token": fast_token(repo, policy),
+            "fast_token": fast_token(
+                repo, policy, status=status, branch=branch, head=head
+            ),
             "content_digest": content_digest,
             "status_sha256": bytes_sha256(status),
             "index_sha256": content["index_sha256"],
@@ -855,6 +875,7 @@ def wait_for_quiescence(
     repositories: Sequence[dict[str, str]],
     policy: dict[str, Any],
     *,
+    selected_roots: Sequence[Path] | None = None,
     freeze_marker: Path = DEFAULT_FREEZE,
     stable_samples: int = 3,
     interval_seconds: float = 10.0,
@@ -866,7 +887,8 @@ def wait_for_quiescence(
         raise ConvergenceError("stable_samples must be at least 2")
     if interval_seconds <= 0 or max_wait_seconds <= 0:
         raise ConvergenceError("quiescence intervals must be positive")
-    paths = [Path(record["path"]) for record in repositories]
+    records_by_path = {record["path"]: dict(record) for record in repositories}
+    roots = list(selected_roots or [Path(record["path"]) for record in repositories])
     started = time.monotonic()
     stable_count = 0
     previous_tokens: dict[str, str] = {}
@@ -877,6 +899,10 @@ def wait_for_quiescence(
     while time.monotonic() - started < max_wait_seconds:
         if not freeze_marker.exists():
             raise ConvergenceError(f"freeze marker disappeared before snapshot: {freeze_marker}")
+        discovered = discover_repositories(roots, policy)
+        for record in discovered:
+            records_by_path.setdefault(record["path"], record)
+        paths = [Path(path) for path in sorted(records_by_path)]
         current_tokens = {str(repo): fast_token(repo, policy) for repo in paths}
         observations += 1
         if current_tokens == previous_tokens:
@@ -921,6 +947,7 @@ def wait_for_quiescence(
                 "span_seconds": int(time.monotonic() - started),
                 "fast_tokens": final_tokens,
                 "boundaries": candidate_boundary,
+                "repositories": [records_by_path[path] for path in sorted(records_by_path)],
                 "completed_at": iso_now(),
             }
         boundary = candidate_boundary

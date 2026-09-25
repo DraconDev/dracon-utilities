@@ -65,6 +65,7 @@ def main() -> int:
         quiescence = wait_for_quiescence(
             discovered,
             policy,
+            selected_roots=args.repo,
             freeze_marker=args.freeze_marker,
             stable_samples=args.stable_samples,
             interval_seconds=args.interval_seconds,
@@ -72,7 +73,7 @@ def main() -> int:
             progress=lambda message: print(message, file=sys.stderr, flush=True),
         )
         captured: list[dict] = []
-        for record in discovered:
+        for record in quiescence["repositories"]:
             repo = Path(record["path"])
             snapshot = capture_repository(repo, policy)
             expected = quiescence["fast_tokens"][str(repo)]
