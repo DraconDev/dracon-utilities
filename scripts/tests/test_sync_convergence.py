@@ -415,6 +415,22 @@ class SyncConvergenceTests(unittest.TestCase):
         self.assertIn("missing top-level fields", " ".join(errors))
         self.assertIn("repositories must be a non-empty array", errors)
 
+    def test_evidence_references_must_exist_inside_audit_directory(self) -> None:
+        evidence = {
+            "phases": [
+                {
+                    "name": "pre-resume",
+                    "evidence": ["commands/missing.txt", "../escape.txt"],
+                }
+            ],
+            "actions": [],
+            "gates": {},
+            "external_blockers": [],
+        }
+        errors = sc.validate_evidence_references(evidence, self.root / "audit" / "evidence.json")
+        self.assertTrue(any("does not exist" in error for error in errors))
+        self.assertTrue(any("escapes audit directory" in error for error in errors))
+
     def test_offline_verifier_accepts_complete_local_evidence(self) -> None:
         policy_path = self.root / "policy.toml"
         policy_path.write_text(
