@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dracon.dev/schemas/sync-convergence-evidence-v1.json",
+  "title": "Dracon sync convergence evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "created_at",
+    "updated_at",
+    "contract",
+    "phases",
+    "repositories",
+    "actions",
+    "gates",
+    "external_blockers",
+    "result"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "run_id": { "type": "string", "minLength": 1 },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "forward_only",
+        "selected_paths",
+        "policy_file",
+        "policy_sha256",
+        "freeze_marker",
+        "remote_query_attempts"
+      ],
+      "properties": {
+        "forward_only": { "const": true },
+        "selected_paths": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "policy_file": { "type": "string", "minLength": 1 },
+        "policy_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "freeze_marker": { "type": "string", "minLength": 1 },
+        "remote_query_attempts": { "type": "integer", "minimum": 3 }
+      }
+    },
+    "phases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name", "started_at", "ended_at"],
+        "properties": {
+          "name": { "enum": ["quiescent-snapshot", "adoption", "pre-resume", "post-resume"] },
+          "started_at": { "type": "string", "format": "date-time" },
+          "ended_at": { "type": "string", "format": "date-time" },
+          "quiescence": { "type": "object" }
+        }
+      }
+    },
+    "repositories": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["path", "role", "git_dir", "common_dir", "branch", "head", "state", "snapshot", "remotes"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "role": { "enum": ["standalone", "parent", "nested-required"] },
+          "git_dir": { "type": "string", "minLength": 1 },
+          "common_dir": { "type": "string", "minLength": 1 },
+          "branch": { "const": "main" },
+          "head": { "type": "string", "pattern": "^[0-9a-f]{40,64}$" },
+          "state": { "type": "object" },
+          "snapshot": { "type": "object" },
+          "remotes": { "type": "array" }
+        }
+      }
+    },
+    "actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["repository", "kind", "result", "evidence", "recorded_at"],
+        "properties": {
+          "repository": { "type": "string", "minLength": 1 },
+          "kind": { "enum": ["commit", "pull", "merge", "push", "config", "hook", "ignore", "resume"] },
+          "result": { "enum": ["ok", "blocked"] },
+          "head_before": { "type": ["string", "null"] },
+          "head_after": { "type": ["string", "null"] },
+          "evidence": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+          "recorded_at": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+    "gates": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["command", "status", "notes", "recorded_at"],
+        "properties": {
+          "command": { "type": "string", "minLength": 1 },
+          "status": { "enum": ["pass", "fail", "blocked"] },
+          "notes": { "type": "string", "minLength": 1 },
+          "recorded_at": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+    "external_blockers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["repository", "remote", "kind", "attempts", "evidence"],
+        "properties": {
+          "repository": { "type": "string", "minLength": 1 },
+          "remote": { "type": "string", "minLength": 1 },
+          "kind": { "enum": ["authentication", "permission", "provider_outage", "remote_unavailable"] },
+          "attempts": { "type": "array", "minItems": 3 },
+          "evidence": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+        }
+      }
+    },
+    "result": { "enum": ["pending", "pass", "blocked"] }
+  }
+}

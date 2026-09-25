@@ -68,6 +68,16 @@ else
   echo "PASS: Core unit tests pass"
 fi
 
+# Invariant 5: sync convergence evidence tools preserve the selected-repository
+# safety and forward-only invariants in deterministic local fixtures.
+echo "--- Invariant 5: Sync convergence evidence tools ---"
+if python3 -m unittest -v scripts.tests.test_sync_convergence; then
+  echo "PASS: Sync convergence evidence tool tests pass"
+else
+  echo "FAIL: Sync convergence evidence tool tests failed"
+  failures=$((failures + 1))
+fi
+
 # --- Add more checks above this line ---
 
 if [ "$failures" -eq 0 ]; then
