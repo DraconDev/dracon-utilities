@@ -1,0 +1,1662 @@
+{
+  "actions": [],
+  "contract": {
+    "forward_only": true,
+    "freeze_marker": "/home/dracon/.dracon/dracon-sync.freeze",
+    "policy_file": "/home/dracon/.dracon/utilities/sync/dracon-sync.toml",
+    "policy_sha256": "e6708c9cee8579772099a31c7a812bd8e3f782b47a6c80a54d7b19f14d07a59a",
+    "remote_query_attempts": 3,
+    "selected_paths": [
+      "/home/dracon/.dracon",
+      "/home/dracon/Dev/dracon-platform",
+      "/home/dracon/Dev/dracon-platform/web/games/released/come-get-me",
+      "/home/dracon/Dev/dracon-platform/web/games/wip/capture-anime-girls",
+      "/home/dracon/Dev/dracon-platform/web/games/wip/darklord",
+      "/home/dracon/Dev/dracon-platform/web/games/wip/deathrun",
+      "/home/dracon/Dev/dracon-platform/web/games/wip/doomtap",
+      "/home/dracon/Dev/dracon-platform/web/games/wip/endless-td",
+      "/home/dracon/Dev/dracon-platform/web/games/wip/football-forever",
+      "/home/dracon/Dev/dracon-platform/web/games/wip/freeport",
+      "/home/dracon/Dev/dracon-platform/web/games/wip/hegemon",
+      "/home/dracon/Dev/dracon-platform/web/games/wip/hellhunter",
+      "/home/dracon/Dev/dracon-platform/web/games/wip/junk-runner",
+      "/home/dracon/Dev/dracon-platform/web/games/wip/polis",
+      "/home/dracon/Dev/dracon-strategy",
+      "/home/dracon/Dev/pi-plugins/pi-goal-list-loop-audit"
+    ]
+  },
+  "created_at": "2026-09-25T10:58:29.072960Z",
+  "external_blockers": [],
+  "gates": {},
+  "phases": [
+    {
+      "ended_at": "2026-09-25T10:56:55.768919Z",
+      "name": "quiescent-snapshot",
+      "quiescence": {
+        "boundaries": {
+          "/home/dracon/.dracon": {
+            "branch": "main",
+            "candidate_count": 4,
+            "captured_at": "2026-09-25T10:56:46.419678Z",
+            "digest": "e4867029f5fe40fedcc1a101f02ffc5c3cb55dee9b733c71a6218f392854ea12",
+            "head": "33c46e9e497f0511b1cdc7f886dd0b3dc0b4316f",
+            "index_sha256": "92fdd505bb89b229a0a7adb6916839452e65c341ed47ce4e55366b2b3cf1ada9",
+            "status_sha256": "da475f8e04af8b68944d035c6df3bacdc4082db43e7aaa1308f5f333bcd0ca74",
+            "unsafe_candidates": []
+          },
+          "/home/dracon/Dev/dracon-platform": {
+            "branch": "main",
+            "candidate_count": 58,
+            "captured_at": "2026-09-25T10:56:48.394380Z",
+            "digest": "84f81fc4129133baf14f520371f62fcdaf98943e97b1c99af046f98e7996edef",
+            "head": "ea59ab42913964953fce2e9f3a5c995e5bf8a39b",
+            "index_sha256": "f0aef087752095bcb9c443e93668a46e68dc456201fa1af5a26e3b46a60e0abb",
+            "status_sha256": "289099cccb44eca56f9afb1084d750d565520b3ed5e29a63d38d10c8c65fc668",
+            "unsafe_candidates": []
+          },
+          "/home/dracon/Dev/dracon-platform/web/games/released/come-get-me": {
+            "branch": "main",
+            "candidate_count": 0,
+            "captured_at": "2026-09-25T10:56:48.564756Z",
+            "digest": "c7fd0dfb72ecba91aa304f47b5c6c323815bfc5b0569bddc976d073fd849c917",
+            "head": "e7792054e3a70a257ddf1137350ccfc5df4c95dc",
+            "index_sha256": "8ebaa824cff9cd512483ddd1558ecb8b223fe6178ebb8d4551ad2235ee1abb44",
+            "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "unsafe_candidates": []
+          },
+          "/home/dracon/Dev/dracon-platform/web/games/wip/capture-anime-girls": {
+            "branch": "main",
+            "candidate_count": 0,
+            "captured_at": "2026-09-25T10:56:48.724400Z",
+            "digest": "01e5cda463c6517a3ada8384eb57a9cb89fd3a42fc7f9ee1667f2b7d814d663d",
+            "head": "f043ae7070e04c8d4ad97642014c685871a70505",
+            "index_sha256": "57407008249da7ae0a2c08f687fafc1cbdfefa7606a55f739e9a1615a1d42e59",
+            "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "unsafe_candidates": []
+          },
+          "/home/dracon/Dev/dracon-platform/web/games/wip/darklord": {
+            "branch": "main",
+            "candidate_count": 46,
+            "captured_at": "2026-09-25T10:56:49.268076Z",
+            "digest": "7d21765328cf106b492e6f07d94c05aea99d202b1eeab77f81e478115863c770",
+            "head": "d3a71a933b2473cf1d2a5aa2348e00b77f1a91c2",
+            "index_sha256": "d597ac48f87cce4b6dc63c4f892c63be58607b63753f41a11e12c86b82bbfaf0",
+            "status_sha256": "cd81e56497b0dd84d8c8cac482551d2bfed7649d62d1e1a4b40592f79de854e5",
+            "unsafe_candidates": []
+          },
+          "/home/dracon/Dev/dracon-platform/web/games/wip/deathrun": {
+            "branch": "main",
+            "candidate_count": 0,
+            "captured_at": "2026-09-25T10:56:49.364382Z",
+            "digest": "7af8954a9d981a9dabf78529968ecc0c81ab255d9afbbb1f94f1127b86655355",
+            "head": "2271f0033bab0fc491392f12b31295d93ae48dc8",
+            "index_sha256": "c93cf6c1b10f05ad27918847eec045e71391e6e726677ce43a4706240d7c4ccf",
+            "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "unsafe_candidates": []
+          },
+          "/home/dracon/Dev/dracon-platform/web/games/wip/doomtap": {
+            "branch": "main",
+            "candidate_count": 1,
+            "captured_at": "2026-09-25T10:56:49.496630Z",
+            "digest": "a321c02614d44a2e08468917985ace8ee8521e23e508e511606e70fdf518a2b9",
+            "head": "71c0e8b63c6703f14787a284745c4a75dc21a2d2",
+            "index_sha256": "40c6c8325593d2bf4523af719bc83feadb1ac4a5491b16aa43d914f9bf6b887a",
+            "status_sha256": "83d43abe88593bec034d88b2d259eabc83734673fe44562222e41c2d1d59a9c6",
+            "unsafe_candidates": []
+          },
+          "/home/dracon/Dev/dracon-platform/web/games/wip/endless-td": {
+            "branch": "main",
+            "candidate_count": 0,
+            "captured_at": "2026-09-25T10:56:49.545929Z",
+            "digest": "22ca2d927723c983338b582149e4e30958da968402e69c4a93a13d15fdc5f0f3",
+            "head": "ab4bcd3c885e0115b8ec9ec33bfe4391c4bf4b28",
+            "index_sha256": "8f8815097e9f90013d2f20e6ef6b3b68d1706c208bc30994573d765c74b82fa1",
+            "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "unsafe_candidates": []
+          },
+          "/home/dracon/Dev/dracon-platform/web/games/wip/football-forever": {
+            "branch": "main",
+            "candidate_count": 24,
+            "captured_at": "2026-09-25T10:56:50.009007Z",
+            "digest": "5aac3b3335b3d54babf5043b760dd8159836861b9d4fd167d6ef08125701e2de",
+            "head": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec",
+            "index_sha256": "86557e93da16e29aa8a93237950aaa5e2d03fb34b6b67a576cff71c36316b44f",
+            "status_sha256": "0e3f478c44627144ccf9f78a188851ee74c6e4911d4f5ac6e9a56abd88fa498b",
+            "unsafe_candidates": []
+          },
+          "/home/dracon/Dev/dracon-platform/web/games/wip/freeport": {
+            "branch": "main",
+            "candidate_count": 0,
+            "captured_at": "2026-09-25T10:56:50.130655Z",
+            "digest": "a8dc84bba95ac35d5b4d67eb9a3a0654eb2913bd1a9519f70a7858b6d761c070",
+            "head": "300d70681ed33cd9d47160b5bba0481348d50f37",
+            "index_sha256": "a5bb561b40cf95f21666f94e2d91cb28a2b80d011a150151448cd58478ea91c3",
+            "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "unsafe_candidates": []
+          },
+          "/home/dracon/Dev/dracon-platform/web/games/wip/hegemon": {
+            "branch": "main",
+            "candidate_count": 49,
+            "captured_at": "2026-09-25T10:56:51.164520Z",
+            "digest": "b30c9838a2233b270fabfbbbce582dd6a4e7748b3ec37d4517fab7db1a27486f",
+            "head": "6b0aeef752ed2d6ae820eee40f1e0206053b2769",
+            "index_sha256": "576d3a0dab6c5dec8b856b0affe4273440e2c3c32eaba2f8ef6aada900778b22",
+            "status_sha256": "2fa93a721f4462f0d765af8bebc9f88e16665ab80afeb64d4b3a9a2c671146ad",
+            "unsafe_candidates": []
+          },
+          "/home/dracon/Dev/dracon-platform/web/games/wip/hellhunter": {
+            "branch": "main",
+            "candidate_count": 0,
+            "captured_at": "2026-09-25T10:56:51.476547Z",
+            "digest": "a2145198e4f522d15efab0b4df0898706b195703d56c32add4016251d6d539d9",
+            "head": "14f65d1852a2ef132989c99e31185fa6d843b074",
+            "index_sha256": "3c870e6bf2b1f1059e132953880cb931882f372c85c794162c690c2cbdbcb502",
+            "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "unsafe_candidates": []
+          },
+          "/home/dracon/Dev/dracon-platform/web/games/wip/junk-runner": {
+            "branch": "main",
+            "candidate_count": 2,
+            "captured_at": "2026-09-25T10:56:51.544798Z",
+            "digest": "fc6f238c23ccc9a76fb77c0ba41d7fcbaf90524dc9bbbf9b8288de123717414f",
+            "head": "674864967ac32f2eee4f4e7ae734ef0da6b392d2",
+            "index_sha256": "b84e64a9c7a35993d755c56f5def2c10117a127d68cd4f0d9765a6d61ee57cc7",
+            "status_sha256": "01db9dfd27d778fc6eaa99d83b38fc5a31c8c4b58df37335c7e74f235ac15e08",
+            "unsafe_candidates": []
+          },
+          "/home/dracon/Dev/dracon-platform/web/games/wip/polis": {
+            "branch": "main",
+            "candidate_count": 22,
+            "captured_at": "2026-09-25T10:56:52.608606Z",
+            "digest": "895f7026c33215cede6faa2e7507d01b42dfcbc84e6c5fcf76caa7075a771e16",
+            "head": "ad6ad5d21057a8a9268cf66bdf7781c48018386c",
+            "index_sha256": "a9fe4c43bbf0c0a34f307161b378362ac93888ae995369703f5c77208658f1a8",
+            "status_sha256": "4a9a0e7e27f047dad62c43966b97190742fc08e489023ed74ed916b543b41f09",
+            "unsafe_candidates": []
+          },
+          "/home/dracon/Dev/dracon-strategy": {
+            "branch": "main",
+            "candidate_count": 1,
+            "captured_at": "2026-09-25T10:56:53.745140Z",
+            "digest": "8d26740aebf2139d4bd73850d2c7bb0f6c561fb3c0fb36559c765c60e4e8be4d",
+            "head": "83a2fe89b1505a7111a9dfd1801dccd6ad36163e",
+            "index_sha256": "6fd35890df230314b50b19e6878d4282796156dfc53c805fb3600b0b4d171ce6",
+            "status_sha256": "48be5c41efeb631ebce204600870c267bb82f52d7f9549559a77cd9e9a287a3b",
+            "unsafe_candidates": []
+          },
+          "/home/dracon/Dev/pi-plugins/pi-goal-list-loop-audit": {
+            "branch": "main",
+            "candidate_count": 10,
+            "captured_at": "2026-09-25T10:56:54.084722Z",
+            "digest": "72a338c5260baa668f0193daf1db1c9dcd410c74e2a35dfb5db106b4e016c6e9",
+            "head": "ba413a06778695bd4eb3fc183589228ed59a7f99",
+            "index_sha256": "dfe59cd66e1e44c99e66bab964aab7987025769eb325d2dedd0cb24a8723017e",
+            "status_sha256": "f30e215135509d82956f8371bae8105e13f4a1821a3b2e8842331089d4074bb3",
+            "unsafe_candidates": []
+          }
+        },
+        "completed_at": "2026-09-25T10:56:55.768919Z",
+        "fast_tokens": {
+          "/home/dracon/.dracon": "6d5a65988e51f725da502d2533f9f8f7beb837d1faa589456f0bb9426a8d9a87",
+          "/home/dracon/Dev/dracon-platform": "3de6ac98e037103fa0174326fd56b88f15de3132c4e136331639b7d081c6e79a",
+          "/home/dracon/Dev/dracon-platform/web/games/released/come-get-me": "0aa2f869a8c8e9cd85b7a41fdcf8ef2d67bb87e931488cdc6220243ac54749ee",
+          "/home/dracon/Dev/dracon-platform/web/games/wip/capture-anime-girls": "771c67f58204665c9815e432d35889674c019fa112ee535edcc07a6a26c5b02d",
+          "/home/dracon/Dev/dracon-platform/web/games/wip/darklord": "f7c5396513a5e63b62156eae4c3d80700965011634c9d047884cbbbadd69bfb4",
+          "/home/dracon/Dev/dracon-platform/web/games/wip/deathrun": "218857d7e97b227a0892be829b960e03d9a9afa4707c92ff991161c0900f29b4",
+          "/home/dracon/Dev/dracon-platform/web/games/wip/doomtap": "1b7221b8c3b8e288295c94ee44b32aab377ce40be19a2c33b83b25898f5d21f8",
+          "/home/dracon/Dev/dracon-platform/web/games/wip/endless-td": "c14e64de4f7eeb8ef6cda2bda31fe2f781885433c12aca847b35cd3500b7b52a",
+          "/home/dracon/Dev/dracon-platform/web/games/wip/football-forever": "df47630cf853b516f633bae0a307ebb214e78067476c3e900d4809f16764c0c4",
+          "/home/dracon/Dev/dracon-platform/web/games/wip/freeport": "1563d71f64d815768631999eeae728f0ee55e56ec6022bee9a063baf3da1d680",
+          "/home/dracon/Dev/dracon-platform/web/games/wip/hegemon": "23716a365954f4cb0f7282f67774752ef3caed758b4f8e6d54b1500b2669c844",
+          "/home/dracon/Dev/dracon-platform/web/games/wip/hellhunter": "a76d18d6d59b086e8073308bdf2f84bf4b9903d18da10a79540e39c337b2b406",
+          "/home/dracon/Dev/dracon-platform/web/games/wip/junk-runner": "261fc5f44cde18561b14f5cb85a36681a0c9db2c4dfa7c30f69e60685549bf3f",
+          "/home/dracon/Dev/dracon-platform/web/games/wip/polis": "bf3e7d1e18673a28d90d310f5f2a5770c90a4900cc84150d0cf0e5ce5dfbbe42",
+          "/home/dracon/Dev/dracon-strategy": "cf35b2b758e11471a74c3ef6885411af8b48bf81124a44a4061adf7ec963446a",
+          "/home/dracon/Dev/pi-plugins/pi-goal-list-loop-audit": "347d8d3c189b48fc1b0bf309c517bc21ed4ba6deea7e9538c443b632eb3405b0"
+        },
+        "interval_seconds": 10.0,
+        "observations": 4,
+        "repositories": [
+          {
+            "common_dir": "/home/dracon/.dracon/.git",
+            "git_dir": "/home/dracon/.dracon/.git",
+            "path": "/home/dracon/.dracon",
+            "role": "standalone"
+          },
+          {
+            "common_dir": "/home/dracon/Dev/dracon-platform/.git",
+            "git_dir": "/home/dracon/Dev/dracon-platform/.git",
+            "path": "/home/dracon/Dev/dracon-platform",
+            "role": "parent"
+          },
+          {
+            "common_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-come-get-me",
+            "git_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-come-get-me",
+            "path": "/home/dracon/Dev/dracon-platform/web/games/released/come-get-me",
+            "role": "nested-required"
+          },
+          {
+            "common_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-capture-anime-girls",
+            "git_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-capture-anime-girls",
+            "path": "/home/dracon/Dev/dracon-platform/web/games/wip/capture-anime-girls",
+            "role": "nested-required"
+          },
+          {
+            "common_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-darklord",
+            "git_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-darklord",
+            "path": "/home/dracon/Dev/dracon-platform/web/games/wip/darklord",
+            "role": "nested-required"
+          },
+          {
+            "common_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-deathrun",
+            "git_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-deathrun",
+            "path": "/home/dracon/Dev/dracon-platform/web/games/wip/deathrun",
+            "role": "nested-required"
+          },
+          {
+            "common_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-doomtap",
+            "git_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-doomtap",
+            "path": "/home/dracon/Dev/dracon-platform/web/games/wip/doomtap",
+            "role": "nested-required"
+          },
+          {
+            "common_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-endless-td",
+            "git_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-endless-td",
+            "path": "/home/dracon/Dev/dracon-platform/web/games/wip/endless-td",
+            "role": "nested-required"
+          },
+          {
+            "common_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-football-forever",
+            "git_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-football-forever",
+            "path": "/home/dracon/Dev/dracon-platform/web/games/wip/football-forever",
+            "role": "nested-required"
+          },
+          {
+            "common_dir": "/home/dracon/Dev/dracon-platform/web/games/wip/freeport/.git",
+            "git_dir": "/home/dracon/Dev/dracon-platform/web/games/wip/freeport/.git",
+            "path": "/home/dracon/Dev/dracon-platform/web/games/wip/freeport",
+            "role": "nested-required"
+          },
+          {
+            "common_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-hegemon",
+            "git_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-hegemon",
+            "path": "/home/dracon/Dev/dracon-platform/web/games/wip/hegemon",
+            "role": "nested-required"
+          },
+          {
+            "common_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-hellhunter",
+            "git_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-hellhunter",
+            "path": "/home/dracon/Dev/dracon-platform/web/games/wip/hellhunter",
+            "role": "nested-required"
+          },
+          {
+            "common_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-junk-runner",
+            "git_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-junk-runner",
+            "path": "/home/dracon/Dev/dracon-platform/web/games/wip/junk-runner",
+            "role": "nested-required"
+          },
+          {
+            "common_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-polis",
+            "git_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-polis",
+            "path": "/home/dracon/Dev/dracon-platform/web/games/wip/polis",
+            "role": "nested-required"
+          },
+          {
+            "common_dir": "/home/dracon/Dev/dracon-strategy/.git",
+            "git_dir": "/home/dracon/Dev/dracon-strategy/.git",
+            "path": "/home/dracon/Dev/dracon-strategy",
+            "role": "standalone"
+          },
+          {
+            "common_dir": "/home/dracon/Dev/pi-plugins/pi-goal-list-loop-audit/.git",
+            "git_dir": "/home/dracon/Dev/pi-plugins/pi-goal-list-loop-audit/.git",
+            "path": "/home/dracon/Dev/pi-plugins/pi-goal-list-loop-audit",
+            "role": "standalone"
+          }
+        ],
+        "span_seconds": 51,
+        "stable_samples": 3
+      },
+      "started_at": "2026-09-25T10:56:46.419678Z"
+    }
+  ],
+  "repositories": [
+    {
+      "branch": "main",
+      "common_dir": "/home/dracon/.dracon/.git",
+      "git_dir": "/home/dracon/.dracon/.git",
+      "head": "33c46e9e497f0511b1cdc7f886dd0b3dc0b4316f",
+      "path": "/home/dracon/.dracon",
+      "remotes": [
+        {
+          "advertised_sha": "33c46e9e497f0511b1cdc7f886dd0b3dc0b4316f",
+          "attempts": [
+            {
+              "advertised_sha": "33c46e9e497f0511b1cdc7f886dd0b3dc0b4316f",
+              "blocker": null,
+              "checked_at": "2026-09-25T10:57:15.679693Z",
+              "duration_ms": 1065,
+              "missing": false,
+              "name": "github",
+              "returncode": 0,
+              "stderr": ""
+            }
+          ],
+          "before_sha": "33c46e9e497f0511b1cdc7f886dd0b3dc0b4316f",
+          "blocker": null,
+          "canonical_project": "github.com/dracondev/dracon-home",
+          "checked_at": "2026-09-25T10:57:15.679693Z",
+          "configured": true,
+          "duration_ms": 1065,
+          "eligible": true,
+          "expected_project": "github.com/dracondev/dracon-home",
+          "missing": false,
+          "name": "github",
+          "policy_identity_ok": true,
+          "relation": "equal",
+          "returncode": 0,
+          "stderr": ""
+        },
+        {
+          "advertised_sha": "33c46e9e497f0511b1cdc7f886dd0b3dc0b4316f",
+          "attempts": [
+            {
+              "advertised_sha": "33c46e9e497f0511b1cdc7f886dd0b3dc0b4316f",
+              "blocker": null,
+              "checked_at": "2026-09-25T10:57:17.038433Z",
+              "duration_ms": 1353,
+              "missing": false,
+              "name": "gitlab",
+              "returncode": 0,
+              "stderr": ""
+            }
+          ],
+          "before_sha": "33c46e9e497f0511b1cdc7f886dd0b3dc0b4316f",
+          "blocker": null,
+          "canonical_project": "gitlab.com/dracondev/dracon-home",
+          "checked_at": "2026-09-25T10:57:17.038433Z",
+          "configured": true,
+          "duration_ms": 1353,
+          "eligible": true,
+          "expected_project": "gitlab.com/dracondev/dracon-home",
+          "missing": false,
+          "name": "gitlab",
+          "policy_identity_ok": true,
+          "relation": "equal",
+          "returncode": 0,
+          "stderr": ""
+        }
+      ],
+      "role": "standalone",
+      "snapshot": {
+        "candidate_count": 4,
+        "captured_at": "2026-09-25T10:57:14.612970Z",
+        "content_digest": "e4867029f5fe40fedcc1a101f02ffc5c3cb55dee9b733c71a6218f392854ea12",
+        "fast_token": "6d5a65988e51f725da502d2533f9f8f7beb837d1faa589456f0bb9426a8d9a87",
+        "index_sha256": "92fdd505bb89b229a0a7adb6916839452e65c341ed47ce4e55366b2b3cf1ada9",
+        "status_sha256": "da475f8e04af8b68944d035c6df3bacdc4082db43e7aaa1308f5f333bcd0ca74",
+        "unsafe_candidates": []
+      },
+      "state": {
+        "ahead": 0,
+        "behind": 0,
+        "missing_objects": 0,
+        "modified": 3,
+        "operation": "none",
+        "staged": 0,
+        "submodule": 0,
+        "untracked": 1
+      }
+    },
+    {
+      "branch": "main",
+      "common_dir": "/home/dracon/Dev/dracon-platform/.git",
+      "git_dir": "/home/dracon/Dev/dracon-platform/.git",
+      "head": "ea59ab42913964953fce2e9f3a5c995e5bf8a39b",
+      "path": "/home/dracon/Dev/dracon-platform",
+      "remotes": [
+        {
+          "advertised_sha": "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51",
+          "attempts": [
+            {
+              "advertised_sha": "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51",
+              "blocker": null,
+              "checked_at": "2026-09-25T10:57:24.115605Z",
+              "duration_ms": 1082,
+              "missing": false,
+              "name": "github",
+              "returncode": 0,
+              "stderr": ""
+            }
+          ],
+          "before_sha": "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51",
+          "blocker": null,
+          "canonical_project": "github.com/dracondev/dracon-platform",
+          "checked_at": "2026-09-25T10:57:24.115605Z",
+          "configured": true,
+          "duration_ms": 1082,
+          "eligible": true,
+          "expected_project": "github.com/dracondev/dracon-platform",
+          "missing": false,
+          "name": "github",
+          "policy_identity_ok": true,
+          "relation": "local-ahead",
+          "returncode": 0,
+          "stderr": ""
+        },
+        {
+          "advertised_sha": "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51",
+          "attempts": [
+            {
+              "advertised_sha": "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51",
+              "blocker": null,
+              "checked_at": "2026-09-25T10:57:25.547315Z",
+              "duration_ms": 1420,
+              "missing": false,
+              "name": "gitlab",
+              "returncode": 0,
+              "stderr": ""
+            }
+          ],
+          "before_sha": "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51",
+          "blocker": null,
+          "canonical_project": "gitlab.com/dracondev/dracon-platform",
+          "checked_at": "2026-09-25T10:57:25.547315Z",
+          "configured": true,
+          "duration_ms": 1420,
+          "eligible": true,
+          "expected_project": "gitlab.com/dracondev/dracon-platform",
+          "missing": false,
+          "name": "gitlab",
+          "policy_identity_ok": true,
+          "relation": "local-ahead",
+          "returncode": 0,
+          "stderr": ""
+        }
+      ],
+      "role": "parent",
+      "snapshot": {
+        "candidate_count": 58,
+        "captured_at": "2026-09-25T10:57:23.028780Z",
+        "content_digest": "84f81fc4129133baf14f520371f62fcdaf98943e97b1c99af046f98e7996edef",
+        "fast_token": "3de6ac98e037103fa0174326fd56b88f15de3132c4e136331639b7d081c6e79a",
+        "index_sha256": "f0aef087752095bcb9c443e93668a46e68dc456201fa1af5a26e3b46a60e0abb",
+        "status_sha256": "289099cccb44eca56f9afb1084d750d565520b3ed5e29a63d38d10c8c65fc668",
+        "unsafe_candidates": []
+      },
+      "state": {
+        "ahead": 5,
+        "behind": 0,
+        "missing_objects": 0,
+        "modified": 17,
+        "operation": "none",
+        "staged": 40,
+        "submodule": 11,
+        "untracked": 1
+      }
+    },
+    {
+      "branch": "main",
+      "common_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-come-get-me",
+      "git_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-come-get-me",
+      "head": "e7792054e3a70a257ddf1137350ccfc5df4c95dc",
+      "path": "/home/dracon/Dev/dracon-platform/web/games/released/come-get-me",
+      "remotes": [
+        {
+          "advertised_sha": "ef6f7a6327c3b04bcf4d9ce83bbd5a63d6429e2d",
+          "attempts": [
+            {
+              "advertised_sha": "ef6f7a6327c3b04bcf4d9ce83bbd5a63d6429e2d",
+              "blocker": null,
+              "checked_at": "2026-09-25T10:57:28.790631Z",
+              "duration_ms": 1184,
+              "missing": false,
+              "name": "github",
+              "returncode": 0,
+              "stderr": ""
+            }
+          ],
+          "before_sha": "ef6f7a6327c3b04bcf4d9ce83bbd5a63d6429e2d",
+          "blocker": null,
+          "canonical_project": "github.com/dracondev/come-get-me",
+          "checked_at": "2026-09-25T10:57:28.790631Z",
+          "configured": true,
+          "duration_ms": 1184,
+          "eligible": true,
+          "expected_project": "github.com/dracondev/come-get-me",
+          "missing": false,
+          "name": "github",
+          "policy_identity_ok": true,
+          "relation": "local-ahead",
+          "returncode": 0,
+          "stderr": ""
+        },
+        {
+          "advertised_sha": "ef6f7a6327c3b04bcf4d9ce83bbd5a63d6429e2d",
+          "attempts": [
+            {
+              "advertised_sha": "ef6f7a6327c3b04bcf4d9ce83bbd5a63d6429e2d",
+              "blocker": null,
+              "checked_at": "2026-09-25T10:57:30.145100Z",
+              "duration_ms": 1340,
+              "missing": false,
+              "name": "gitlab",
+              "returncode": 0,
+              "stderr": ""
+            }
+          ],
+          "before_sha": "ef6f7a6327c3b04bcf4d9ce83bbd5a63d6429e2d",
+          "blocker": null,
+          "canonical_project": "gitlab.com/dracondev/come-get-me",
+          "checked_at": "2026-09-25T10:57:30.145100Z",
+          "configured": true,
+          "duration_ms": 1340,
+          "eligible": true,
+          "expected_project": "gitlab.com/dracondev/come-get-me",
+          "missing": false,
+          "name": "gitlab",
+          "policy_identity_ok": true,
+          "relation": "local-ahead",
+          "returncode": 0,
+          "stderr": ""
+        }
+      ],
+      "role": "nested-required",
+      "snapshot": {
+        "candidate_count": 0,
+        "captured_at": "2026-09-25T10:57:27.604443Z",
+        "content_digest": "c7fd0dfb72ecba91aa304f47b5c6c323815bfc5b0569bddc976d073fd849c917",
+        "fast_token": "0aa2f869a8c8e9cd85b7a41fdcf8ef2d67bb87e931488cdc6220243ac54749ee",
+        "index_sha256": "8ebaa824cff9cd512483ddd1558ecb8b223fe6178ebb8d4551ad2235ee1abb44",
+        "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "unsafe_candidates": []
+      },
+      "state": {
+        "ahead": 22,
+        "behind": 0,
+        "missing_objects": 0,
+        "modified": 0,
+        "operation": "none",
+        "staged": 0,
+        "submodule": 0,
+        "untracked": 0
+      }
+    },
+    {
+      "branch": "main",
+      "common_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-capture-anime-girls",
+      "git_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-capture-anime-girls",
+      "head": "f043ae7070e04c8d4ad97642014c685871a70505",
+      "path": "/home/dracon/Dev/dracon-platform/web/games/wip/capture-anime-girls",
+      "remotes": [
+        {
+          "advertised_sha": "6721c2ef05093ca5321b03447cd1bfdaf4570ff4",
+          "attempts": [
+            {
+              "advertised_sha": "6721c2ef05093ca5321b03447cd1bfdaf4570ff4",
+              "blocker": null,
+              "checked_at": "2026-09-25T10:57:32.697919Z",
+              "duration_ms": 1044,
+              "missing": false,
+              "name": "github",
+              "returncode": 0,
+              "stderr": ""
+            }
+          ],
+          "before_sha": "6721c2ef05093ca5321b03447cd1bfdaf4570ff4",
+          "blocker": null,
+          "canonical_project": "github.com/dracondev/web-games-capture-anime-girls",
+          "checked_at": "2026-09-25T10:57:32.697919Z",
+          "configured": true,
+          "duration_ms": 1044,
+          "eligible": true,
+          "expected_project": "github.com/dracondev/web-games-capture-anime-girls",
+          "missing": false,
+          "name": "github",
+          "policy_identity_ok": true,
+          "relation": "local-ahead",
+          "returncode": 0,
+          "stderr": ""
+        },
+        {
+          "advertised_sha": "6721c2ef05093ca5321b03447cd1bfdaf4570ff4",
+          "attempts": [
+            {
+              "advertised_sha": "6721c2ef05093ca5321b03447cd1bfdaf4570ff4",
+              "blocker": null,
+              "checked_at": "2026-09-25T10:57:34.140113Z",
+              "duration_ms": 1437,
+              "missing": false,
+              "name": "gitlab",
+              "returncode": 0,
+              "stderr": ""
+            }
+          ],
+          "before_sha": "6721c2ef05093ca5321b03447cd1bfdaf4570ff4",
+          "blocker": null,
+          "canonical_project": "gitlab.com/dracondev/web-games-capture-anime-girls",
+          "checked_at": "2026-09-25T10:57:34.140113Z",
+          "configured": true,
+          "duration_ms": 1437,
+          "eligible": true,
+          "expected_project": "gitlab.com/dracondev/web-games-capture-anime-girls",
+          "missing": false,
+          "name": "gitlab",
+          "policy_identity_ok": true,
+          "relation": "local-ahead",
+          "returncode": 0,
+          "stderr": ""
+        }
+      ],
+      "role": "nested-required",
+      "snapshot": {
+        "candidate_count": 0,
+        "captured_at": "2026-09-25T10:57:31.651915Z",
+        "content_digest": "01e5cda463c6517a3ada8384eb57a9cb89fd3a42fc7f9ee1667f2b7d814d663d",
+        "fast_token": "771c67f58204665c9815e432d35889674c019fa112ee535edcc07a6a26c5b02d",
+        "index_sha256": "57407008249da7ae0a2c08f687fafc1cbdfefa7606a55f739e9a1615a1d42e59",
+        "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "unsafe_candidates": []
+      },
+      "state": {
+        "ahead": 3,
+        "behind": 0,
+        "missing_objects": 0,
+        "modified": 0,
+        "operation": "none",
+        "staged": 0,
+        "submodule": 0,
+        "untracked": 0
+      }
+    },
+    {
+      "branch": "main",
+      "common_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-darklord",
+      "git_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-darklord",
+      "head": "d3a71a933b2473cf1d2a5aa2348e00b77f1a91c2",
+      "path": "/home/dracon/Dev/dracon-platform/web/games/wip/darklord",
+      "remotes": [
+        {
+          "advertised_sha": "d3a71a933b2473cf1d2a5aa2348e00b77f1a91c2",
+          "attempts": [
+            {
+              "advertised_sha": "d3a71a933b2473cf1d2a5aa2348e00b77f1a91c2",
+              "blocker": null,
+              "checked_at": "2026-09-25T10:57:37.737129Z",
+              "duration_ms": 1023,
+              "missing": false,
+              "name": "github",
+              "returncode": 0,
+              "stderr": ""
+            }
+          ],
+          "before_sha": "d3a71a933b2473cf1d2a5aa2348e00b77f1a91c2",
+          "blocker": null,
+          "canonical_project": "github.com/dracondev/web-games-darklord",
+          "checked_at": "2026-09-25T10:57:37.737129Z",
+          "configured": true,
+          "duration_ms": 1023,
+          "eligible": true,
+          "expected_project": "github.com/dracondev/web-games-darklord",
+          "missing": false,
+          "name": "github",
+          "policy_identity_ok": true,
+          "relation": "equal",
+          "returncode": 0,
+          "stderr": ""
+        },
+        {
+          "advertised_sha": "d3a71a933b2473cf1d2a5aa2348e00b77f1a91c2",
+          "attempts": [
+            {
+              "advertised_sha": "d3a71a933b2473cf1d2a5aa2348e00b77f1a91c2",
+              "blocker": null,
+              "checked_at": "2026-09-25T10:57:39.153768Z",
+              "duration_ms": 1414,
+              "missing": false,
+              "name": "gitlab",
+              "returncode": 0,
+              "stderr": ""
+            }
+          ],
+          "before_sha": "d3a71a933b2473cf1d2a5aa2348e00b77f1a91c2",
+          "blocker": null,
+          "canonical_project": "gitlab.com/dracondev/web-games-darklord",
+          "checked_at": "2026-09-25T10:57:39.153768Z",
+          "configured": true,
+          "duration_ms": 1414,
+          "eligible": true,
+          "expected_project": "gitlab.com/dracondev/web-games-darklord",
+          "missing": false,
+          "name": "gitlab",
+          "policy_identity_ok": true,
+          "relation": "equal",
+          "returncode": 0,
+          "stderr": ""
+        }
+      ],
+      "role": "nested-required",
+      "snapshot": {
+        "candidate_count": 46,
+        "captured_at": "2026-09-25T10:57:36.711608Z",
+        "content_digest": "7d21765328cf106b492e6f07d94c05aea99d202b1eeab77f81e478115863c770",
+        "fast_token": "f7c5396513a5e63b62156eae4c3d80700965011634c9d047884cbbbadd69bfb4",
+        "index_sha256": "d597ac48f87cce4b6dc63c4f892c63be58607b63753f41a11e12c86b82bbfaf0",
+        "status_sha256": "cd81e56497b0dd84d8c8cac482551d2bfed7649d62d1e1a4b40592f79de854e5",
+        "unsafe_candidates": []
+      },
+      "state": {
+        "ahead": 0,
+        "behind": 0,
+        "missing_objects": 0,
+        "modified": 34,
+        "operation": "none",
+        "staged": 0,
+        "submodule": 0,
+        "untracked": 12
+      }
+    },
+    {
+      "branch": "main",
+      "common_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-deathrun",
+      "git_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-deathrun",
+      "head": "2271f0033bab0fc491392f12b31295d93ae48dc8",
+      "path": "/home/dracon/Dev/dracon-platform/web/games/wip/deathrun",
+      "remotes": [
+        {
+          "advertised_sha": "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6",
+          "attempts": [
+            {
+              "advertised_sha": "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6",
+              "blocker": null,
+              "checked_at": "2026-09-25T10:57:41.919473Z",
+              "duration_ms": 1063,
+              "missing": false,
+              "name": "github",
+              "returncode": 0,
+              "stderr": ""
+            }
+          ],
+          "before_sha": "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6",
+          "blocker": null,
+          "canonical_project": "github.com/dracondev/web-games-deathrun",
+          "checked_at": "2026-09-25T10:57:41.919473Z",
+          "configured": true,
+          "duration_ms": 1063,
+          "eligible": true,
+          "expected_project": "github.com/dracondev/web-games-deathrun",
+          "missing": false,
+          "name": "github",
+          "policy_identity_ok": true,
+          "relation": "local-ahead",
+          "returncode": 0,
+          "stderr": ""
+        },
+        {
+          "advertised_sha": "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6",
+          "attempts": [
+            {
+              "advertised_sha": "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6",
+              "blocker": null,
+              "checked_at": "2026-09-25T10:57:43.361217Z",
+              "duration_ms": 1437,
+              "missing": false,
+              "name": "gitlab",
+              "returncode": 0,
+              "stderr": ""
+            }
+          ],
+          "before_sha": "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6",
+          "blocker": null,
+          "canonical_project": "gitlab.com/dracondev/web-games-deathrun",
+          "checked_at": "2026-09-25T10:57:43.361217Z",
+          "configured": true,
+          "duration_ms": 1437,
+          "eligible": true,
+          "expected_project": "gitlab.com/dracondev/web-games-deathrun",
+          "missing": false,
+          "name": "gitlab",
+          "policy_identity_ok": true,
+          "relation": "local-ahead",
+          "returncode": 0,
+          "stderr": ""
+        }
+      ],
+      "role": "nested-required",
+      "snapshot": {
+        "candidate_count": 0,
+        "captured_at": "2026-09-25T10:57:40.854561Z",
+        "content_digest": "7af8954a9d981a9dabf78529968ecc0c81ab255d9afbbb1f94f1127b86655355",
+        "fast_token": "218857d7e97b227a0892be829b960e03d9a9afa4707c92ff991161c0900f29b4",
+        "index_sha256": "c93cf6c1b10f05ad27918847eec045e71391e6e726677ce43a4706240d7c4ccf",
+        "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "unsafe_candidates": []
+      },
+      "state": {
+        "ahead": 4,
+        "behind": 0,
+        "missing_objects": 0,
+        "modified": 0,
+        "operation": "none",
+        "staged": 0,
+        "submodule": 0,
+        "untracked": 0
+      }
+    },
+    {
+      "branch": "main",
+      "common_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-doomtap",
+      "git_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-doomtap",
+      "head": "71c0e8b63c6703f14787a284745c4a75dc21a2d2",
+      "path": "/home/dracon/Dev/dracon-platform/web/games/wip/doomtap",
+      "remotes": [
+        {
+          "advertised_sha": "71c0e8b63c6703f14787a284745c4a75dc21a2d2",
+          "attempts": [
+            {
+              "advertised_sha": "71c0e8b63c6703f14787a284745c4a75dc21a2d2",
+              "blocker": null,
+              "checked_at": "2026-09-25T10:57:45.171983Z",
+              "duration_ms": 1027,
+              "missing": false,
+              "name": "github",
+              "returncode": 0,
+              "stderr": ""
+            }
+          ],
+          "before_sha": "71c0e8b63c6703f14787a284745c4a75dc21a2d2",
+          "blocker": null,
+          "canonical_project": "github.com/dracondev/doomtap",
+          "checked_at": "2026-09-25T10:57:45.171983Z",
+          "configured": true,
+          "duration_ms": 1027,
+          "eligible": true,
+          "expected_project": "github.com/dracondev/doomtap",
+          "missing": false,
+          "name": "github",
+          "policy_identity_ok": true,
+          "relation": "equal",
+          "returncode": 0,
+          "stderr": ""
+        },
+        {
+          "advertised_sha": "71c0e8b63c6703f14787a284745c4a75dc21a2d2",
+          "attempts": [
+            {
+              "advertised_sha": "71c0e8b63c6703f14787a284745c4a75dc21a2d2",
+              "blocker": null,
+              "checked_at": "2026-09-25T10:57:57.646012Z",
+              "duration_ms": 12472,
+              "missing": false,
+              "name": "gitlab",
+              "returncode": 0,
+              "stderr": ""
+            }
+          ],
+          "before_sha": "71c0e8b63c6703f14787a284745c4a75dc21a2d2",
+          "blocker": null,
+          "canonical_project": "gitlab.com/dracondev/doomtap",
+          "checked_at": "2026-09-25T10:57:57.646012Z",
+          "configured": true,
+          "duration_ms": 12472,
+          "eligible": true,
+          "expected_project": "gitlab.com/dracondev/doomtap",
+          "missing": false,
+          "name": "gitlab",
+          "policy_identity_ok": true,
+          "relation": "equal",
+          "returncode": 0,
+          "stderr": ""
+        }
+      ],
+      "role": "nested-required",
+      "snapshot": {
+        "candidate_count": 1,
+        "captured_at": "2026-09-25T10:57:44.140496Z",
+        "content_digest": "a321c02614d44a2e08468917985ace8ee8521e23e508e511606e70fdf518a2b9",
+        "fast_token": "1b7221b8c3b8e288295c94ee44b32aab377ce40be19a2c33b83b25898f5d21f8",
+        "index_sha256": "40c6c8325593d2bf4523af719bc83feadb1ac4a5491b16aa43d914f9bf6b887a",
+        "status_sha256": "83d43abe88593bec034d88b2d259eabc83734673fe44562222e41c2d1d59a9c6",
+        "unsafe_candidates": []
+      },
+      "state": {
+        "ahead": 0,
+        "behind": 0,
+        "missing_objects": 0,
+        "modified": 1,
+        "operation": "none",
+        "staged": 0,
+        "submodule": 0,
+        "untracked": 0
+      }
+    },
+    {
+      "branch": "main",
+      "common_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-endless-td",
+      "git_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-endless-td",
+      "head": "ab4bcd3c885e0115b8ec9ec33bfe4391c4bf4b28",
+      "path": "/home/dracon/Dev/dracon-platform/web/games/wip/endless-td",
+      "remotes": [
+        {
+          "advertised_sha": "ab4bcd3c885e0115b8ec9ec33bfe4391c4bf4b28",
+          "attempts": [
+            {
+              "advertised_sha": "ab4bcd3c885e0115b8ec9ec33bfe4391c4bf4b28",
+              "blocker": null,
+              "checked_at": "2026-09-25T10:57:59.121277Z",
+              "duration_ms": 1046,
+              "missing": false,
+              "name": "github",
+              "returncode": 0,
+              "stderr": ""
+            }
+          ],
+          "before_sha": "ab4bcd3c885e0115b8ec9ec33bfe4391c4bf4b28",
+          "blocker": null,
+          "canonical_project": "github.com/dracondev/web-games-endless-td",
+          "checked_at": "2026-09-25T10:57:59.121277Z",
+          "configured": true,
+          "duration_ms": 1046,
+          "eligible": true,
+          "expected_project": "github.com/dracondev/web-games-endless-td",
+          "missing": false,
+          "name": "github",
+          "policy_identity_ok": true,
+          "relation": "equal",
+          "returncode": 0,
+          "stderr": ""
+        },
+        {
+          "advertised_sha": "ab4bcd3c885e0115b8ec9ec33bfe4391c4bf4b28",
+          "attempts": [
+            {
+              "advertised_sha": "ab4bcd3c885e0115b8ec9ec33bfe4391c4bf4b28",
+              "blocker": null,
+              "checked_at": "2026-09-25T10:58:00.483499Z",
+              "duration_ms": 1356,
+              "missing": false,
+              "name": "gitlab",
+              "returncode": 0,
+              "stderr": ""
+            }
+          ],
+          "before_sha": "ab4bcd3c885e0115b8ec9ec33bfe4391c4bf4b28",
+          "blocker": null,
+          "canonical_project": "gitlab.com/dracondev/web-games-endless-td",
+          "checked_at": "2026-09-25T10:58:00.483499Z",
+          "configured": true,
+          "duration_ms": 1356,
+          "eligible": true,
+          "expected_project": "gitlab.com/dracondev/web-games-endless-td",
+          "missing": false,
+          "name": "gitlab",
+          "policy_identity_ok": true,
+          "relation": "equal",
+          "returncode": 0,
+          "stderr": ""
+        }
+      ],
+      "role": "nested-required",
+      "snapshot": {
+        "candidate_count": 0,
+        "captured_at": "2026-09-25T10:57:58.072884Z",
+        "content_digest": "22ca2d927723c983338b582149e4e30958da968402e69c4a93a13d15fdc5f0f3",
+        "fast_token": "c14e64de4f7eeb8ef6cda2bda31fe2f781885433c12aca847b35cd3500b7b52a",
+        "index_sha256": "8f8815097e9f90013d2f20e6ef6b3b68d1706c208bc30994573d765c74b82fa1",
+        "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "unsafe_candidates": []
+      },
+      "state": {
+        "ahead": 0,
+        "behind": 0,
+        "missing_objects": 0,
+        "modified": 0,
+        "operation": "none",
+        "staged": 0,
+        "submodule": 0,
+        "untracked": 0
+      }
+    },
+    {
+      "branch": "main",
+      "common_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-football-forever",
+      "git_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-football-forever",
+      "head": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec",
+      "path": "/home/dracon/Dev/dracon-platform/web/games/wip/football-forever",
+      "remotes": [
+        {
+          "advertised_sha": "6d2d5baea7b4f5ee0293dfcf692508d1a4728198",
+          "attempts": [
+            {
+              "advertised_sha": "6d2d5baea7b4f5ee0293dfcf692508d1a4728198",
+              "blocker": null,
+              "checked_at": "2026-09-25T10:58:01.982557Z",
+              "duration_ms": 1030,
+              "missing": false,
+              "name": "github",
+              "returncode": 0,
+              "stderr": ""
+            }
+          ],
+          "before_sha": "6d2d5baea7b4f5ee0293dfcf692508d1a4728198",
+          "blocker": null,
+          "canonical_project": "github.com/dracondev/football-forever",
+          "checked_at": "2026-09-25T10:58:01.982557Z",
+          "configured": true,
+          "duration_ms": 1030,
+          "eligible": true,
+          "expected_project": "github.com/dracondev/football-forever",
+          "missing": false,
+          "name": "github",
+          "policy_identity_ok": true,
+          "relation": "local-ahead",
+          "returncode": 0,
+          "stderr": ""
+        },
+        {
+          "advertised_sha": "6d2d5baea7b4f5ee0293dfcf692508d1a4728198",
+          "attempts": [
+            {
+              "advertised_sha": "6d2d5baea7b4f5ee0293dfcf692508d1a4728198",
+              "blocker": null,
+              "checked_at": "2026-09-25T10:58:03.364026Z",
+              "duration_ms": 1374,
+              "missing": false,
+              "name": "gitlab",
+              "returncode": 0,
+              "stderr": ""
+            }
+          ],
+          "before_sha": "6d2d5baea7b4f5ee0293dfcf692508d1a4728198",
+          "blocker": null,
+          "canonical_project": "gitlab.com/dracondev/football-forever",
+          "checked_at": "2026-09-25T10:58:03.364026Z",
+          "configured": true,
+          "duration_ms": 1374,
+          "eligible": true,
+          "expected_project": "gitlab.com/dracondev/football-forever",
+          "missing": false,
+          "name": "gitlab",
+          "policy_identity_ok": true,
+          "relation": "local-ahead",
+          "returncode": 0,
+          "stderr": ""
+        }
+      ],
+      "role": "nested-required",
+      "snapshot": {
+        "candidate_count": 24,
+        "captured_at": "2026-09-25T10:58:00.950368Z",
+        "content_digest": "5aac3b3335b3d54babf5043b760dd8159836861b9d4fd167d6ef08125701e2de",
+        "fast_token": "df47630cf853b516f633bae0a307ebb214e78067476c3e900d4809f16764c0c4",
+        "index_sha256": "86557e93da16e29aa8a93237950aaa5e2d03fb34b6b67a576cff71c36316b44f",
+        "status_sha256": "0e3f478c44627144ccf9f78a188851ee74c6e4911d4f5ac6e9a56abd88fa498b",
+        "unsafe_candidates": []
+      },
+      "state": {
+        "ahead": 1,
+        "behind": 0,
+        "missing_objects": 0,
+        "modified": 0,
+        "operation": "none",
+        "staged": 0,
+        "submodule": 0,
+        "untracked": 24
+      }
+    },
+    {
+      "branch": "main",
+      "common_dir": "/home/dracon/Dev/dracon-platform/web/games/wip/freeport/.git",
+      "git_dir": "/home/dracon/Dev/dracon-platform/web/games/wip/freeport/.git",
+      "head": "300d70681ed33cd9d47160b5bba0481348d50f37",
+      "path": "/home/dracon/Dev/dracon-platform/web/games/wip/freeport",
+      "remotes": [
+        {
+          "advertised_sha": "a262886eac30d59f9aead395f04e475c79eff68e",
+          "attempts": [
+            {
+              "advertised_sha": "a262886eac30d59f9aead395f04e475c79eff68e",
+              "blocker": null,
+              "checked_at": "2026-09-25T10:58:04.919539Z",
+              "duration_ms": 1079,
+              "missing": false,
+              "name": "github",
+              "returncode": 0,
+              "stderr": ""
+            }
+          ],
+          "before_sha": "a262886eac30d59f9aead395f04e475c79eff68e",
+          "blocker": null,
+          "canonical_project": "github.com/dracondev/web-games-freeport",
+          "checked_at": "2026-09-25T10:58:04.919539Z",
+          "configured": true,
+          "duration_ms": 1079,
+          "eligible": true,
+          "expected_project": "github.com/dracondev/web-games-freeport",
+          "missing": false,
+          "name": "github",
+          "policy_identity_ok": true,
+          "relation": "local-ahead",
+          "returncode": 0,
+          "stderr": ""
+        },
+        {
+          "advertised_sha": "a262886eac30d59f9aead395f04e475c79eff68e",
+          "attempts": [
+            {
+              "advertised_sha": "a262886eac30d59f9aead395f04e475c79eff68e",
+              "blocker": null,
+              "checked_at": "2026-09-25T10:58:06.283734Z",
+              "duration_ms": 1360,
+              "missing": false,
+              "name": "gitlab",
+              "returncode": 0,
+              "stderr": ""
+            }
+          ],
+          "before_sha": "a262886eac30d59f9aead395f04e475c79eff68e",
+          "blocker": null,
+          "canonical_project": "gitlab.com/dracondev/web-games-freeport",
+          "checked_at": "2026-09-25T10:58:06.283734Z",
+          "configured": true,
+          "duration_ms": 1360,
+          "eligible": true,
+          "expected_project": "gitlab.com/dracondev/web-games-freeport",
+          "missing": false,
+          "name": "gitlab",
+          "policy_identity_ok": true,
+          "relation": "local-ahead",
+          "returncode": 0,
+          "stderr": ""
+        }
+      ],
+      "role": "nested-required",
+      "snapshot": {
+        "candidate_count": 0,
+        "captured_at": "2026-09-25T10:58:03.838999Z",
+        "content_digest": "a8dc84bba95ac35d5b4d67eb9a3a0654eb2913bd1a9519f70a7858b6d761c070",
+        "fast_token": "1563d71f64d815768631999eeae728f0ee55e56ec6022bee9a063baf3da1d680",
+        "index_sha256": "a5bb561b40cf95f21666f94e2d91cb28a2b80d011a150151448cd58478ea91c3",
+        "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "unsafe_candidates": []
+      },
+      "state": {
+        "ahead": 1,
+        "behind": 0,
+        "missing_objects": 0,
+        "modified": 0,
+        "operation": "none",
+        "staged": 0,
+        "submodule": 0,
+        "untracked": 0
+      }
+    },
+    {
+      "branch": "main",
+      "common_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-hegemon",
+      "git_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-hegemon",
+      "head": "6b0aeef752ed2d6ae820eee40f1e0206053b2769",
+      "path": "/home/dracon/Dev/dracon-platform/web/games/wip/hegemon",
+      "remotes": [],
+      "role": "nested-required",
+      "snapshot": {
+        "candidate_count": 49,
+        "captured_at": "2026-09-25T10:58:07.500908Z",
+        "content_digest": "b30c9838a2233b270fabfbbbce582dd6a4e7748b3ec37d4517fab7db1a27486f",
+        "fast_token": "23716a365954f4cb0f7282f67774752ef3caed758b4f8e6d54b1500b2669c844",
+        "index_sha256": "576d3a0dab6c5dec8b856b0affe4273440e2c3c32eaba2f8ef6aada900778b22",
+        "status_sha256": "2fa93a721f4462f0d765af8bebc9f88e16665ab80afeb64d4b3a9a2c671146ad",
+        "unsafe_candidates": []
+      },
+      "state": {
+        "ahead": 32,
+        "behind": 0,
+        "missing_objects": 0,
+        "modified": 1,
+        "operation": "none",
+        "staged": 0,
+        "submodule": 0,
+        "untracked": 48
+      }
+    },
+    {
+      "branch": "main",
+      "common_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-hellhunter",
+      "git_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-hellhunter",
+      "head": "14f65d1852a2ef132989c99e31185fa6d843b074",
+      "path": "/home/dracon/Dev/dracon-platform/web/games/wip/hellhunter",
+      "remotes": [
+        {
+          "advertised_sha": "14f65d1852a2ef132989c99e31185fa6d843b074",
+          "attempts": [
+            {
+              "advertised_sha": "14f65d1852a2ef132989c99e31185fa6d843b074",
+              "blocker": null,
+              "checked_at": "2026-09-25T10:58:10.487709Z",
+              "duration_ms": 1063,
+              "missing": false,
+              "name": "github",
+              "returncode": 0,
+              "stderr": ""
+            }
+          ],
+          "before_sha": "14f65d1852a2ef132989c99e31185fa6d843b074",
+          "blocker": null,
+          "canonical_project": "github.com/dracondev/web-games-hellhunter",
+          "checked_at": "2026-09-25T10:58:10.487709Z",
+          "configured": true,
+          "duration_ms": 1063,
+          "eligible": true,
+          "expected_project": "github.com/dracondev/web-games-hellhunter",
+          "missing": false,
+          "name": "github",
+          "policy_identity_ok": true,
+          "relation": "equal",
+          "returncode": 0,
+          "stderr": ""
+        },
+        {
+          "advertised_sha": "14f65d1852a2ef132989c99e31185fa6d843b074",
+          "attempts": [
+            {
+              "advertised_sha": "14f65d1852a2ef132989c99e31185fa6d843b074",
+              "blocker": null,
+              "checked_at": "2026-09-25T10:58:11.848662Z",
+              "duration_ms": 1356,
+              "missing": false,
+              "name": "gitlab",
+              "returncode": 0,
+              "stderr": ""
+            }
+          ],
+          "before_sha": "14f65d1852a2ef132989c99e31185fa6d843b074",
+          "blocker": null,
+          "canonical_project": "gitlab.com/dracondev/web-games-hellhunter",
+          "checked_at": "2026-09-25T10:58:11.848662Z",
+          "configured": true,
+          "duration_ms": 1356,
+          "eligible": true,
+          "expected_project": "gitlab.com/dracondev/web-games-hellhunter",
+          "missing": false,
+          "name": "gitlab",
+          "policy_identity_ok": true,
+          "relation": "equal",
+          "returncode": 0,
+          "stderr": ""
+        }
+      ],
+      "role": "nested-required",
+      "snapshot": {
+        "candidate_count": 0,
+        "captured_at": "2026-09-25T10:58:09.421745Z",
+        "content_digest": "a2145198e4f522d15efab0b4df0898706b195703d56c32add4016251d6d539d9",
+        "fast_token": "a76d18d6d59b086e8073308bdf2f84bf4b9903d18da10a79540e39c337b2b406",
+        "index_sha256": "3c870e6bf2b1f1059e132953880cb931882f372c85c794162c690c2cbdbcb502",
+        "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "unsafe_candidates": []
+      },
+      "state": {
+        "ahead": 0,
+        "behind": 0,
+        "missing_objects": 0,
+        "modified": 0,
+        "operation": "none",
+        "staged": 0,
+        "submodule": 0,
+        "untracked": 0
+      }
+    },
+    {
+      "branch": "main",
+      "common_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-junk-runner",
+      "git_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-junk-runner",
+      "head": "674864967ac32f2eee4f4e7ae734ef0da6b392d2",
+      "path": "/home/dracon/Dev/dracon-platform/web/games/wip/junk-runner",
+      "remotes": [
+        {
+          "advertised_sha": "cd302bc8d47b95a56578337dc502123abf5e5109",
+          "attempts": [
+            {
+              "advertised_sha": "cd302bc8d47b95a56578337dc502123abf5e5109",
+              "blocker": null,
+              "checked_at": "2026-09-25T10:58:13.410491Z",
+              "duration_ms": 1104,
+              "missing": false,
+              "name": "github",
+              "returncode": 0,
+              "stderr": ""
+            }
+          ],
+          "before_sha": "cd302bc8d47b95a56578337dc502123abf5e5109",
+          "blocker": null,
+          "canonical_project": "github.com/dracondev/web-games-junk-runner",
+          "checked_at": "2026-09-25T10:58:13.410491Z",
+          "configured": true,
+          "duration_ms": 1104,
+          "eligible": true,
+          "expected_project": "github.com/dracondev/web-games-junk-runner",
+          "missing": false,
+          "name": "github",
+          "policy_identity_ok": true,
+          "relation": "diverged",
+          "returncode": 0,
+          "stderr": ""
+        },
+        {
+          "advertised_sha": "cd302bc8d47b95a56578337dc502123abf5e5109",
+          "attempts": [
+            {
+              "advertised_sha": "cd302bc8d47b95a56578337dc502123abf5e5109",
+              "blocker": null,
+              "checked_at": "2026-09-25T10:58:14.810466Z",
+              "duration_ms": 1384,
+              "missing": false,
+              "name": "gitlab",
+              "returncode": 0,
+              "stderr": ""
+            }
+          ],
+          "before_sha": "cd302bc8d47b95a56578337dc502123abf5e5109",
+          "blocker": null,
+          "canonical_project": "gitlab.com/dracondev/web-games-junk-runner",
+          "checked_at": "2026-09-25T10:58:14.810466Z",
+          "configured": true,
+          "duration_ms": 1384,
+          "eligible": true,
+          "expected_project": "gitlab.com/dracondev/web-games-junk-runner",
+          "missing": false,
+          "name": "gitlab",
+          "policy_identity_ok": true,
+          "relation": "diverged",
+          "returncode": 0,
+          "stderr": ""
+        }
+      ],
+      "role": "nested-required",
+      "snapshot": {
+        "candidate_count": 2,
+        "captured_at": "2026-09-25T10:58:12.304066Z",
+        "content_digest": "fc6f238c23ccc9a76fb77c0ba41d7fcbaf90524dc9bbbf9b8288de123717414f",
+        "fast_token": "261fc5f44cde18561b14f5cb85a36681a0c9db2c4dfa7c30f69e60685549bf3f",
+        "index_sha256": "b84e64a9c7a35993d755c56f5def2c10117a127d68cd4f0d9765a6d61ee57cc7",
+        "status_sha256": "01db9dfd27d778fc6eaa99d83b38fc5a31c8c4b58df37335c7e74f235ac15e08",
+        "unsafe_candidates": []
+      },
+      "state": {
+        "ahead": 0,
+        "behind": 0,
+        "missing_objects": 0,
+        "modified": 2,
+        "operation": "none",
+        "staged": 0,
+        "submodule": 0,
+        "untracked": 0
+      }
+    },
+    {
+      "branch": "main",
+      "common_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-polis",
+      "git_dir": "/home/dracon/Dev/dracon-platform/.git/modules/web-games-polis",
+      "head": "ad6ad5d21057a8a9268cf66bdf7781c48018386c",
+      "path": "/home/dracon/Dev/dracon-platform/web/games/wip/polis",
+      "remotes": [
+        {
+          "advertised_sha": "ad6ad5d21057a8a9268cf66bdf7781c48018386c",
+          "attempts": [
+            {
+              "advertised_sha": "ad6ad5d21057a8a9268cf66bdf7781c48018386c",
+              "blocker": null,
+              "checked_at": "2026-09-25T10:58:17.725086Z",
+              "duration_ms": 1074,
+              "missing": false,
+              "name": "github",
+              "returncode": 0,
+              "stderr": ""
+            }
+          ],
+          "before_sha": "ad6ad5d21057a8a9268cf66bdf7781c48018386c",
+          "blocker": null,
+          "canonical_project": "github.com/dracondev/web-games-polis",
+          "checked_at": "2026-09-25T10:58:17.725086Z",
+          "configured": true,
+          "duration_ms": 1074,
+          "eligible": true,
+          "expected_project": "github.com/dracondev/web-games-polis",
+          "missing": false,
+          "name": "github",
+          "policy_identity_ok": true,
+          "relation": "equal",
+          "returncode": 0,
+          "stderr": ""
+        },
+        {
+          "advertised_sha": "ad6ad5d21057a8a9268cf66bdf7781c48018386c",
+          "attempts": [
+            {
+              "advertised_sha": "ad6ad5d21057a8a9268cf66bdf7781c48018386c",
+              "blocker": null,
+              "checked_at": "2026-09-25T10:58:19.072244Z",
+              "duration_ms": 1345,
+              "missing": false,
+              "name": "gitlab",
+              "returncode": 0,
+              "stderr": ""
+            }
+          ],
+          "before_sha": "ad6ad5d21057a8a9268cf66bdf7781c48018386c",
+          "blocker": null,
+          "canonical_project": "gitlab.com/dracondev/web-games-polis",
+          "checked_at": "2026-09-25T10:58:19.072244Z",
+          "configured": true,
+          "duration_ms": 1345,
+          "eligible": true,
+          "expected_project": "gitlab.com/dracondev/web-games-polis",
+          "missing": false,
+          "name": "gitlab",
+          "policy_identity_ok": true,
+          "relation": "equal",
+          "returncode": 0,
+          "stderr": ""
+        }
+      ],
+      "role": "nested-required",
+      "snapshot": {
+        "candidate_count": 22,
+        "captured_at": "2026-09-25T10:58:16.647994Z",
+        "content_digest": "895f7026c33215cede6faa2e7507d01b42dfcbc84e6c5fcf76caa7075a771e16",
+        "fast_token": "bf3e7d1e18673a28d90d310f5f2a5770c90a4900cc84150d0cf0e5ce5dfbbe42",
+        "index_sha256": "a9fe4c43bbf0c0a34f307161b378362ac93888ae995369703f5c77208658f1a8",
+        "status_sha256": "4a9a0e7e27f047dad62c43966b97190742fc08e489023ed74ed916b543b41f09",
+        "unsafe_candidates": []
+      },
+      "state": {
+        "ahead": 0,
+        "behind": 0,
+        "missing_objects": 0,
+        "modified": 22,
+        "operation": "none",
+        "staged": 5,
+        "submodule": 0,
+        "untracked": 0
+      }
+    },
+    {
+      "branch": "main",
+      "common_dir": "/home/dracon/Dev/dracon-strategy/.git",
+      "git_dir": "/home/dracon/Dev/dracon-strategy/.git",
+      "head": "83a2fe89b1505a7111a9dfd1801dccd6ad36163e",
+      "path": "/home/dracon/Dev/dracon-strategy",
+      "remotes": [
+        {
+          "advertised_sha": "c42f4f41996309d442c01167800a22f76ae97275",
+          "attempts": [
+            {
+              "advertised_sha": "c42f4f41996309d442c01167800a22f76ae97275",
+              "blocker": null,
+              "checked_at": "2026-09-25T10:58:21.987629Z",
+              "duration_ms": 1027,
+              "missing": false,
+              "name": "github",
+              "returncode": 0,
+              "stderr": ""
+            }
+          ],
+          "before_sha": "c42f4f41996309d442c01167800a22f76ae97275",
+          "blocker": null,
+          "canonical_project": "github.com/dracondev/dracon-strategy",
+          "checked_at": "2026-09-25T10:58:21.987629Z",
+          "configured": true,
+          "duration_ms": 1027,
+          "eligible": true,
+          "expected_project": "github.com/dracondev/dracon-strategy",
+          "missing": false,
+          "name": "github",
+          "policy_identity_ok": true,
+          "relation": "local-ahead",
+          "returncode": 0,
+          "stderr": ""
+        },
+        {
+          "advertised_sha": "c42f4f41996309d442c01167800a22f76ae97275",
+          "attempts": [
+            {
+              "advertised_sha": "c42f4f41996309d442c01167800a22f76ae97275",
+              "blocker": null,
+              "checked_at": "2026-09-25T10:58:23.329278Z",
+              "duration_ms": 1337,
+              "missing": false,
+              "name": "gitlab",
+              "returncode": 0,
+              "stderr": ""
+            }
+          ],
+          "before_sha": "c42f4f41996309d442c01167800a22f76ae97275",
+          "blocker": null,
+          "canonical_project": "gitlab.com/dracondev/dracon-strategy",
+          "checked_at": "2026-09-25T10:58:23.329278Z",
+          "configured": true,
+          "duration_ms": 1337,
+          "eligible": true,
+          "expected_project": "gitlab.com/dracondev/dracon-strategy",
+          "missing": false,
+          "name": "gitlab",
+          "policy_identity_ok": true,
+          "relation": "local-ahead",
+          "returncode": 0,
+          "stderr": ""
+        }
+      ],
+      "role": "standalone",
+      "snapshot": {
+        "candidate_count": 1,
+        "captured_at": "2026-09-25T10:58:20.958378Z",
+        "content_digest": "8d26740aebf2139d4bd73850d2c7bb0f6c561fb3c0fb36559c765c60e4e8be4d",
+        "fast_token": "cf35b2b758e11471a74c3ef6885411af8b48bf81124a44a4061adf7ec963446a",
+        "index_sha256": "6fd35890df230314b50b19e6878d4282796156dfc53c805fb3600b0b4d171ce6",
+        "status_sha256": "48be5c41efeb631ebce204600870c267bb82f52d7f9549559a77cd9e9a287a3b",
+        "unsafe_candidates": []
+      },
+      "state": {
+        "ahead": 1,
+        "behind": 0,
+        "missing_objects": 0,
+        "modified": 1,
+        "operation": "none",
+        "staged": 0,
+        "submodule": 0,
+        "untracked": 0
+      }
+    },
+    {
+      "branch": "main",
+      "common_dir": "/home/dracon/Dev/pi-plugins/pi-goal-list-loop-audit/.git",
+      "git_dir": "/home/dracon/Dev/pi-plugins/pi-goal-list-loop-audit/.git",
+      "head": "ba413a06778695bd4eb3fc183589228ed59a7f99",
+      "path": "/home/dracon/Dev/pi-plugins/pi-goal-list-loop-audit",
+      "remotes": [
+        {
+          "advertised_sha": "ba413a06778695bd4eb3fc183589228ed59a7f99",
+          "attempts": [
+            {
+              "advertised_sha": "ba413a06778695bd4eb3fc183589228ed59a7f99",
+              "blocker": null,
+              "checked_at": "2026-09-25T10:58:26.290178Z",
+              "duration_ms": 1087,
+              "missing": false,
+              "name": "github",
+              "returncode": 0,
+              "stderr": ""
+            }
+          ],
+          "before_sha": "ba413a06778695bd4eb3fc183589228ed59a7f99",
+          "blocker": null,
+          "canonical_project": "github.com/dracondev/pi-goal-list-loop-audit",
+          "checked_at": "2026-09-25T10:58:26.290178Z",
+          "configured": true,
+          "duration_ms": 1087,
+          "eligible": true,
+          "expected_project": "github.com/dracondev/pi-goal-list-loop-audit",
+          "missing": false,
+          "name": "github",
+          "policy_identity_ok": true,
+          "relation": "equal",
+          "returncode": 0,
+          "stderr": ""
+        },
+        {
+          "advertised_sha": "20d2ba1aa7730486a536ce4375a2fc9b8d6e1f5a",
+          "attempts": [
+            {
+              "advertised_sha": "20d2ba1aa7730486a536ce4375a2fc9b8d6e1f5a",
+              "blocker": null,
+              "checked_at": "2026-09-25T10:58:27.668468Z",
+              "duration_ms": 1376,
+              "missing": false,
+              "name": "gitlab",
+              "returncode": 0,
+              "stderr": ""
+            }
+          ],
+          "before_sha": "20d2ba1aa7730486a536ce4375a2fc9b8d6e1f5a",
+          "blocker": null,
+          "canonical_project": "gitlab.com/dracondev/pi-goal-list-loop-audit",
+          "checked_at": "2026-09-25T10:58:27.668468Z",
+          "configured": true,
+          "duration_ms": 1376,
+          "eligible": true,
+          "expected_project": "gitlab.com/dracondev/pi-goal-list-loop-audit",
+          "missing": false,
+          "name": "gitlab",
+          "policy_identity_ok": true,
+          "relation": "local-ahead",
+          "returncode": 0,
+          "stderr": ""
+        }
+      ],
+      "role": "standalone",
+      "snapshot": {
+        "candidate_count": 10,
+        "captured_at": "2026-09-25T10:58:25.200898Z",
+        "content_digest": "72a338c5260baa668f0193daf1db1c9dcd410c74e2a35dfb5db106b4e016c6e9",
+        "fast_token": "347d8d3c189b48fc1b0bf309c517bc21ed4ba6deea7e9538c443b632eb3405b0",
+        "index_sha256": "dfe59cd66e1e44c99e66bab964aab7987025769eb325d2dedd0cb24a8723017e",
+        "status_sha256": "f30e215135509d82956f8371bae8105e13f4a1821a3b2e8842331089d4074bb3",
+        "unsafe_candidates": []
+      },
+      "state": {
+        "ahead": 0,
+        "behind": 0,
+        "missing_objects": 0,
+        "modified": 7,
+        "operation": "none",
+        "staged": 0,
+        "submodule": 0,
+        "untracked": 3
+      }
+    }
+  ],
+  "result": "pending",
+  "run_id": "sync-convergence-1790333909-3466843",
+  "schema_version": 1,
+  "updated_at": "2026-09-25T10:58:29.072975Z"
+}
