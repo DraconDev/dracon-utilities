@@ -1,0 +1,34 @@
+$ bash -n .githooks/pre-push web/scripts/git-hooks/pre-push-shared.sh
+$ bun test web/scripts/bucket-strategy-hooks.test.mjs web/scripts/bucket-strategy.test.mjs
+bun test v1.3.14 (0d9b296a)
+
+web/scripts/bucket-strategy-hooks.test.mjs:
+(pass) nested bucket hook installer > uses stable shared dispatch for fresh nested repositories and checks it idempotently [3034.52ms]
+(pass) nested bucket hook installer > stable shared dispatch preserves the global Warden chain [2779.30ms]
+(pass) nested bucket hook installer > parent pre-commit removes Git hook overrides before the offline guard [1814.75ms]
+(pass) nested bucket hook installer > shared pre-commit removes Git hook overrides before the offline guard [2042.93ms]
+(pass) nested bucket hook installer > parent pre-push removes Git hook overrides before the offline guard [2008.04ms]
+(pass) nested bucket hook installer > shared pre-push removes Git hook overrides before the offline guard [1404.94ms]
+(pass) nested bucket hook installer > parent hooks preserve Warden ordering, chaining, failure propagation, and exact push-stream replay [2762.69ms]
+(pass) nested bucket hook installer > preserves a custom local hook and refuses to overwrite a conflicting preserved copy [2431.68ms]
+(pass) nested bucket hook installer > refuses a broken symlink custom hook instead of silently switching policy [1707.40ms]
+(pass) nested bucket hook installer > does not switch policy when the second hook fails preservation [3187.95ms]
+
+web/scripts/bucket-strategy.test.mjs:
+(pass) policy and manifest validation > policy normalizes limits and requires fail-closed guard [10.66ms]
+(pass) policy and manifest validation > safe paths reject absolute, traversal, NUL, and Windows drive forms [0.13ms]
+(pass) policy and manifest validation > manifest accepts only explicit public regenerable entries [1.82ms]
+(pass) policy and manifest validation > promotion excludes opaque binaries while inventory still classifies them [0.37ms]
+(pass) policy and manifest validation > manifest rejects duplicate ids and logical paths [0.49ms]
+(pass) policy and manifest validation > manifest requires source and logical extensions to match [0.13ms]
+(pass) deterministic offline promotion > plan is sorted, content-addressed, and leaves the source unchanged [495.03ms]
+(pass) deterministic offline promotion > missing and modified source files fail closed [370.99ms]
+(pass) provider ceiling and pushable measurement > lowest configured provider limit governs, including GitHub [2225.95ms]
+(pass) provider ceiling and pushable measurement > unknown provider and no remote fail closed [2083.71ms]
+(pass) provider ceiling and pushable measurement > pushable branch measures objects, not .git directory size [3490.05ms]
+(pass) provider ceiling and pushable measurement > staged bytes are included and exact high-water blocks [3994.27ms]
+
+ 22 pass
+ 0 fail
+ 111 expect() calls
+Ran 22 tests across 2 files. [79.41s]

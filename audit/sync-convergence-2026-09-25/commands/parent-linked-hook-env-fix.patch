@@ -1,0 +1,118 @@
+diff --git a/.githooks/pre-push b/.githooks/pre-push
+index d3db088ef6..cf9a83583c 100755
+--- a/.githooks/pre-push
++++ b/.githooks/pre-push
+@@ -26,7 +26,14 @@ cat >"$REFS_FILE"
+ # The nested/portable wrapper selects pre-push mode from --refs-file. It
+ # measures every pushed ref, applies supplied remote tips only to this target
+ # remote, and never contacts OVH or a Git server.
+-if ! bash "$REPO_ROOT/web/scripts/bucket-strategy-guard.sh" \
++# Git exports repository-discovery overrides to hooks. Linked worktrees
++# legitimately receive an absolute GIT_DIR; remove graph/worktree redirects
++# after resolving REPO_ROOT so the fail-closed strategy measures exactly the
++# linked worktree named above rather than rejecting Git's own hook env.
++if ! env -u GIT_DIR -u GIT_WORK_TREE -u GIT_COMMON_DIR \
++  -u GIT_OBJECT_DIRECTORY -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_NAMESPACE \
++  -u GIT_SHALLOW_FILE -u GIT_GRAFT_FILE -u GIT_REPLACE_REF_BASE \
++  bash "$REPO_ROOT/web/scripts/bucket-strategy-guard.sh" \
+   --refs-file "$REFS_FILE" \
+   --remote-name "$REMOTE_NAME" \
+   --remote-url "$REMOTE_URL" \
+diff --git a/web/scripts/bucket-strategy-hooks.test.mjs b/web/scripts/bucket-strategy-hooks.test.mjs
+index e872516d50..a2fc0f59cf 100644
+--- a/web/scripts/bucket-strategy-hooks.test.mjs
++++ b/web/scripts/bucket-strategy-hooks.test.mjs
+@@ -197,6 +197,55 @@ describe('nested bucket hook installer', () => {
+     });
+   }
+
++  for (const [label, hookPath] of [
++    ['parent', '.githooks/pre-push'],
++    ['shared', 'web/scripts/git-hooks/pre-push-shared.sh']
++  ]) {
++    test(`${label} pre-push removes Git hook overrides before the offline guard`, () => {
++      const { root, repo, log, globalPrePush } = parentHookFixture();
++      const guard = join(repo, 'web', 'scripts', 'bucket-strategy-guard.sh');
++      const envDump = join(root, 'push-guard-env.txt');
++      writeFileSync(guard, `#!/usr/bin/env bash\nset -eu\nenv | sort | grep '^GIT_' > ${JSON.stringify(envDump)} || true\nprintf 'bucket:%s\\n' "$*" >> "$HOOK_CHAIN_LOG"\n`, { mode: 0o755 });
++      let hook = join(repo, hookPath);
++      if (label === 'shared') {
++        hook = join(repo, 'web', 'scripts', 'git-hooks', 'pre-push-shared.sh');
++        mkdirSync(join(repo, 'web', 'scripts', 'git-hooks'), { recursive: true });
++        copyFileSync(resolve(platformRoot, 'web', 'scripts', 'git-hooks', 'pre-push-shared.sh'), hook);
++        chmodSync(hook, 0o755);
++      }
++      const head = git(repo, ['rev-parse', 'HEAD']);
++      const zero = '0'.repeat(40);
++      const stream = `refs/heads/main ${head} refs/heads/main ${zero}\n`;
++      const env = {
++        ...process.env,
++        HOOK_CHAIN_LOG: log,
++        DRACON_BUCKET_GUARD: guard,
++        DRACON_WARDEN_PRE_PUSH_HOOK: globalPrePush,
++        GIT_DIR: git(repo, ['rev-parse', '--absolute-git-dir']),
++        GIT_WORK_TREE: repo,
++        GIT_COMMON_DIR: git(repo, ['rev-parse', '--path-format=absolute', '--git-common-dir']),
++        GIT_NAMESPACE: 'hook-fixture',
++        GIT_SHALLOW_FILE: join(root, 'shallow'),
++        GIT_GRAFT_FILE: join(root, 'grafts'),
++        GIT_REPLACE_REF_BASE: 'refs/replace/hook-fixture'
++      };
++      execFileSync('bash', [hook, 'origin', 'git@github.com:example/fixture.git'], {
++        cwd: repo,
++        env,
++        input: stream,
++        encoding: 'utf8',
++        stdio: ['pipe', 'pipe', 'pipe'],
++        timeout: 30000
++      });
++      const guardEnv = readFileSync(envDump, 'utf8');
++      expect(guardEnv).not.toMatch(/^GIT_(?:DIR|WORK_TREE|COMMON_DIR|OBJECT_DIRECTORY|ALTERNATE_OBJECT_DIRECTORIES|NAMESPACE|SHALLOW_FILE|GRAFT_FILE|REPLACE_REF_BASE)=/mu);
++      expect(readFileSync(log, 'utf8')).toContain('bucket:');
++      if (label === 'parent') {
++        expect(readFileSync(log, 'utf8')).toContain(`warden-pre-push:${stream.trimEnd()}`);
++      }
++    });
++  }
++
+   test('parent hooks preserve Warden ordering, chaining, failure propagation, and exact push-stream replay', () => {
+     const { root, repo, log, globalPreCommit, globalPrePush } = parentHookFixture();
+     const env = {
+@@ -268,7 +317,7 @@ describe('nested bucket hook installer', () => {
+     })).toThrow();
+     expect(readFileSync(log, 'utf8')).toMatch(/^bucket:/u);
+     expect(readFileSync(log, 'utf8')).not.toContain('warden-pre-push');
+-  });
++  }, { timeout: 30000 });
+
+   test('preserves a custom local hook and refuses to overwrite a conflicting preserved copy', () => {
+     const { repos, installer } = fixture();
+@@ -286,7 +335,7 @@ describe('nested bucket hook installer', () => {
+     git(repo, ['config', 'core.hooksPath', 'custom-hooks']);
+     expect(() => execFileSync('bash', [installer], { encoding: 'utf8', timeout: 30000, stdio: ['pipe', 'pipe', 'pipe'] })).toThrow();
+     expect(readFileSync(join(repo, '.githooks', 'pre-commit.drac-original'), 'utf8')).toBe(preserved);
+-  });
++  }, { timeout: 30000 });
+
+   test('refuses a broken symlink custom hook instead of silently switching policy', () => {
+     const { repos, installer } = fixture();
+diff --git a/web/scripts/git-hooks/pre-push-shared.sh b/web/scripts/git-hooks/pre-push-shared.sh
+index 34e400d57f..de1b1cda60 100755
+--- a/web/scripts/git-hooks/pre-push-shared.sh
++++ b/web/scripts/git-hooks/pre-push-shared.sh
+@@ -28,7 +28,14 @@ fi
+ REFS_FILE="$(mktemp)"
+ trap 'rm -f "$REFS_FILE"' EXIT
+ cat >"$REFS_FILE"
+-if ! "$GUARD" --refs-file "$REFS_FILE" --remote-name "$REMOTE_NAME" --remote-url "$REMOTE_URL" --json; then
++# Git exports repository-discovery overrides to hooks. Linked worktrees
++# legitimately receive an absolute GIT_DIR; remove graph/worktree redirects
++# after resolving REPO_ROOT so the fail-closed strategy measures exactly the
++# linked worktree named above rather than rejecting Git's own hook env.
++if ! env -u GIT_DIR -u GIT_WORK_TREE -u GIT_COMMON_DIR \
++  -u GIT_OBJECT_DIRECTORY -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_NAMESPACE \
++  -u GIT_SHALLOW_FILE -u GIT_GRAFT_FILE -u GIT_REPLACE_REF_BASE \
++  "$GUARD" --refs-file "$REFS_FILE" --remote-name "$REMOTE_NAME" --remote-url "$REMOTE_URL" --json; then
+   echo "pre-push: bucket high-water/forward-only guard blocked this push" >&2
+   exit 1
+ fi

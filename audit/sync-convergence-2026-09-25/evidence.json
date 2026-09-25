@@ -1,5 +1,107 @@
 {
-  "actions": [],
+  "actions": [
+    {
+      "evidence": [
+        "commands/adopt-dracon-home-freeze-event.log",
+        "commands/adopt-dracon-home-runtime-state.log"
+      ],
+      "head_after": "bc19cf0235816c8b8e9baaacd93cb79b4313905e",
+      "head_before": "33c46e9e497f0511b1cdc7f886dd0b3dc0b4316f",
+      "kind": "ignore",
+      "recorded_at": "2026-09-25T11:20:33.709247Z",
+      "repository": "/home/dracon/.dracon",
+      "result": "ok"
+    },
+    {
+      "evidence": [
+        "commands/adopt-football-forever-hooks.log"
+      ],
+      "head_after": "93719cfdf41a35fc4cad4ed6b51fd12d75511023",
+      "head_before": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec",
+      "kind": "commit",
+      "recorded_at": "2026-09-25T11:20:34.288604Z",
+      "repository": "/home/dracon/Dev/dracon-platform/web/games/wip/football-forever",
+      "result": "ok"
+    },
+    {
+      "evidence": [
+        "commands/adopt-football-forever-hooks.log"
+      ],
+      "head_after": "93719cfdf41a35fc4cad4ed6b51fd12d75511023",
+      "head_before": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec",
+      "kind": "push",
+      "recorded_at": "2026-09-25T11:20:34.595113Z",
+      "repository": "/home/dracon/Dev/dracon-platform/web/games/wip/football-forever",
+      "result": "ok"
+    },
+    {
+      "evidence": [
+        "commands/push-snapshot-committed-heads.log"
+      ],
+      "head_after": "ea59ab42913964953fce2e9f3a5c995e5bf8a39b",
+      "head_before": "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51",
+      "kind": "push",
+      "recorded_at": "2026-09-25T11:20:34.748075Z",
+      "repository": "/home/dracon/Dev/dracon-platform",
+      "result": "blocked"
+    },
+    {
+      "evidence": [
+        "commands/push-linked-worktree-heads.log"
+      ],
+      "head_after": "f043ae7070e04c8d4ad97642014c685871a70505",
+      "head_before": "6721c2ef05093ca5321b03447cd1bfdaf4570ff4",
+      "kind": "push",
+      "recorded_at": "2026-09-25T11:20:35.036675Z",
+      "repository": "/home/dracon/Dev/dracon-platform/web/games/wip/capture-anime-girls",
+      "result": "blocked"
+    },
+    {
+      "evidence": [
+        "commands/push-linked-worktree-heads.log"
+      ],
+      "head_after": "2271f0033babfc491392f12b31295d93ae48dc8",
+      "head_before": "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6",
+      "kind": "push",
+      "recorded_at": "2026-09-25T11:20:35.606040Z",
+      "repository": "/home/dracon/Dev/dracon-platform/web/games/wip/deathrun",
+      "result": "blocked"
+    },
+    {
+      "evidence": [
+        "commands/bucket-hook-regression.log",
+        "commands/parent-linked-hook-env-fix.patch"
+      ],
+      "head_after": "ea59ab42913964953fce2e9f3a5c995e5bf8a39b",
+      "head_before": "ea59ab42913964953fce2e9f3a5c995e5bf8a39b",
+      "kind": "hook",
+      "recorded_at": "2026-09-25T11:23:17.388512Z",
+      "repository": "/home/dracon/Dev/dracon-platform",
+      "result": "blocked"
+    },
+    {
+      "evidence": [
+        "commands/push-linked-worktree-heads.log"
+      ],
+      "head_after": "f043ae7070e04c8d4ad97642014c685871a70505",
+      "head_before": "f043ae7070e04c8d4ad97642014c685871a70505",
+      "kind": "hook",
+      "recorded_at": "2026-09-25T11:23:17.573772Z",
+      "repository": "/home/dracon/Dev/dracon-platform/web/games/wip/capture-anime-girls",
+      "result": "blocked"
+    },
+    {
+      "evidence": [
+        "commands/push-linked-worktree-heads.log"
+      ],
+      "head_after": "2271f0033babfc491392f12b31295d93ae48dc8",
+      "head_before": "2271f0033babfc491392f12b31295d93ae48dc8",
+      "kind": "hook",
+      "recorded_at": "2026-09-25T11:23:18.044072Z",
+      "repository": "/home/dracon/Dev/dracon-platform/web/games/wip/deathrun",
+      "result": "blocked"
+    }
+  ],
   "contract": {
     "forward_only": true,
     "freeze_marker": "/home/dracon/.dracon/dracon-sync.freeze",
@@ -27,7 +129,35 @@
   },
   "created_at": "2026-09-25T10:58:29.072960Z",
   "external_blockers": [],
-  "gates": {},
+  "gates": {
+    "bucket-hook-environment-regression": {
+      "command": "bash -n .githooks/pre-push web/scripts/git-hooks/pre-push-shared.sh && bun test web/scripts/bucket-strategy-hooks.test.mjs web/scripts/bucket-strategy.test.mjs",
+      "evidence": [
+        "commands/bucket-hook-regression.log"
+      ],
+      "notes": "22 tests passed; linked-worktree Git hook environment is stripped before the offline guard",
+      "recorded_at": "2026-09-25T11:22:45.400729Z",
+      "status": "pass"
+    },
+    "convergence-unit-tests": {
+      "command": "python3 -m unittest -v scripts.tests.test_sync_convergence",
+      "evidence": [
+        "commands/python-convergence-tests.log"
+      ],
+      "notes": "29 tests passed after binary-safe hashing, gitlink discovery, detached opacity, prefilter, and transaction-race fixes",
+      "recorded_at": "2026-09-25T11:22:45.632655Z",
+      "status": "pass"
+    },
+    "provider-high-water": {
+      "command": "normal git push through platform bucket guard",
+      "evidence": [
+        "commands/internal-high-water-blockers.md"
+      ],
+      "notes": "Parent, Capture-Anime-Girls, and Deathrun exceed the fail-closed 2 GiB policy ceiling; no bypass or rewrite used",
+      "recorded_at": "2026-09-25T11:23:53.837909Z",
+      "status": "blocked"
+    }
+  },
   "phases": [
     {
       "ended_at": "2026-09-25T10:56:55.768919Z",
@@ -1658,5 +1788,5 @@
   "result": "pending",
   "run_id": "sync-convergence-1790333909-3466843",
   "schema_version": 1,
-  "updated_at": "2026-09-25T10:58:29.072975Z"
+  "updated_at": "2026-09-25T11:23:53.837924Z"
 }

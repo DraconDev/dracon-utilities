@@ -1,0 +1,685 @@
+## adopt linked-worktree hook refresh
+## main...origin/main [ahead 1]
+ M .githooks/pre-commit
+ M .githooks/pre-push
+?? docs/premium/evidence/baseline-season-v1/run-2026-09-25T07-53-53-2026-09-25T07-53-53/
+?? docs/premium/evidence/baseline-season-v1/run-2026-09-25T08-00-40-2026-09-25T08-00-40/
+?? docs/premium/evidence/baseline-season-v1/run-2026-09-25T08-04-37-2026-09-25T08-04-37/
+diff --git a/.githooks/pre-commit b/.githooks/pre-commit
+index bf002c4..c847ce6 100755
+--- a/.githooks/pre-commit
++++ b/.githooks/pre-commit
+@@ -18,7 +18,17 @@ if [ -z "$GUARD" ] || [ ! -x "$GUARD" ]; then
+   echo "pre-commit: cannot locate bucket-strategy-guard.sh; refusing commit" >&2
+   exit 1
+ fi
+-if ! "$GUARD" --staged --json; then
++# Git exports repository-discovery overrides to hooks. Linked/submodule
++# worktrees legitimately receive an absolute GIT_DIR; commits receive a
++# temporary GIT_INDEX_FILE. Remove graph/worktree redirects before invoking
++# the fail-closed strategy so it discovers the same repository from its
++# explicit --repo root. Preserve GIT_INDEX_FILE because that temporary index
++# is the exact staged tree the pre-commit guard must measure; the guard copies
++# it into an isolated index before creating any prospective objects.
++if ! env -u GIT_DIR -u GIT_WORK_TREE -u GIT_COMMON_DIR \
++  -u GIT_OBJECT_DIRECTORY -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_NAMESPACE \
++  -u GIT_SHALLOW_FILE -u GIT_GRAFT_FILE -u GIT_REPLACE_REF_BASE \
++  "$GUARD" --staged --json; then
+   echo "pre-commit: bucket high-water/forward-only guard blocked this commit" >&2
+   exit 1
+ fi
+diff --git a/.githooks/pre-push b/.githooks/pre-push
+index 34e400d..de1b1cd 100755
+--- a/.githooks/pre-push
++++ b/.githooks/pre-push
+@@ -28,7 +28,14 @@ fi
+ REFS_FILE="$(mktemp)"
+ trap 'rm -f "$REFS_FILE"' EXIT
+ cat >"$REFS_FILE"
+-if ! "$GUARD" --refs-file "$REFS_FILE" --remote-name "$REMOTE_NAME" --remote-url "$REMOTE_URL" --json; then
++# Git exports repository-discovery overrides to hooks. Linked worktrees
++# legitimately receive an absolute GIT_DIR; remove graph/worktree redirects
++# after resolving REPO_ROOT so the fail-closed strategy measures exactly the
++# linked worktree named above rather than rejecting Git's own hook env.
++if ! env -u GIT_DIR -u GIT_WORK_TREE -u GIT_COMMON_DIR \
++  -u GIT_OBJECT_DIRECTORY -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_NAMESPACE \
++  -u GIT_SHALLOW_FILE -u GIT_GRAFT_FILE -u GIT_REPLACE_REF_BASE \
++  "$GUARD" --refs-file "$REFS_FILE" --remote-name "$REMOTE_NAME" --remote-url "$REMOTE_URL" --json; then
+   echo "pre-push: bucket high-water/forward-only guard blocked this push" >&2
+   exit 1
+ fi
+ .githooks/pre-commit | 12 +++++++++++-
+ .githooks/pre-push   |  9 ++++++++-
+ 2 files changed, 19 insertions(+), 2 deletions(-)
+{
+  "ref": "refs/heads/main",
+  "refs": [
+    {
+      "name": "refs/heads/main",
+      "ref": "refs/heads/main",
+      "remoteRef": "refs/heads/main",
+      "objectId": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec",
+      "remoteTip": null
+    }
+  ],
+  "targetRemote": null,
+  "effectiveLimitBytes": 2147483648,
+  "limitingRemote": "github",
+  "limitingProvider": "github",
+  "scenarios": [
+    {
+      "remote": "github",
+      "url": "git@github.com:DraconDev/football-forever.git",
+      "provider": "github",
+      "limitBytes": 2147483648,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec",
+          "remoteTip": null,
+          "trackingTip": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "9723a12c335dd427a36aee1ae04678ae7eb4e8ec"
+      ],
+      "objectCount": 10954,
+      "reachableObjectCount": 10954,
+      "deltaBaseCount": 5653,
+      "uncompressedBytes": 1194537470,
+      "storedBytes": 702480252,
+      "policyEstimateBytes": 1315524451,
+      "packPolicyEstimateBytes": 1315458865,
+      "packUpperBoundBytes": 1315458865,
+      "prospectiveCommitAllowanceBytes": 65586,
+      "prospectiveCommitMessageBytes": 50,
+      "basisBytes": 1315524451
+    },
+    {
+      "remote": "gitlab",
+      "url": "git@gitlab.com:DraconDev/football-forever.git",
+      "provider": "gitlab",
+      "limitBytes": 5239860101,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec",
+          "remoteTip": null,
+          "trackingTip": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "9723a12c335dd427a36aee1ae04678ae7eb4e8ec"
+      ],
+      "objectCount": 10954,
+      "reachableObjectCount": 10954,
+      "deltaBaseCount": 5653,
+      "uncompressedBytes": 1194537470,
+      "storedBytes": 702480252,
+      "policyEstimateBytes": 1315524451,
+      "packPolicyEstimateBytes": 1315458865,
+      "packUpperBoundBytes": 1315458865,
+      "prospectiveCommitAllowanceBytes": 65586,
+      "prospectiveCommitMessageBytes": 50,
+      "basisBytes": 1315524451
+    },
+    {
+      "remote": "mirror-github",
+      "url": "git@github.com:DraconDev/web-games-football-forever.git",
+      "provider": "github",
+      "limitBytes": 2147483648,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec",
+          "remoteTip": null,
+          "trackingTip": "241c92289a26a2622c40ff2abf92d9cdad31eb55"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "241c92289a26a2622c40ff2abf92d9cdad31eb55"
+      ],
+      "objectCount": 10954,
+      "reachableObjectCount": 10954,
+      "deltaBaseCount": 5653,
+      "uncompressedBytes": 1194537470,
+      "storedBytes": 702480252,
+      "policyEstimateBytes": 1315524451,
+      "packPolicyEstimateBytes": 1315458865,
+      "packUpperBoundBytes": 1315458865,
+      "prospectiveCommitAllowanceBytes": 65586,
+      "prospectiveCommitMessageBytes": 50,
+      "basisBytes": 1315524451
+    },
+    {
+      "remote": "mirror-gitlab",
+      "url": "git@gitlab.com:DraconDev/web-games-football-forever.git",
+      "provider": "gitlab",
+      "limitBytes": 5239860101,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec",
+          "remoteTip": null,
+          "trackingTip": "241c92289a26a2622c40ff2abf92d9cdad31eb55"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "241c92289a26a2622c40ff2abf92d9cdad31eb55"
+      ],
+      "objectCount": 10954,
+      "reachableObjectCount": 10954,
+      "deltaBaseCount": 5653,
+      "uncompressedBytes": 1194537470,
+      "storedBytes": 702480252,
+      "policyEstimateBytes": 1315524451,
+      "packPolicyEstimateBytes": 1315458865,
+      "packUpperBoundBytes": 1315458865,
+      "prospectiveCommitAllowanceBytes": 65586,
+      "prospectiveCommitMessageBytes": 50,
+      "basisBytes": 1315524451
+    },
+    {
+      "remote": "origin",
+      "url": "git@github.com:DraconDev/football-forever.git",
+      "provider": "github",
+      "limitBytes": 2147483648,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec",
+          "remoteTip": null,
+          "trackingTip": "6d2d5baea7b4f5ee0293dfcf692508d1a4728198"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "6d2d5baea7b4f5ee0293dfcf692508d1a4728198"
+      ],
+      "objectCount": 10954,
+      "reachableObjectCount": 10954,
+      "deltaBaseCount": 5653,
+      "uncompressedBytes": 1194537470,
+      "storedBytes": 702480252,
+      "policyEstimateBytes": 1315524451,
+      "packPolicyEstimateBytes": 1315458865,
+      "packUpperBoundBytes": 1315458865,
+      "prospectiveCommitAllowanceBytes": 65586,
+      "prospectiveCommitMessageBytes": 50,
+      "basisBytes": 1315524451
+    }
+  ],
+  "maxBasisBytes": 1315524451,
+  "stagedBytes": 10384,
+  "stagedTree": "544ce254b820acd9012767bc9d824721ef3789ac",
+  "projectedBytes": 1315524451,
+  "highWaterBytes": 2147483648,
+  "atOrAboveLimit": false,
+  "measurable": true,
+  "ok": true,
+  "code": "OK",
+  "limitBytes": 2147483648,
+  "remainingBytes": 831959197,
+  "errors": [],
+  "forwardOnly": {
+    "ok": true,
+    "code": "OK",
+    "checked": {
+      "staged": true,
+      "refs": 0
+    },
+    "violations": [],
+    "errors": []
+  }
+}
+[main 93719cf] chore: harden linked-worktree bucket hooks
+ 2 files changed, 19 insertions(+), 2 deletions(-)
+head_before=9723a12c335dd427a36aee1ae04678ae7eb4e8ec
+head_after=93719cfdf41a35fc4cad4ed6b51fd12d75511023
+{
+  "ref": "refs/heads/main",
+  "refs": [
+    {
+      "name": "refs/heads/main",
+      "ref": "refs/heads/main",
+      "remoteRef": "refs/heads/main",
+      "objectId": "93719cfdf41a35fc4cad4ed6b51fd12d75511023",
+      "remoteTip": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec"
+    }
+  ],
+  "targetRemote": {
+    "name": "github",
+    "url": "git@github.com:DraconDev/football-forever.git"
+  },
+  "effectiveLimitBytes": 2147483648,
+  "limitingRemote": "github",
+  "limitingProvider": "github",
+  "scenarios": [
+    {
+      "remote": "github",
+      "url": "git@github.com:DraconDev/football-forever.git",
+      "provider": "github",
+      "limitBytes": 2147483648,
+      "target": true,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "93719cfdf41a35fc4cad4ed6b51fd12d75511023",
+          "remoteTip": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec",
+          "trackingTip": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "9723a12c335dd427a36aee1ae04678ae7eb4e8ec"
+      ],
+      "objectCount": 10955,
+      "reachableObjectCount": 10955,
+      "deltaBaseCount": 5653,
+      "uncompressedBytes": 1194537703,
+      "storedBytes": 702480454,
+      "policyEstimateBytes": 1315459250,
+      "packPolicyEstimateBytes": 1315459250,
+      "packUpperBoundBytes": 1315459250,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 1315459250
+    },
+    {
+      "remote": "gitlab",
+      "url": "git@gitlab.com:DraconDev/football-forever.git",
+      "provider": "gitlab",
+      "limitBytes": 5239860101,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "93719cfdf41a35fc4cad4ed6b51fd12d75511023",
+          "remoteTip": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec",
+          "trackingTip": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "9723a12c335dd427a36aee1ae04678ae7eb4e8ec"
+      ],
+      "objectCount": 10955,
+      "reachableObjectCount": 10955,
+      "deltaBaseCount": 5653,
+      "uncompressedBytes": 1194537703,
+      "storedBytes": 702480454,
+      "policyEstimateBytes": 1315459250,
+      "packPolicyEstimateBytes": 1315459250,
+      "packUpperBoundBytes": 1315459250,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 1315459250
+    },
+    {
+      "remote": "mirror-github",
+      "url": "git@github.com:DraconDev/web-games-football-forever.git",
+      "provider": "github",
+      "limitBytes": 2147483648,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "93719cfdf41a35fc4cad4ed6b51fd12d75511023",
+          "remoteTip": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec",
+          "trackingTip": "241c92289a26a2622c40ff2abf92d9cdad31eb55"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "241c92289a26a2622c40ff2abf92d9cdad31eb55"
+      ],
+      "objectCount": 10955,
+      "reachableObjectCount": 10955,
+      "deltaBaseCount": 5653,
+      "uncompressedBytes": 1194537703,
+      "storedBytes": 702480454,
+      "policyEstimateBytes": 1315459250,
+      "packPolicyEstimateBytes": 1315459250,
+      "packUpperBoundBytes": 1315459250,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 1315459250
+    },
+    {
+      "remote": "mirror-gitlab",
+      "url": "git@gitlab.com:DraconDev/web-games-football-forever.git",
+      "provider": "gitlab",
+      "limitBytes": 5239860101,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "93719cfdf41a35fc4cad4ed6b51fd12d75511023",
+          "remoteTip": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec",
+          "trackingTip": "241c92289a26a2622c40ff2abf92d9cdad31eb55"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "241c92289a26a2622c40ff2abf92d9cdad31eb55"
+      ],
+      "objectCount": 10955,
+      "reachableObjectCount": 10955,
+      "deltaBaseCount": 5653,
+      "uncompressedBytes": 1194537703,
+      "storedBytes": 702480454,
+      "policyEstimateBytes": 1315459250,
+      "packPolicyEstimateBytes": 1315459250,
+      "packUpperBoundBytes": 1315459250,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 1315459250
+    },
+    {
+      "remote": "origin",
+      "url": "git@github.com:DraconDev/football-forever.git",
+      "provider": "github",
+      "limitBytes": 2147483648,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "93719cfdf41a35fc4cad4ed6b51fd12d75511023",
+          "remoteTip": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec",
+          "trackingTip": "6d2d5baea7b4f5ee0293dfcf692508d1a4728198"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "6d2d5baea7b4f5ee0293dfcf692508d1a4728198"
+      ],
+      "objectCount": 10955,
+      "reachableObjectCount": 10955,
+      "deltaBaseCount": 5653,
+      "uncompressedBytes": 1194537703,
+      "storedBytes": 702480454,
+      "policyEstimateBytes": 1315459250,
+      "packPolicyEstimateBytes": 1315459250,
+      "packUpperBoundBytes": 1315459250,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 1315459250
+    }
+  ],
+  "maxBasisBytes": 1315459250,
+  "stagedBytes": 0,
+  "stagedTree": null,
+  "projectedBytes": 1315459250,
+  "highWaterBytes": 2147483648,
+  "atOrAboveLimit": false,
+  "measurable": true,
+  "ok": true,
+  "code": "OK",
+  "limitBytes": 2147483648,
+  "remainingBytes": 832024398,
+  "errors": [],
+  "forwardOnly": {
+    "ok": true,
+    "code": "OK",
+    "checked": {
+      "staged": false,
+      "refs": 1
+    },
+    "violations": [],
+    "errors": []
+  }
+}
+To github.com:DraconDev/football-forever.git
+   9723a12..93719cf  main -> main
+github=93719cfdf41a35fc4cad4ed6b51fd12d75511023
+{
+  "ref": "refs/heads/main",
+  "refs": [
+    {
+      "name": "refs/heads/main",
+      "ref": "refs/heads/main",
+      "remoteRef": "refs/heads/main",
+      "objectId": "93719cfdf41a35fc4cad4ed6b51fd12d75511023",
+      "remoteTip": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec"
+    }
+  ],
+  "targetRemote": {
+    "name": "gitlab",
+    "url": "git@gitlab.com:DraconDev/football-forever.git"
+  },
+  "effectiveLimitBytes": 2147483648,
+  "limitingRemote": "github",
+  "limitingProvider": "github",
+  "scenarios": [
+    {
+      "remote": "github",
+      "url": "git@github.com:DraconDev/football-forever.git",
+      "provider": "github",
+      "limitBytes": 2147483648,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "93719cfdf41a35fc4cad4ed6b51fd12d75511023",
+          "remoteTip": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec",
+          "trackingTip": "93719cfdf41a35fc4cad4ed6b51fd12d75511023"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "93719cfdf41a35fc4cad4ed6b51fd12d75511023"
+      ],
+      "objectCount": 10955,
+      "reachableObjectCount": 10955,
+      "deltaBaseCount": 5653,
+      "uncompressedBytes": 1194537703,
+      "storedBytes": 702480454,
+      "policyEstimateBytes": 1315459250,
+      "packPolicyEstimateBytes": 1315459250,
+      "packUpperBoundBytes": 1315459250,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 1315459250
+    },
+    {
+      "remote": "gitlab",
+      "url": "git@gitlab.com:DraconDev/football-forever.git",
+      "provider": "gitlab",
+      "limitBytes": 5239860101,
+      "target": true,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "93719cfdf41a35fc4cad4ed6b51fd12d75511023",
+          "remoteTip": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec",
+          "trackingTip": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "9723a12c335dd427a36aee1ae04678ae7eb4e8ec"
+      ],
+      "objectCount": 10955,
+      "reachableObjectCount": 10955,
+      "deltaBaseCount": 5653,
+      "uncompressedBytes": 1194537703,
+      "storedBytes": 702480454,
+      "policyEstimateBytes": 1315459250,
+      "packPolicyEstimateBytes": 1315459250,
+      "packUpperBoundBytes": 1315459250,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 1315459250
+    },
+    {
+      "remote": "mirror-github",
+      "url": "git@github.com:DraconDev/web-games-football-forever.git",
+      "provider": "github",
+      "limitBytes": 2147483648,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "93719cfdf41a35fc4cad4ed6b51fd12d75511023",
+          "remoteTip": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec",
+          "trackingTip": "241c92289a26a2622c40ff2abf92d9cdad31eb55"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "241c92289a26a2622c40ff2abf92d9cdad31eb55"
+      ],
+      "objectCount": 10955,
+      "reachableObjectCount": 10955,
+      "deltaBaseCount": 5653,
+      "uncompressedBytes": 1194537703,
+      "storedBytes": 702480454,
+      "policyEstimateBytes": 1315459250,
+      "packPolicyEstimateBytes": 1315459250,
+      "packUpperBoundBytes": 1315459250,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 1315459250
+    },
+    {
+      "remote": "mirror-gitlab",
+      "url": "git@gitlab.com:DraconDev/web-games-football-forever.git",
+      "provider": "gitlab",
+      "limitBytes": 5239860101,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "93719cfdf41a35fc4cad4ed6b51fd12d75511023",
+          "remoteTip": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec",
+          "trackingTip": "241c92289a26a2622c40ff2abf92d9cdad31eb55"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "241c92289a26a2622c40ff2abf92d9cdad31eb55"
+      ],
+      "objectCount": 10955,
+      "reachableObjectCount": 10955,
+      "deltaBaseCount": 5653,
+      "uncompressedBytes": 1194537703,
+      "storedBytes": 702480454,
+      "policyEstimateBytes": 1315459250,
+      "packPolicyEstimateBytes": 1315459250,
+      "packUpperBoundBytes": 1315459250,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 1315459250
+    },
+    {
+      "remote": "origin",
+      "url": "git@github.com:DraconDev/football-forever.git",
+      "provider": "github",
+      "limitBytes": 2147483648,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "93719cfdf41a35fc4cad4ed6b51fd12d75511023",
+          "remoteTip": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec",
+          "trackingTip": "6d2d5baea7b4f5ee0293dfcf692508d1a4728198"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "6d2d5baea7b4f5ee0293dfcf692508d1a4728198"
+      ],
+      "objectCount": 10955,
+      "reachableObjectCount": 10955,
+      "deltaBaseCount": 5653,
+      "uncompressedBytes": 1194537703,
+      "storedBytes": 702480454,
+      "policyEstimateBytes": 1315459250,
+      "packPolicyEstimateBytes": 1315459250,
+      "packUpperBoundBytes": 1315459250,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 1315459250
+    }
+  ],
+  "maxBasisBytes": 1315459250,
+  "stagedBytes": 0,
+  "stagedTree": null,
+  "projectedBytes": 1315459250,
+  "highWaterBytes": 2147483648,
+  "atOrAboveLimit": false,
+  "measurable": true,
+  "ok": true,
+  "code": "OK",
+  "limitBytes": 2147483648,
+  "remainingBytes": 832024398,
+  "errors": [],
+  "forwardOnly": {
+    "ok": true,
+    "code": "OK",
+    "checked": {
+      "staged": false,
+      "refs": 1
+    },
+    "violations": [],
+    "errors": []
+  }
+}
+remote:
+remote: ========================================================================
+remote:
+remote:     You have reached the free storage limit of 10 GiB on one or more
+remote:      projects. To unlock your projects over the free 10 GiB project
+remote:   limit, you must purchase additional storage. You can't push to your
+remote:     repository, create pipelines, create issues, or add comments. To
+remote:       reduce storage capacity, you can delete unused repositories,
+remote:                 artifacts, wikis, issues, and pipelines.
+remote:
+remote: ========================================================================
+remote:
+To gitlab.com:DraconDev/football-forever.git
+   9723a12..93719cf  main -> main
+gitlab=93719cfdf41a35fc4cad4ed6b51fd12d75511023
+## main...origin/main [ahead 2]
+?? docs/premium/evidence/baseline-season-v1/run-2026-09-25T07-53-53-2026-09-25T07-53-53/
+?? docs/premium/evidence/baseline-season-v1/run-2026-09-25T08-00-40-2026-09-25T08-00-40/
+?? docs/premium/evidence/baseline-season-v1/run-2026-09-25T08-04-37-2026-09-25T08-04-37/
