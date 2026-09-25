@@ -376,7 +376,16 @@ def head_sha(repo: Path) -> str:
 
 def git_status_bytes(repo: Path) -> bytes:
     result = run_command(
-        ["git", "-C", repo, "status", "--porcelain=v2", "-z", "--untracked-files=all"],
+        [
+            "git",
+            "-C",
+            repo,
+            "status",
+            "--porcelain=v2",
+            "-z",
+            "--untracked-files=all",
+            "--ignore-submodules=none",
+        ],
         timeout=180,
     )
     if not result.ok:
@@ -415,7 +424,7 @@ def parse_status_v2(raw: bytes) -> list[dict[str, Any]]:
             records.append({"kind": "unknown", "record": text})
             continue
         xy = fields[1]
-        mode = fields[2]
+        mode = fields[3]
         path = fields[8]
         item: dict[str, Any] = {
             "kind": "tracked",
@@ -486,30 +495,29 @@ def operation_state(repo: Path) -> str:
 
 
 def nested_required_repositories(parent: Path, excluded_names: set[str]) -> list[Path]:
-    """Discover only child repositories that make the parent dirty."""
-    result = run_command(
-        ["git", "-C", parent, "status", "--porcelain=v1", "-z", "--ignore-submodules=none"],
-        timeout=180,
-    )
-    if not result.ok:
-        return []
+    """Discover only dirty repositories registered as gitlinks by the parent."""
     selected: set[Path] = set()
-    for record in result.stdout.split("\0"):
-        if len(record) < 4:
+    for record in parse_status_v2(git_status_bytes(parent)):
+        if record.get("kind") != "tracked" or record.get("submodule") is not True:
             continue
-        path_text = record[3:]
-        if " -> " in path_text:
-            path_text = path_text.split(" -> ", 1)[1]
-        path = (parent / path_text).resolve()
-        try:
-            path.relative_to(parent)
-        except ValueError:
-            continue
-        if path == parent or not (path / ".git").exists():
-            continue
-        if any(fnmatch.fnmatch(part, pattern) for part in path.parts for pattern in excluded_names):
-            continue
-        selected.add(path)
+        for key in ("path", "orig_path"):
+            path_text = record.get(key)
+            if not isinstance(path_text, str) or not path_text or "\0" in path_text:
+                continue
+            path = (parent / path_text).resolve()
+            try:
+                relative = path.relative_to(parent)
+            except ValueError:
+                continue
+            if path == parent or not (path / ".git").exists():
+                continue
+            if any(
+                fnmatch.fnmatch(part, pattern)
+                for part in relative.parts
+                for pattern in excluded_names
+            ):
+                continue
+            selected.add(path)
     return sorted(selected, key=str)
 
 

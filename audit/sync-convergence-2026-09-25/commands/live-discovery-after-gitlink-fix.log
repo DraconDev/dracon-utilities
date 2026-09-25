@@ -1,0 +1,16 @@
+discovered=14
+standalone /home/dracon/.dracon
+parent /home/dracon/Dev/dracon-platform
+nested-required /home/dracon/Dev/dracon-platform/web/games/released/come-get-me
+nested-required /home/dracon/Dev/dracon-platform/web/games/wip/capture-anime-girls
+nested-required /home/dracon/Dev/dracon-platform/web/games/wip/darklord
+nested-required /home/dracon/Dev/dracon-platform/web/games/wip/deathrun
+nested-required /home/dracon/Dev/dracon-platform/web/games/wip/doomtap
+nested-required /home/dracon/Dev/dracon-platform/web/games/wip/endless-td
+nested-required /home/dracon/Dev/dracon-platform/web/games/wip/freeport
+nested-required /home/dracon/Dev/dracon-platform/web/games/wip/hegemon
+nested-required /home/dracon/Dev/dracon-platform/web/games/wip/hellhunter
+nested-required /home/dracon/Dev/dracon-platform/web/games/wip/junk-runner
+standalone /home/dracon/Dev/dracon-strategy
+standalone /home/dracon/Dev/pi-plugins/pi-goal-list-loop-audit
+excluded_unregistered_detached=/home/dracon/Dev/dracon-platform/web/games/wip/hegemon-audit-final

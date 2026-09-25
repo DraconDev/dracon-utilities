@@ -1,0 +1,1 @@
+FAIL: command failed (1): git -C /home/dracon/Dev/dracon-platform/web/games/wip/hegemon-audit-final symbolic-ref --quiet --short HEAD:

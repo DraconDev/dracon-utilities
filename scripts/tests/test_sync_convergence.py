@@ -124,6 +124,55 @@ class SyncConvergenceTests(unittest.TestCase):
             sc.canonical_remote_url(expected), "example.com/operator/canonical-repository"
         )
 
+    def test_repository_discovery_includes_dirty_registered_gitlink(self) -> None:
+        parent = self.root / "dracon-platform"
+        self.fixture.repo.rename(parent)
+        self.fixture.repo = parent
+        source = self.root / "child-source"
+        source.mkdir()
+        self.fixture.git(source, "init", "-q", "-b", "main")
+        self.fixture.git(source, "config", "user.name", "Fixture")
+        self.fixture.git(source, "config", "user.email", "fixture@example.test")
+        (source / "README.md").write_text("child\n", encoding="utf-8")
+        self.fixture.git(source, "add", "README.md")
+        self.fixture.git(source, "commit", "-qm", "child")
+        relative = "web/games/wip/tracked-game"
+        self.fixture.git(
+            parent,
+            "-c",
+            "protocol.file.allow=always",
+            "submodule",
+            "add",
+            "--quiet",
+            str(source),
+            relative,
+        )
+        self.fixture.git(parent, "commit", "-qm", "add child gitlink")
+        child = parent / relative
+        (child / "dirty.txt").write_text("dirty\n", encoding="utf-8")
+        self.assertEqual(sc.nested_required_repositories(parent, set()), [child.resolve()])
+        records = sc.discover_repositories([parent], self.policy)
+        self.assertIn(str(child.resolve()), [record["path"] for record in records])
+
+    def test_repository_discovery_ignores_unregistered_nested_worktree(self) -> None:
+        parent = self.root / "dracon-platform"
+        self.fixture.repo.rename(parent)
+        self.fixture.repo = parent
+        self.fixture.git(parent, "config", "status.showUntrackedFiles", "all")
+        child = parent / "web/games/wip/audit-final"
+        child.mkdir(parents=True)
+        self.fixture.git(child, "init", "-q", "-b", "main")
+        self.fixture.git(child, "config", "user.name", "Fixture")
+        self.fixture.git(child, "config", "user.email", "fixture@example.test")
+        (child / "README.md").write_text("fixture\n", encoding="utf-8")
+        self.fixture.git(child, "add", "README.md")
+        self.fixture.git(child, "commit", "-qm", "child")
+        head = self.fixture.git(child, "rev-parse", "HEAD")
+        self.fixture.git(child, "checkout", "-q", "--detach", head)
+        records = sc.discover_repositories([parent], self.policy)
+        self.assertEqual([record["path"] for record in records], [str(parent.resolve())])
+        self.assertEqual(sc.nested_required_repositories(parent, set()), [])
+
     def test_detached_head_is_rejected(self) -> None:
         head = sc.head_sha(self.fixture.repo)
         sc.run_command(["git", "-C", self.fixture.repo, "checkout", "-q", "--detach", head])
