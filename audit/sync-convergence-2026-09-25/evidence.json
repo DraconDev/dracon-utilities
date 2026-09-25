@@ -169,6 +169,17 @@
       "recorded_at": "2026-09-25T11:36:08.053370Z",
       "repository": "/home/dracon/.dracon",
       "result": "ok"
+    },
+    {
+      "evidence": [
+        "commands/push-deathrun-head-7cabf9cf.log"
+      ],
+      "head_after": "7cabf9cfabecd187750bbd2ae97dc0558ddea01d",
+      "head_before": "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6",
+      "kind": "push",
+      "recorded_at": "2026-09-25T12:00:09.010833Z",
+      "repository": "/home/dracon/Dev/dracon-platform/web/games/wip/deathrun",
+      "result": "blocked"
     }
   ],
   "contract": {
@@ -1857,5 +1868,5 @@
   "result": "pending",
   "run_id": "sync-convergence-1790333909-3466843",
   "schema_version": 1,
-  "updated_at": "2026-09-25T11:36:08.053388Z"
+  "updated_at": "2026-09-25T12:00:09.010855Z"
 }

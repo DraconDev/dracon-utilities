@@ -1,0 +1,290 @@
+### remote=github before=c1a1fb22530c7e9e32a3c9b396712be433ff5eb6 head=7cabf9cfabecd187750bbd2ae97dc0558ddea01d
+{
+  "ref": "refs/heads/main",
+  "refs": [
+    {
+      "name": "refs/heads/main",
+      "ref": "refs/heads/main",
+      "remoteRef": "refs/heads/main",
+      "objectId": "7cabf9cfabecd187750bbd2ae97dc0558ddea01d",
+      "remoteTip": "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6"
+    }
+  ],
+  "targetRemote": {
+    "name": "github",
+    "url": "git@github.com:DraconDev/web-games-deathrun.git"
+  },
+  "effectiveLimitBytes": 2147483648,
+  "limitingRemote": "github",
+  "limitingProvider": "github",
+  "scenarios": [
+    {
+      "remote": "github",
+      "url": "git@github.com:DraconDev/web-games-deathrun.git",
+      "provider": "github",
+      "limitBytes": 2147483648,
+      "target": true,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "7cabf9cfabecd187750bbd2ae97dc0558ddea01d",
+          "remoteTip": "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6",
+          "trackingTip": "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6"
+      ],
+      "objectCount": 43700,
+      "reachableObjectCount": 43700,
+      "deltaBaseCount": 21595,
+      "uncompressedBytes": 2147144228,
+      "storedBytes": 1564209445,
+      "policyEstimateBytes": 2367517787,
+      "packPolicyEstimateBytes": 2367517787,
+      "packUpperBoundBytes": 2367517787,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 2367517787
+    },
+    {
+      "remote": "gitlab",
+      "url": "git@gitlab.com:DraconDev/web-games-deathrun.git",
+      "provider": "gitlab",
+      "limitBytes": 5239860101,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "7cabf9cfabecd187750bbd2ae97dc0558ddea01d",
+          "remoteTip": "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6",
+          "trackingTip": "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6"
+      ],
+      "objectCount": 43700,
+      "reachableObjectCount": 43700,
+      "deltaBaseCount": 21595,
+      "uncompressedBytes": 2147144228,
+      "storedBytes": 1564209445,
+      "policyEstimateBytes": 2367517787,
+      "packPolicyEstimateBytes": 2367517787,
+      "packUpperBoundBytes": 2367517787,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 2367517787
+    },
+    {
+      "remote": "origin",
+      "url": "git@github.com:DraconDev/web-games-deathrun.git",
+      "provider": "github",
+      "limitBytes": 2147483648,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "7cabf9cfabecd187750bbd2ae97dc0558ddea01d",
+          "remoteTip": "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6",
+          "trackingTip": "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6"
+      ],
+      "objectCount": 43700,
+      "reachableObjectCount": 43700,
+      "deltaBaseCount": 21595,
+      "uncompressedBytes": 2147144228,
+      "storedBytes": 1564209445,
+      "policyEstimateBytes": 2367517787,
+      "packPolicyEstimateBytes": 2367517787,
+      "packUpperBoundBytes": 2367517787,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 2367517787
+    }
+  ],
+  "maxBasisBytes": 2367517787,
+  "stagedBytes": 0,
+  "stagedTree": null,
+  "projectedBytes": 2367517787,
+  "highWaterBytes": 2147483648,
+  "atOrAboveLimit": true,
+  "measurable": true,
+  "ok": false,
+  "code": "BUCKET_STRATEGY_HIGH_WATER",
+  "limitBytes": 2147483648,
+  "remainingBytes": -220034139,
+  "errors": [
+    "projected pushable size 2367517787 is at or above provider limit 2147483648"
+  ],
+  "forwardOnly": {
+    "ok": true,
+    "code": "OK",
+    "checked": {
+      "staged": false,
+      "refs": 1
+    },
+    "violations": [],
+    "errors": []
+  }
+}
+pre-push: bucket high-water/forward-only guard blocked this push
+error: failed to push some refs to 'github.com:DraconDev/web-games-deathrun.git'
+after=c1a1fb22530c7e9e32a3c9b396712be433ff5eb6
+### remote=gitlab before=c1a1fb22530c7e9e32a3c9b396712be433ff5eb6 head=7cabf9cfabecd187750bbd2ae97dc0558ddea01d
+{
+  "ref": "refs/heads/main",
+  "refs": [
+    {
+      "name": "refs/heads/main",
+      "ref": "refs/heads/main",
+      "remoteRef": "refs/heads/main",
+      "objectId": "7cabf9cfabecd187750bbd2ae97dc0558ddea01d",
+      "remoteTip": "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6"
+    }
+  ],
+  "targetRemote": {
+    "name": "gitlab",
+    "url": "git@gitlab.com:DraconDev/web-games-deathrun.git"
+  },
+  "effectiveLimitBytes": 2147483648,
+  "limitingRemote": "github",
+  "limitingProvider": "github",
+  "scenarios": [
+    {
+      "remote": "github",
+      "url": "git@github.com:DraconDev/web-games-deathrun.git",
+      "provider": "github",
+      "limitBytes": 2147483648,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "7cabf9cfabecd187750bbd2ae97dc0558ddea01d",
+          "remoteTip": "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6",
+          "trackingTip": null
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        null
+      ],
+      "objectCount": 43700,
+      "reachableObjectCount": 43700,
+      "deltaBaseCount": 21595,
+      "uncompressedBytes": 2147144228,
+      "storedBytes": 1564209445,
+      "policyEstimateBytes": 2367517787,
+      "packPolicyEstimateBytes": 2367517787,
+      "packUpperBoundBytes": 2367517787,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 2367517787
+    },
+    {
+      "remote": "gitlab",
+      "url": "git@gitlab.com:DraconDev/web-games-deathrun.git",
+      "provider": "gitlab",
+      "limitBytes": 5239860101,
+      "target": true,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "7cabf9cfabecd187750bbd2ae97dc0558ddea01d",
+          "remoteTip": "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6",
+          "trackingTip": "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6"
+      ],
+      "objectCount": 43700,
+      "reachableObjectCount": 43700,
+      "deltaBaseCount": 21595,
+      "uncompressedBytes": 2147144228,
+      "storedBytes": 1564209445,
+      "policyEstimateBytes": 2367517787,
+      "packPolicyEstimateBytes": 2367517787,
+      "packUpperBoundBytes": 2367517787,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 2367517787
+    },
+    {
+      "remote": "origin",
+      "url": "git@github.com:DraconDev/web-games-deathrun.git",
+      "provider": "github",
+      "limitBytes": 2147483648,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "7cabf9cfabecd187750bbd2ae97dc0558ddea01d",
+          "remoteTip": "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6",
+          "trackingTip": "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6"
+      ],
+      "objectCount": 43700,
+      "reachableObjectCount": 43700,
+      "deltaBaseCount": 21595,
+      "uncompressedBytes": 2147144228,
+      "storedBytes": 1564209445,
+      "policyEstimateBytes": 2367517787,
+      "packPolicyEstimateBytes": 2367517787,
+      "packUpperBoundBytes": 2367517787,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 2367517787
+    }
+  ],
+  "maxBasisBytes": 2367517787,
+  "stagedBytes": 0,
+  "stagedTree": null,
+  "projectedBytes": 2367517787,
+  "highWaterBytes": 2147483648,
+  "atOrAboveLimit": true,
+  "measurable": true,
+  "ok": false,
+  "code": "BUCKET_STRATEGY_HIGH_WATER",
+  "limitBytes": 2147483648,
+  "remainingBytes": -220034139,
+  "errors": [
+    "projected pushable size 2367517787 is at or above provider limit 2147483648"
+  ],
+  "forwardOnly": {
+    "ok": true,
+    "code": "OK",
+    "checked": {
+      "staged": false,
+      "refs": 1
+    },
+    "violations": [],
+    "errors": []
+  }
+}
+pre-push: bucket high-water/forward-only guard blocked this push
+error: failed to push some refs to 'gitlab.com:DraconDev/web-games-deathrun.git'
+after=c1a1fb22530c7e9e32a3c9b396712be433ff5eb6
