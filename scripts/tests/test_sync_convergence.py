@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import datetime as dt
 import json
 import os
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -377,6 +379,24 @@ class SyncConvergenceTests(unittest.TestCase):
                 remote="origin",
                 evidence_ref="commands/missing.txt",
             )
+
+    def test_reflog_filter_ignores_old_resets_and_captures_new(self) -> None:
+        original = sc.head_sha(self.fixture.repo)
+        self.fixture.git(self.fixture.repo, "reset", "--hard", "HEAD")
+        past = dt.datetime.fromtimestamp(
+            1, tz=dt.timezone.utc
+        ).isoformat().replace("+00:00", "Z")
+        self.assertTrue(
+            any(
+                action.lower().startswith("reset:")
+                for action in sc._forbidden_reflog_actions(self.fixture.repo, past)
+            )
+        )
+        future = dt.datetime.fromtimestamp(
+            time.time() + 5, tz=dt.timezone.utc
+        ).isoformat().replace("+00:00", "Z")
+        self.assertEqual(sc._forbidden_reflog_actions(self.fixture.repo, future), [])
+        self.assertEqual(sc.head_sha(self.fixture.repo), original)
 
     def test_evidence_shape_validation_rejects_missing_fields(self) -> None:
         errors = sc.validate_evidence_shape({"schema_version": 1})

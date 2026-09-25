@@ -1502,17 +1502,35 @@ def _validate_external_blocker(blocker: dict[str, Any]) -> list[str]:
 
 
 def _forbidden_reflog_actions(repo: Path, since: str) -> list[str]:
+    """Return prohibited reflog actions at or after an evidence timestamp.
+
+    Git's ``--since`` behavior varies across reflog selectors and can include
+    older entries in ``--all`` output. Parse each entry's epoch explicitly so
+    historical resets cannot fail a new convergence run.
+    """
+    try:
+        since_epoch = int(
+            dt.datetime.fromisoformat(since.replace("Z", "+00:00")).timestamp()
+        )
+    except (TypeError, ValueError):
+        since_epoch = 0
     result = run_command(
-        ["git", "-C", repo, "reflog", "--all", f"--since={since}", "--format=%gs"],
+        ["git", "-C", repo, "reflog", "--all", "--format=%ct%x09%gs"],
         timeout=120,
     )
     if not result.ok:
         return []
     actions: list[str] = []
     for line in result.stdout.splitlines():
-        action = line.strip()
-        if action.lower().startswith(PROHIBITED_REFLOG_PREFIXES):
-            actions.append(action)
+        epoch_text, tab, action = line.partition("\t")
+        if not tab:
+            continue
+        try:
+            epoch = int(epoch_text)
+        except ValueError:
+            continue
+        if epoch >= since_epoch and action.strip().lower().startswith(PROHIBITED_REFLOG_PREFIXES):
+            actions.append(action.strip())
     return actions
 
 
