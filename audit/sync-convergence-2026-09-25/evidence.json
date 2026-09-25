@@ -100,6 +100,51 @@
       "recorded_at": "2026-09-25T11:23:18.044072Z",
       "repository": "/home/dracon/Dev/dracon-platform/web/games/wip/deathrun",
       "result": "blocked"
+    },
+    {
+      "evidence": [
+        "commands/push-snapshot-committed-heads.log"
+      ],
+      "head_after": "300d70681ed33cd9d47160b5bba0481348d50f37",
+      "head_before": "a262886eac30d59f9aead395f04e47579eff68e",
+      "kind": "push",
+      "recorded_at": "2026-09-25T11:25:49.715366Z",
+      "repository": "/home/dracon/Dev/dracon-platform/web/games/wip/freeport",
+      "result": "ok"
+    },
+    {
+      "evidence": [
+        "commands/push-snapshot-committed-heads.log"
+      ],
+      "head_after": "83a2fe89b1505a7111a9dfd1801dccd6ad36163e",
+      "head_before": "c42f4f41996309d442c01167800a22f76ae97275",
+      "kind": "push",
+      "recorded_at": "2026-09-25T11:25:50.909221Z",
+      "repository": "/home/dracon/Dev/dracon-strategy",
+      "result": "ok"
+    },
+    {
+      "evidence": [
+        "commands/push-snapshot-committed-heads.log"
+      ],
+      "head_after": "ba413a06778695bd4eb3fc183589228ed59a7f99",
+      "head_before": "20d2ba1aa7730486a536ce4375a2fc9b8d6e1f5a",
+      "kind": "push",
+      "recorded_at": "2026-09-25T11:25:52.082512Z",
+      "repository": "/home/dracon/Dev/pi-plugins/pi-goal-list-loop-audit",
+      "result": "ok"
+    },
+    {
+      "evidence": [
+        "commands/junk-runner-unrelated-history-guard.json",
+        "commands/junk-runner-unrelated-history-summary.json"
+      ],
+      "head_after": "674864967ac32f2eee4f4e7ae734ef0da6b392d2",
+      "head_before": "674864967ac32f2eee4f4e7ae734ef0da6b392d2",
+      "kind": "merge",
+      "recorded_at": "2026-09-25T11:34:37.183078Z",
+      "repository": "/home/dracon/Dev/dracon-platform/web/games/wip/junk-runner",
+      "result": "blocked"
     }
   ],
   "contract": {
@@ -1788,5 +1833,5 @@
   "result": "pending",
   "run_id": "sync-convergence-1790333909-3466843",
   "schema_version": 1,
-  "updated_at": "2026-09-25T11:23:53.837924Z"
+  "updated_at": "2026-09-25T11:34:37.183104Z"
 }

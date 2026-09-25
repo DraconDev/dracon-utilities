@@ -1,4 +1,4 @@
-# Internal high-water blockers
+# Internal convergence blockers
 
 Observed while the daemon remained frozen on 2026-09-25. These are internal policy/structural blockers, not external provider outages.
 
@@ -18,5 +18,7 @@ Evidence:
 - `commands/push-linked-worktree-heads.log`
 - `commands/parent-linked-hook-env-fix.patch`
 - `commands/bucket-hook-regression.log`
+
+Junk-Runner has a separate unrelated-history blocker. Its local `main` (`674864967ac32f2eee4f4e7ae734ef0da6b392d2`) and the SHA advertised by both GitHub and GitLab (`cd302bc8d47b95a56578337dc502123abf5e5109`) have no merge base. A read-only `merge-tree --allow-unrelated-histories` simulation found 40 changed paths and 28 conflicts across product code, tests, reports, and binary screenshots. The normal forward-only asset guard then rejected the prospective lineage with 612 `commit:` violations before size measurement. No merge was started. See `commands/junk-runner-unrelated-history-summary.json` and its raw guard output.
 
 GitLab printed a free-storage-limit notice during some successful pushes, but those pushes succeeded and the advertised refs changed as expected; storage notice text is not classified as an external blocker here.
