@@ -180,6 +180,28 @@
       "recorded_at": "2026-09-25T12:00:09.010833Z",
       "repository": "/home/dracon/Dev/dracon-platform/web/games/wip/deathrun",
       "result": "blocked"
+    },
+    {
+      "evidence": [
+        "commands/post-snapshot-prohibited-history-regressions.log"
+      ],
+      "head_after": "1fa513f8c23c0ea5d7937abbd74b13805e057eea",
+      "head_before": "300d70681ed33cd9d47160b5bba0481348d50f37",
+      "kind": "config",
+      "recorded_at": "2026-09-25T14:37:04.990231Z",
+      "repository": "/home/dracon/Dev/dracon-platform/web/games/wip/freeport",
+      "result": "blocked"
+    },
+    {
+      "evidence": [
+        "commands/post-snapshot-prohibited-history-regressions.log"
+      ],
+      "head_after": "bf06016e5d24d35eee34b1ec178b29521475d8a4",
+      "head_before": "674864967ac32f2eee4f4e7ae734ef0da6b392d2",
+      "kind": "config",
+      "recorded_at": "2026-09-25T14:37:05.213999Z",
+      "repository": "/home/dracon/Dev/dracon-platform/web/games/wip/junk-runner",
+      "result": "blocked"
     }
   ],
   "contract": {
@@ -1868,5 +1890,5 @@
   "result": "pending",
   "run_id": "sync-convergence-1790333909-3466843",
   "schema_version": 1,
-  "updated_at": "2026-09-25T12:00:09.010855Z"
+  "updated_at": "2026-09-25T14:37:05.214020Z"
 }

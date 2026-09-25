@@ -19,7 +19,10 @@ Evidence:
 - `commands/push-deathrun-head-7cabf9cf.log`
 - `commands/parent-linked-hook-env-fix.patch`
 - `commands/bucket-hook-regression.log`
+- `commands/post-snapshot-prohibited-history-regressions.log`
 
-Junk-Runner has a separate unrelated-history blocker. Its local `main` (`674864967ac32f2eee4f4e7ae734ef0da6b392d2`) and the SHA advertised by both GitHub and GitLab (`cd302bc8d47b95a56578337dc502123abf5e5109`) have no merge base. A read-only `merge-tree --allow-unrelated-histories` simulation found 40 changed paths and 28 conflicts across product code, tests, reports, and binary screenshots. The normal forward-only asset guard then rejected the prospective lineage with 612 `commit:` violations before size measurement. No merge was started. See `commands/junk-runner-unrelated-history-summary.json` and its raw guard output.
+Junk-Runner has two separate integrity blockers. First, its sealed snapshot lineage and the SHA originally advertised by both GitHub and GitLab had no merge base. A read-only `merge-tree --allow-unrelated-histories` simulation found 40 changed paths and 28 conflicts across product code, tests, reports, and binary screenshots. The normal forward-only asset guard then rejected the prospective lineage with 612 `commit:` violations before size measurement. No merge was started. Second, after later independent activity, the sealed snapshot object `674864967ac32f2eee4f4e7ae734ef0da6b392d2` is no longer present in the local object database, so the required forward-ancestry proof from the accepted snapshot can no longer be established even though current local/remotes are equal at a later head. See `commands/junk-runner-unrelated-history-summary.json`, its raw guard output, and `commands/post-snapshot-prohibited-history-regressions.log`.
+
+Freeport has a separate post-snapshot integrity blocker: its reflog records `reset: moving to HEAD` at `2026-09-25 14:58:42 +0100`, after the immutable snapshot was accepted. The task contract forbids reset operations. The current branch is clean, but that prohibited action cannot be erased by a forward-only operation.
 
 GitLab printed a free-storage-limit notice during some successful pushes, but those pushes succeeded and the advertised refs changed as expected; storage notice text is not classified as an external blocker here.
