@@ -17,13 +17,10 @@ from sync_convergence import (
     DEFAULT_POLICY,
     ConvergenceError,
     atomic_write_json,
-    capture_remote_state,
-    capture_repository,
-    discover_repositories,
+    capture_evidence_with_retries,
     initialize_evidence,
     iso_now,
     load_toml,
-    wait_for_quiescence,
 )
 
 
@@ -48,6 +45,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--interval-seconds", type=float, default=10.0)
     parser.add_argument("--max-wait-seconds", type=int, default=1800)
     parser.add_argument("--remote-attempts", type=int, default=3)
+    parser.add_argument("--transaction-attempts", type=int, default=5)
     return parser.parse_args()
 
 
@@ -59,33 +57,17 @@ def main() -> int:
                 f"freeze marker is absent; run `dracon-sync pause` before capture: {args.freeze_marker}"
             )
         policy = load_toml(args.policy)
-        discovered = discover_repositories(args.repo, policy)
-        if not discovered:
-            raise ConvergenceError("no repositories selected")
-        quiescence = wait_for_quiescence(
-            discovered,
+        captured, quiescence = capture_evidence_with_retries(
+            args.repo,
             policy,
-            selected_roots=args.repo,
             freeze_marker=args.freeze_marker,
             stable_samples=args.stable_samples,
             interval_seconds=args.interval_seconds,
             max_wait_seconds=args.max_wait_seconds,
+            remote_attempts=args.remote_attempts,
+            transaction_attempts=args.transaction_attempts,
             progress=lambda message: print(message, file=sys.stderr, flush=True),
         )
-        captured: list[dict] = []
-        for record in quiescence["repositories"]:
-            repo = Path(record["path"])
-            snapshot = capture_repository(repo, policy)
-            expected = quiescence["fast_tokens"][str(repo)]
-            if snapshot["snapshot"]["fast_token"] != expected:
-                raise ConvergenceError(
-                    f"repository changed while evidence was being captured: {repo}"
-                )
-            snapshot["role"] = record["role"]
-            snapshot["remotes"] = capture_remote_state(
-                snapshot, policy, attempts=args.remote_attempts
-            )
-            captured.append(snapshot)
         evidence = initialize_evidence(
             captured,
             args.policy,

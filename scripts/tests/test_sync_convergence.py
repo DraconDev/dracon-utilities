@@ -9,6 +9,7 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -289,6 +290,72 @@ class SyncConvergenceTests(unittest.TestCase):
             [record["path"] for record in result["repositories"]],
             [str(self.fixture.repo)],
         )
+
+    def test_capture_transaction_rejects_change_before_detailed_capture(self) -> None:
+        freeze = self.root / "freeze"
+        freeze.write_text("paused\n", encoding="utf-8")
+        records = sc.discover_repositories([self.fixture.repo], self.policy)
+        quiescence = sc.wait_for_quiescence(
+            records,
+            self.policy,
+            selected_roots=[self.fixture.repo],
+            freeze_marker=freeze,
+            stable_samples=2,
+            interval_seconds=0.01,
+            max_wait_seconds=5,
+        )
+        self.fixture.write("race.txt", "changed after quiescence\n")
+        with self.assertRaises(sc.SnapshotRaceError):
+            sc.capture_evidence_transaction(quiescence, self.policy)
+
+    def test_capture_transaction_rejects_change_during_remote_capture(self) -> None:
+        freeze = self.root / "freeze"
+        freeze.write_text("paused\n", encoding="utf-8")
+        records = sc.discover_repositories([self.fixture.repo], self.policy)
+        quiescence = sc.wait_for_quiescence(
+            records,
+            self.policy,
+            selected_roots=[self.fixture.repo],
+            freeze_marker=freeze,
+            stable_samples=2,
+            interval_seconds=0.01,
+            max_wait_seconds=5,
+        )
+        original = sc.capture_remote_state
+
+        def capture_then_change(snapshot, policy, *, attempts=3):
+            remotes = original(snapshot, policy, attempts=attempts)
+            self.fixture.write("remote-race.txt", "changed during remote capture\n")
+            return remotes
+
+        with mock.patch.object(sc, "capture_remote_state", side_effect=capture_then_change):
+            with self.assertRaises(sc.SnapshotRaceError):
+                sc.capture_evidence_transaction(quiescence, self.policy)
+
+    def test_capture_transaction_retries_are_bounded(self) -> None:
+        freeze = self.root / "freeze"
+        freeze.write_text("paused\n", encoding="utf-8")
+        quiescence = {"repositories": [], "fast_tokens": {}, "boundaries": {}}
+        race = sc.SnapshotRaceError("fixture race")
+        with mock.patch.object(sc, "wait_for_quiescence", return_value=quiescence) as waiter:
+            with mock.patch.object(
+                sc,
+                "capture_evidence_transaction",
+                side_effect=race,
+            ) as transaction:
+                with self.assertRaises(sc.ConvergenceError) as raised:
+                    sc.capture_evidence_with_retries(
+                        [self.fixture.repo],
+                        self.policy,
+                        freeze_marker=freeze,
+                        stable_samples=2,
+                        interval_seconds=0.01,
+                        max_wait_seconds=5,
+                        transaction_attempts=2,
+                    )
+        self.assertEqual(waiter.call_count, 2)
+        self.assertEqual(transaction.call_count, 2)
+        self.assertIn("did not complete after 2 attempts", str(raised.exception))
 
     def test_remote_snapshot_records_ancestor_relation(self) -> None:
         record = sc.capture_repository(self.fixture.repo, self.policy)

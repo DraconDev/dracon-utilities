@@ -7,5 +7,6 @@ f5db3c65977d74968d0a27e4b2cdea860290e217ab82c8b1fb05fed774071ff3  audit/sync-con
 9d04f4ac78807ce02a21d783a0c4ba03148bdcb9ae0758c1647bf45e37804b23  audit/sync-convergence-2026-09-25/commands/python-convergence-tests.log
 7a906011f7db2f887e3cb30817bc64ca9b361ce13ebd0ccd6be4e75e938fd5e8  audit/sync-convergence-2026-09-25/commands/quiescence-attempt-binary-baseline.log
 f70b5f8007eaf1414d53151217cab2183384ff688d3380cfe0420055cca15194  audit/sync-convergence-2026-09-25/commands/quiescence-attempt-boundary-perf.log
+2cfb540f8b03f443e2c596f0c0b6166df873afd82cb33678e22793065af20adb  audit/sync-convergence-2026-09-25/commands/quiescence-attempt-capture-race.log
 e166c0a0e151d3abfbc552dec8daa9171be8c441e712cc77aebaf2680cc3a056  audit/sync-convergence-2026-09-25/commands/quiescence-attempt-detached-nested.log
 e651749f501fec13ef9f04051ce9c50be927fcc7264fdcc74fc9c1c6b7aee975  audit/sync-convergence-2026-09-25/commands/quiescence-attempt-detached-parent-scan.log

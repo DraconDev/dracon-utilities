@@ -16,7 +16,7 @@ Permitted final exceptions are limited to provider outage, authentication/permis
 ## Regeneration
 
 1. Keep `dracon-sync pause` active.
-2. Run `scripts/capture-sync-convergence.py` with every selected `--repo` and `--evidence audit/sync-convergence-2026-09-25/evidence.json`.
+2. Run `scripts/capture-sync-convergence.py` with every selected `--repo` and `--evidence audit/sync-convergence-2026-09-25/evidence.json`. A selected-repository change during detailed hashing or remote queries retries the entire bounded transaction; partial evidence is never written.
 3. Review and adopt the snapshotted work using normal commits and fast-forward-only Git operations.
 4. Record each action and quality gate with `scripts/manage-sync-convergence.py`; every reference must be a real file beneath this audit directory. Use `record-blocker` only after the verifier independently classifies three fresh remote attempts as an allowed provider/auth failure.
 5. Record the `pre-resume` phase, then run `dracon-sync resume` and record that action.

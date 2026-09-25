@@ -96,6 +96,10 @@ class ConvergenceError(RuntimeError):
     """A convergence invariant failed."""
 
 
+class SnapshotRaceError(ConvergenceError):
+    """A selected repository changed while immutable evidence was captured."""
+
+
 @dataclasses.dataclass(frozen=True)
 class CommandResult:
     argv: tuple[str, ...]
@@ -1110,6 +1114,115 @@ def wait_for_quiescence(
 
     raise ConvergenceError(
         f"selected repositories did not quiesce within {max_wait_seconds}s"
+    )
+
+
+def capture_evidence_transaction(
+    quiescence: dict[str, Any],
+    policy: dict[str, Any],
+    *,
+    remote_attempts: int = 3,
+) -> list[dict[str, Any]]:
+    """Capture one internally consistent snapshot or reject the whole transaction."""
+    captured: list[dict[str, Any]] = []
+    expected_tokens = {
+        str(path): token for path, token in quiescence.get("fast_tokens", {}).items()
+    }
+    boundaries = quiescence.get("boundaries", {})
+    for record in quiescence.get("repositories", []):
+        repo = Path(record["path"])
+        snapshot = capture_repository(repo, policy)
+        key = str(repo)
+        expected_boundary = boundaries.get(key, {})
+        if (
+            snapshot["snapshot"]["fast_token"] != expected_tokens.get(key)
+            or snapshot["snapshot"]["content_digest"] != expected_boundary.get("digest")
+            or snapshot["head"] != expected_boundary.get("head")
+        ):
+            raise SnapshotRaceError(f"repository changed while evidence was being captured: {repo}")
+        snapshot["role"] = record["role"]
+        snapshot["remotes"] = capture_remote_state(
+            snapshot, policy, attempts=remote_attempts
+        )
+        captured.append(snapshot)
+
+    final_tokens = {
+        record["path"]: fast_token(Path(record["path"]), policy)
+        for record in quiescence.get("repositories", [])
+    }
+    if final_tokens != expected_tokens:
+        changed = sorted(
+            path
+            for path in set(expected_tokens) | set(final_tokens)
+            if expected_tokens.get(path) != final_tokens.get(path)
+        )
+        raise SnapshotRaceError(
+            "repositories changed before evidence transaction completed: " + ", ".join(changed)
+        )
+    return captured
+
+
+def capture_evidence_with_retries(
+    selected_roots: Sequence[Path],
+    policy: dict[str, Any],
+    *,
+    freeze_marker: Path = DEFAULT_FREEZE,
+    stable_samples: int = 3,
+    interval_seconds: float = 10.0,
+    max_wait_seconds: int = 1800,
+    remote_attempts: int = 3,
+    transaction_attempts: int = 5,
+    progress=None,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Wait for and capture one immutable transaction within one overall deadline."""
+    if transaction_attempts < 1:
+        raise ConvergenceError("transaction_attempts must be positive")
+    deadline = time.monotonic() + max_wait_seconds
+    last_race: SnapshotRaceError | None = None
+    for attempt in range(1, transaction_attempts + 1):
+        if not freeze_marker.exists():
+            raise ConvergenceError(
+                f"freeze marker is absent; run `dracon-sync pause` before capture: {freeze_marker}"
+            )
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        discovered = discover_repositories(selected_roots, policy)
+        if not discovered:
+            raise ConvergenceError("no repositories selected")
+
+        def emit(message: str) -> None:
+            if progress:
+                progress(f"transaction {attempt}/{transaction_attempts}: {message}")
+
+        quiescence = wait_for_quiescence(
+            discovered,
+            policy,
+            selected_roots=selected_roots,
+            freeze_marker=freeze_marker,
+            stable_samples=stable_samples,
+            interval_seconds=interval_seconds,
+            max_wait_seconds=remaining,
+            progress=lambda message: emit(message),
+        )
+        try:
+            captured = capture_evidence_transaction(
+                quiescence,
+                policy,
+                remote_attempts=remote_attempts,
+            )
+        except SnapshotRaceError as exc:
+            last_race = exc
+            emit(f"retrying after capture race: {exc}")
+            continue
+        return captured, quiescence
+    if last_race is not None:
+        raise ConvergenceError(
+            f"immutable evidence transaction did not complete after {transaction_attempts} attempts: "
+            f"{last_race}"
+        )
+    raise ConvergenceError(
+        f"selected repositories did not quiesce and capture within {max_wait_seconds}s"
     )
 
 
