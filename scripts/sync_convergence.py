@@ -1252,6 +1252,38 @@ def refresh_evidence(
     return updated
 
 
+def record_phase(
+    evidence: dict[str, Any],
+    *,
+    name: str,
+    evidence_refs: Sequence[str],
+    notes: str,
+) -> dict[str, Any]:
+    if name not in {"pre-resume", "post-resume"}:
+        raise ConvergenceError(f"unsupported evidence phase: {name}")
+    refs = sorted({redact(str(ref)) for ref in evidence_refs if str(ref).strip()})
+    if not refs:
+        raise ConvergenceError("phase requires at least one evidence reference")
+    if not notes.strip():
+        raise ConvergenceError("phase requires notes")
+    if any(phase.get("name") == name for phase in evidence.get("phases", [])):
+        raise ConvergenceError(f"phase already recorded: {name}")
+    now = iso_now()
+    updated = dict(evidence)
+    updated["phases"] = [
+        *evidence.get("phases", []),
+        {
+            "name": name,
+            "started_at": now,
+            "ended_at": now,
+            "notes": redact(notes.strip()),
+            "evidence": refs,
+        },
+    ]
+    updated["updated_at"] = now
+    return updated
+
+
 def record_action(
     evidence: dict[str, Any],
     *,
@@ -1345,17 +1377,22 @@ def record_gate(
     command: str,
     status: str,
     notes: str,
+    evidence_refs: Sequence[str],
 ) -> dict[str, Any]:
     if status not in {"pass", "fail", "blocked"}:
         raise ConvergenceError(f"unsupported gate status: {status}")
     if not command.strip() or not notes.strip():
         raise ConvergenceError("gate requires command and notes")
+    refs = sorted({redact(str(ref)) for ref in evidence_refs if str(ref).strip()})
+    if not refs:
+        raise ConvergenceError("gate requires at least one evidence reference")
     updated = dict(evidence)
     gates = dict(evidence.get("gates", {}))
     gates[name] = {
         "command": command.strip(),
         "status": status,
         "notes": redact(notes.strip()),
+        "evidence": refs,
         "recorded_at": iso_now(),
     }
     updated["gates"] = gates
@@ -1469,6 +1506,29 @@ def assert_evidence_safe(evidence: dict[str, Any]) -> None:
         raise ConvergenceError("evidence contains URL userinfo")
 
 
+def validate_evidence_references(evidence: dict[str, Any], evidence_path: Path) -> list[str]:
+    errors: list[str] = []
+    refs: list[str] = []
+    for phase in evidence.get("phases", []):
+        if phase.get("name") != "quiescent-snapshot":
+            refs.extend(str(ref) for ref in phase.get("evidence", []))
+    for action in evidence.get("actions", []):
+        refs.extend(str(ref) for ref in action.get("evidence", []))
+    for gate in evidence.get("gates", {}).values():
+        refs.extend(str(ref) for ref in gate.get("evidence", []))
+    for blocker in evidence.get("external_blockers", []):
+        refs.extend(str(ref) for ref in blocker.get("evidence", []))
+    root = evidence_path.parent.resolve()
+    for ref in sorted(set(refs)):
+        candidate = Path(ref)
+        if candidate.is_absolute() or ".." in candidate.parts:
+            errors.append(f"evidence reference escapes audit directory: {ref}")
+            continue
+        if not (root / candidate).is_file():
+            errors.append(f"evidence reference does not exist: {ref}")
+    return errors
+
+
 def _is_ancestor(repo: Path, ancestor: str, descendant: str) -> bool:
     return run_command(
         ["git", "-C", repo, "merge-base", "--is-ancestor", ancestor, descendant],
@@ -1548,6 +1608,9 @@ def verify_evidence(
     except (OSError, json.JSONDecodeError) as exc:
         raise ConvergenceError(f"cannot read evidence {evidence_path}: {exc}") from exc
     assert_evidence_safe(evidence)
+    reference_errors = validate_evidence_references(evidence, evidence_path)
+    if reference_errors:
+        raise ConvergenceError("evidence reference errors: " + "; ".join(reference_errors[:10]))
     shape_errors = validate_evidence_shape(evidence)
     if shape_errors:
         raise ConvergenceError("evidence schema violations: " + "; ".join(shape_errors[:10]))

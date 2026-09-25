@@ -316,6 +316,11 @@ class SyncConvergenceTests(unittest.TestCase):
         evidence = sc.initialize_evidence(
             [record], policy_path, freeze, quiescence
         )
+        evidence_dir = self.root / "audit"
+        evidence_dir.mkdir()
+        (evidence_dir / "commands").mkdir()
+        for name in ("push.txt", "gate.txt", "pre.txt", "post.txt", "resume.txt"):
+            (evidence_dir / "commands" / name).write_text("fixture evidence\n", encoding="utf-8")
         evidence = sc.record_action(
             evidence,
             repository=str(self.fixture.repo),
@@ -331,6 +336,13 @@ class SyncConvergenceTests(unittest.TestCase):
             command="python3 -m unittest",
             status="pass",
             notes="all fixture tests pass",
+            evidence_refs=["commands/gate.txt"],
+        )
+        evidence = sc.record_phase(
+            evidence,
+            name="pre-resume",
+            evidence_refs=["commands/pre.txt"],
+            notes="pre-resume fixture complete",
         )
         self.assertEqual(evidence["actions"][0]["kind"], "push")
         self.assertEqual(evidence["gates"]["fixture"]["status"], "pass")
@@ -433,13 +445,13 @@ class SyncConvergenceTests(unittest.TestCase):
         evidence = sc.initialize_evidence(
             [record], policy_path, freeze, quiescence
         )
-        evidence["result"] = "pass"
-        evidence["phases"].extend(
-            [
-                {"name": "pre-resume", "started_at": sc.iso_now(), "ended_at": sc.iso_now()},
-                {"name": "post-resume", "started_at": sc.iso_now(), "ended_at": sc.iso_now()},
-            ]
-        )
+        evidence_dir = self.root / "audit"
+        (evidence_dir / "commands").mkdir(parents=True)
+        refs: dict[str, str] = {}
+        for name in [*sc.REQUIRED_FINAL_GATES, "pre-resume", "post-resume", "resume"]:
+            ref = f"commands/{name}.txt"
+            refs[name] = ref
+            (evidence_dir / ref).write_text("fixture evidence\n", encoding="utf-8")
         for name in sc.REQUIRED_FINAL_GATES:
             evidence = sc.record_gate(
                 evidence,
@@ -447,15 +459,29 @@ class SyncConvergenceTests(unittest.TestCase):
                 command="fixture",
                 status="pass",
                 notes="fixture pass",
+                evidence_refs=[refs[name]],
             )
+        evidence = sc.record_phase(
+            evidence,
+            name="pre-resume",
+            evidence_refs=[refs["pre-resume"]],
+            notes="fixture pre-resume complete",
+        )
         evidence = sc.record_action(
             evidence,
             repository="fleet",
             kind="resume",
             result="ok",
-            evidence_refs=["commands/resume.txt"],
+            evidence_refs=[refs["resume"]],
         )
-        evidence_path = self.root / "evidence.json"
+        evidence = sc.record_phase(
+            evidence,
+            name="post-resume",
+            evidence_refs=[refs["post-resume"]],
+            notes="fixture post-resume complete",
+        )
+        evidence["result"] = "pass"
+        evidence_path = evidence_dir / "evidence.json"
         sc.atomic_write_json(evidence_path, evidence)
         freeze.unlink()
         result = sc.verify_evidence(

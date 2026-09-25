@@ -17,6 +17,7 @@ from sync_convergence import (
     record_action,
     record_external_blocker,
     record_gate,
+    record_phase,
     refresh_evidence,
     load_toml,
 )
@@ -29,6 +30,16 @@ def read_evidence(path: Path) -> dict:
         raise ConvergenceError(f"cannot read evidence {path}: {exc}") from exc
 
 
+def validate_ref_files(evidence_path: Path, refs: list[str]) -> None:
+    root = evidence_path.parent.resolve()
+    for ref in refs:
+        candidate = Path(ref)
+        if candidate.is_absolute() or ".." in candidate.parts:
+            raise ConvergenceError(f"evidence reference escapes audit directory: {ref}")
+        if not (root / candidate).is_file():
+            raise ConvergenceError(f"evidence reference does not exist: {ref}")
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--evidence", required=True, type=Path)
@@ -39,6 +50,11 @@ def parse_args() -> argparse.Namespace:
 
     refresh = sub.add_parser("refresh", help="Refresh live heads, state, and remotes.")
     refresh.add_argument("--require-clean", action="store_true")
+
+    phase = sub.add_parser("record-phase", help="Record pre-resume or post-resume evidence.")
+    phase.add_argument("--name", required=True, choices=["pre-resume", "post-resume"])
+    phase.add_argument("--evidence-ref", action="append", required=True)
+    phase.add_argument("--notes", required=True)
 
     action = sub.add_parser("record-action", help="Record a reviewed mutation.")
     action.add_argument("--repository", required=True)
@@ -60,6 +76,7 @@ def parse_args() -> argparse.Namespace:
     gate.add_argument("--command", dest="gate_command", required=True)
     gate.add_argument("--status", required=True)
     gate.add_argument("--notes", required=True)
+    gate.add_argument("--evidence-ref", action="append", required=True)
 
     sub.add_parser("finalize", help="Refresh and mark evidence pass only if final verification succeeds.")
     return parser.parse_args()
@@ -99,7 +116,16 @@ def main() -> int:
             evidence = refresh_evidence(evidence, policy, remote_attempts=args.remote_attempts)
             if args.require_clean:
                 require_clean(evidence)
+        elif args.command == "record-phase":
+            validate_ref_files(args.evidence, args.evidence_ref)
+            evidence = record_phase(
+                evidence,
+                name=args.name,
+                evidence_refs=args.evidence_ref,
+                notes=args.notes,
+            )
         elif args.command == "record-action":
+            validate_ref_files(args.evidence, args.evidence_ref)
             evidence = record_action(
                 evidence,
                 repository=args.repository,
@@ -110,6 +136,7 @@ def main() -> int:
                 head_after=args.head_after,
             )
         elif args.command == "record-blocker":
+            validate_ref_files(args.evidence, [args.evidence_ref])
             evidence = record_external_blocker(
                 evidence,
                 policy,
@@ -119,12 +146,14 @@ def main() -> int:
                 attempts=args.remote_attempts,
             )
         elif args.command == "record-gate":
+            validate_ref_files(args.evidence, args.evidence_ref)
             evidence = record_gate(
                 evidence,
                 name=args.name,
                 command=args.gate_command,
                 status=args.status,
                 notes=args.notes,
+                evidence_refs=args.evidence_ref,
             )
         evidence["updated_at"] = iso_now()
         atomic_write_json(args.evidence, evidence)
