@@ -18,8 +18,8 @@ Permitted final exceptions are limited to provider outage, authentication/permis
 1. Keep `dracon-sync pause` active.
 2. Run `scripts/capture-sync-convergence.py` with every selected `--repo` and `--evidence audit/sync-convergence-2026-09-25/evidence.json`.
 3. Review and adopt the snapshotted work using normal commits and fast-forward-only Git operations.
-4. Record each action and quality gate with `scripts/manage-sync-convergence.py`; use its `record-blocker` subcommand only after the verifier independently classifies three fresh remote attempts as an allowed provider/auth failure.
-5. After pre-resume validation, run `dracon-sync resume` and record that action.
-6. Run `scripts/manage-sync-convergence.py ... finalize`, then the independent contract command `python3 scripts/verify-sync-convergence.py --evidence audit/sync-convergence-2026-09-25/evidence.json`.
+4. Record each action and quality gate with `scripts/manage-sync-convergence.py`; every reference must be a real file beneath this audit directory. Use `record-blocker` only after the verifier independently classifies three fresh remote attempts as an allowed provider/auth failure.
+5. Record the `pre-resume` phase, then run `dracon-sync resume` and record that action.
+6. After at least two settling windows, record the `post-resume` phase and run `scripts/manage-sync-convergence.py ... finalize`, then the independent contract command `python3 scripts/verify-sync-convergence.py --evidence audit/sync-convergence-2026-09-25/evidence.json`.
 
 The verifier independently re-reads every selected repository, checks the daemon JSON reports, queries every effective remote, verifies parent/child gitlinks, and rejects prohibited reflog actions or non-forward ancestry.

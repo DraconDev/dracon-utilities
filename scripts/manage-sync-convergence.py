@@ -46,6 +46,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--policy", type=Path, default=DEFAULT_POLICY)
     parser.add_argument("--freeze-marker", type=Path, default=DEFAULT_FREEZE)
     parser.add_argument("--remote-attempts", type=int, default=3)
+    parser.add_argument(
+        "--offline-evidence-only",
+        action="store_true",
+        help="Use only for deterministic temporary-repository rehearsals; final fleet runs must omit this.",
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     refresh = sub.add_parser("refresh", help="Refresh live heads, state, and remotes.")
@@ -105,6 +110,7 @@ def main() -> int:
                 args.policy,
                 args.freeze_marker,
                 remote_attempts=args.remote_attempts,
+                check_live_remotes=not args.offline_evidence_only,
             )
             atomic_write_json(args.evidence, evidence)
             print(json.dumps(verification, indent=2, sort_keys=True))

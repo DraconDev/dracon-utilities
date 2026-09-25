@@ -442,6 +442,78 @@ class SyncConvergenceTests(unittest.TestCase):
         shaped_errors = sc.validate_evidence_shape(shaped)
         self.assertTrue(any("requires evidence references" in error for error in shaped_errors))
 
+    def test_finalize_requires_live_checks_by_default(self) -> None:
+        policy = self.fixture.policy()
+        freeze = self.root / "freeze"
+        freeze.write_text("paused\n", encoding="utf-8")
+        record = sc.capture_repository(self.fixture.repo, policy)
+        record["role"] = "standalone"
+        record["remotes"] = sc.capture_remote_state(record, policy)
+        policy_path = self.root / "policy.toml"
+        policy_path.write_text(
+            f'remotes = [{{name = "origin", push_url = "{self.fixture.remote}"}}]\n',
+            encoding="utf-8",
+        )
+        quiescence = {
+            "stable_samples": 3,
+            "observations": 3,
+            "interval_seconds": 1,
+            "span_seconds": 2,
+            "fast_tokens": {str(self.fixture.repo): record["snapshot"]["fast_token"]},
+            "boundaries": {
+                str(self.fixture.repo): {**record["snapshot"], "head": record["head"]}
+            },
+            "completed_at": sc.iso_now(),
+        }
+        evidence = sc.initialize_evidence([record], policy_path, freeze, quiescence)
+        evidence_dir = self.root / "audit"
+        (evidence_dir / "commands").mkdir(parents=True)
+        names = [*sc.REQUIRED_FINAL_GATES, "pre-resume", "post-resume", "resume"]
+        refs = {}
+        for name in names:
+            ref = f"commands/{name}.txt"
+            refs[name] = ref
+            (evidence_dir / ref).write_text("fixture\n", encoding="utf-8")
+        for name in sc.REQUIRED_FINAL_GATES:
+            evidence = sc.record_gate(
+                evidence,
+                name=name,
+                command="fixture",
+                status="pass",
+                notes="pass",
+                evidence_refs=[refs[name]],
+            )
+        evidence = sc.record_phase(
+            evidence,
+            name="pre-resume",
+            evidence_refs=[refs["pre-resume"]],
+            notes="pass",
+        )
+        evidence = sc.record_action(
+            evidence,
+            repository="fleet",
+            kind="resume",
+            result="ok",
+            evidence_refs=[refs["resume"]],
+        )
+        evidence = sc.record_phase(
+            evidence,
+            name="post-resume",
+            evidence_refs=[refs["post-resume"]],
+            notes="pass",
+        )
+        evidence_path = evidence_dir / "evidence.json"
+        sc.atomic_write_json(evidence_path, evidence)
+        freeze.unlink()
+        _, blocked = sc.finalize_evidence(
+            evidence_path,
+            policy_path,
+            freeze,
+            check_live_remotes=True,
+        )
+        self.assertFalse(blocked["ok"])
+        self.assertTrue(any("daemon" in error.lower() for error in blocked["errors"]))
+
     def test_evidence_references_must_exist_inside_audit_directory(self) -> None:
         evidence = {
             "phases": [

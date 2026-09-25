@@ -1406,6 +1406,7 @@ def finalize_evidence(
     freeze_marker: Path,
     *,
     remote_attempts: int = 3,
+    check_live_remotes: bool = True,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
     policy = load_toml(policy_path)
@@ -1420,7 +1421,7 @@ def finalize_evidence(
             policy_path,
             freeze_marker=freeze_marker,
             remote_attempts=remote_attempts,
-            check_live_remotes=True,
+            check_live_remotes=check_live_remotes,
         )
     finally:
         candidate_path.unlink(missing_ok=True)
