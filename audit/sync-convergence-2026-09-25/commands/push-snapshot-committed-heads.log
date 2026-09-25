@@ -1,0 +1,1019 @@
+PUSH github /home/dracon/Dev/dracon-platform a3420c4f5bb9..ea59ab429139
+{
+  "ref": "refs/heads/main",
+  "refs": [
+    {
+      "name": "refs/heads/main",
+      "ref": "refs/heads/main",
+      "remoteRef": "refs/heads/main",
+      "objectId": "ea59ab42913964953fce2e9f3a5c995e5bf8a39b",
+      "remoteTip": "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51"
+    }
+  ],
+  "targetRemote": {
+    "name": "github",
+    "url": "git@github.com:DraconDev/dracon-platform.git"
+  },
+  "effectiveLimitBytes": 2147483648,
+  "limitingRemote": "github",
+  "limitingProvider": "github",
+  "scenarios": [
+    {
+      "remote": "github",
+      "url": "git@github.com:DraconDev/dracon-platform.git",
+      "provider": "github",
+      "limitBytes": 2147483648,
+      "target": true,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "ea59ab42913964953fce2e9f3a5c995e5bf8a39b",
+          "remoteTip": "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51",
+          "trackingTip": "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51"
+      ],
+      "objectCount": 266036,
+      "reachableObjectCount": 266027,
+      "deltaBaseCount": 172369,
+      "uncompressedBytes": 25963659222,
+      "storedBytes": 4469518996,
+      "policyEstimateBytes": 28594143289,
+      "packPolicyEstimateBytes": 28594143289,
+      "packUpperBoundBytes": 28594143289,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 28594143289
+    },
+    {
+      "remote": "gitlab",
+      "url": "git@gitlab.com:DraconDev/dracon-platform.git",
+      "provider": "gitlab",
+      "limitBytes": 5239860101,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "ea59ab42913964953fce2e9f3a5c995e5bf8a39b",
+          "remoteTip": "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51",
+          "trackingTip": "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51"
+      ],
+      "objectCount": 266036,
+      "reachableObjectCount": 266027,
+      "deltaBaseCount": 172369,
+      "uncompressedBytes": 25963659222,
+      "storedBytes": 4469518996,
+      "policyEstimateBytes": 28594143289,
+      "packPolicyEstimateBytes": 28594143289,
+      "packUpperBoundBytes": 28594143289,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 28594143289
+    },
+    {
+      "remote": "origin",
+      "url": "git@github.com:DraconDev/dracon-platform.git",
+      "provider": "github",
+      "limitBytes": 2147483648,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "ea59ab42913964953fce2e9f3a5c995e5bf8a39b",
+          "remoteTip": "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51",
+          "trackingTip": "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51"
+      ],
+      "objectCount": 266036,
+      "reachableObjectCount": 266027,
+      "deltaBaseCount": 172369,
+      "uncompressedBytes": 25963659222,
+      "storedBytes": 4469518996,
+      "policyEstimateBytes": 28594143289,
+      "packPolicyEstimateBytes": 28594143289,
+      "packUpperBoundBytes": 28594143289,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 28594143289
+    }
+  ],
+  "maxBasisBytes": 28594143289,
+  "stagedBytes": 0,
+  "stagedTree": null,
+  "projectedBytes": 28594143289,
+  "highWaterBytes": 2147483648,
+  "atOrAboveLimit": true,
+  "measurable": true,
+  "ok": false,
+  "code": "BUCKET_STRATEGY_HIGH_WATER",
+  "limitBytes": 2147483648,
+  "remainingBytes": -26446659641,
+  "errors": [
+    "projected pushable size 28594143289 is at or above provider limit 2147483648"
+  ],
+  "forwardOnly": {
+    "ok": true,
+    "code": "OK",
+    "checked": {
+      "staged": false,
+      "refs": 1
+    },
+    "violations": [],
+    "errors": []
+  }
+}
+pre-push: bucket high-water guard blocked this push
+error: failed to push some refs to 'github.com:DraconDev/dracon-platform.git'
+PUSH gitlab /home/dracon/Dev/dracon-platform a3420c4f5bb9..ea59ab429139
+{
+  "ref": "refs/heads/main",
+  "refs": [
+    {
+      "name": "refs/heads/main",
+      "ref": "refs/heads/main",
+      "remoteRef": "refs/heads/main",
+      "objectId": "ea59ab42913964953fce2e9f3a5c995e5bf8a39b",
+      "remoteTip": "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51"
+    }
+  ],
+  "targetRemote": {
+    "name": "gitlab",
+    "url": "git@gitlab.com:DraconDev/dracon-platform.git"
+  },
+  "effectiveLimitBytes": 2147483648,
+  "limitingRemote": "github",
+  "limitingProvider": "github",
+  "scenarios": [
+    {
+      "remote": "github",
+      "url": "git@github.com:DraconDev/dracon-platform.git",
+      "provider": "github",
+      "limitBytes": 2147483648,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "ea59ab42913964953fce2e9f3a5c995e5bf8a39b",
+          "remoteTip": "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51",
+          "trackingTip": "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51"
+      ],
+      "objectCount": 266036,
+      "reachableObjectCount": 266027,
+      "deltaBaseCount": 172369,
+      "uncompressedBytes": 25963659222,
+      "storedBytes": 4469518996,
+      "policyEstimateBytes": 28594143289,
+      "packPolicyEstimateBytes": 28594143289,
+      "packUpperBoundBytes": 28594143289,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 28594143289
+    },
+    {
+      "remote": "gitlab",
+      "url": "git@gitlab.com:DraconDev/dracon-platform.git",
+      "provider": "gitlab",
+      "limitBytes": 5239860101,
+      "target": true,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "ea59ab42913964953fce2e9f3a5c995e5bf8a39b",
+          "remoteTip": "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51",
+          "trackingTip": "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51"
+      ],
+      "objectCount": 266036,
+      "reachableObjectCount": 266027,
+      "deltaBaseCount": 172369,
+      "uncompressedBytes": 25963659222,
+      "storedBytes": 4469518996,
+      "policyEstimateBytes": 28594143289,
+      "packPolicyEstimateBytes": 28594143289,
+      "packUpperBoundBytes": 28594143289,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 28594143289
+    },
+    {
+      "remote": "origin",
+      "url": "git@github.com:DraconDev/dracon-platform.git",
+      "provider": "github",
+      "limitBytes": 2147483648,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "ea59ab42913964953fce2e9f3a5c995e5bf8a39b",
+          "remoteTip": "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51",
+          "trackingTip": "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51"
+      ],
+      "objectCount": 266036,
+      "reachableObjectCount": 266027,
+      "deltaBaseCount": 172369,
+      "uncompressedBytes": 25963659222,
+      "storedBytes": 4469518996,
+      "policyEstimateBytes": 28594143289,
+      "packPolicyEstimateBytes": 28594143289,
+      "packUpperBoundBytes": 28594143289,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 28594143289
+    }
+  ],
+  "maxBasisBytes": 28594143289,
+  "stagedBytes": 0,
+  "stagedTree": null,
+  "projectedBytes": 28594143289,
+  "highWaterBytes": 2147483648,
+  "atOrAboveLimit": true,
+  "measurable": true,
+  "ok": false,
+  "code": "BUCKET_STRATEGY_HIGH_WATER",
+  "limitBytes": 2147483648,
+  "remainingBytes": -26446659641,
+  "errors": [
+    "projected pushable size 28594143289 is at or above provider limit 2147483648"
+  ],
+  "forwardOnly": {
+    "ok": true,
+    "code": "OK",
+    "checked": {
+      "staged": false,
+      "refs": 1
+    },
+    "violations": [],
+    "errors": []
+  }
+}
+pre-push: bucket high-water guard blocked this push
+error: failed to push some refs to 'gitlab.com:DraconDev/dracon-platform.git'
+PUSH github /home/dracon/Dev/dracon-platform/web/games/wip/capture-anime-girls 6721c2ef0509..f043ae7070e0
+{
+  "ok": false,
+  "code": "BUCKET_STRATEGY_GUARD_UNMEASURABLE",
+  "message": "GIT_DIR overrides are not supported for provider high-water sizing",
+  "details": []
+}
+pre-push: bucket high-water/forward-only guard blocked this push
+error: failed to push some refs to 'github.com:DraconDev/web-games-capture-anime-girls.git'
+PUSH gitlab /home/dracon/Dev/dracon-platform/web/games/wip/capture-anime-girls 6721c2ef0509..f043ae7070e0
+{
+  "ok": false,
+  "code": "BUCKET_STRATEGY_GUARD_UNMEASURABLE",
+  "message": "GIT_DIR overrides are not supported for provider high-water sizing",
+  "details": []
+}
+pre-push: bucket high-water/forward-only guard blocked this push
+error: failed to push some refs to 'gitlab.com:DraconDev/web-games-capture-anime-girls.git'
+PUSH github /home/dracon/Dev/dracon-platform/web/games/wip/deathrun c1a1fb22530c..2271f0033bab
+{
+  "ok": false,
+  "code": "BUCKET_STRATEGY_GUARD_UNMEASURABLE",
+  "message": "GIT_DIR overrides are not supported for provider high-water sizing",
+  "details": []
+}
+pre-push: bucket high-water/forward-only guard blocked this push
+error: failed to push some refs to 'github.com:DraconDev/web-games-deathrun.git'
+PUSH gitlab /home/dracon/Dev/dracon-platform/web/games/wip/deathrun c1a1fb22530c..2271f0033bab
+{
+  "ok": false,
+  "code": "BUCKET_STRATEGY_GUARD_UNMEASURABLE",
+  "message": "GIT_DIR overrides are not supported for provider high-water sizing",
+  "details": []
+}
+pre-push: bucket high-water/forward-only guard blocked this push
+error: failed to push some refs to 'gitlab.com:DraconDev/web-games-deathrun.git'
+PUSH github /home/dracon/Dev/dracon-platform/web/games/wip/football-forever 6d2d5baea7b4..9723a12c335d
+{
+  "ok": false,
+  "code": "BUCKET_STRATEGY_GUARD_UNMEASURABLE",
+  "message": "GIT_DIR overrides are not supported for provider high-water sizing",
+  "details": []
+}
+pre-push: bucket high-water/forward-only guard blocked this push
+error: failed to push some refs to 'github.com:DraconDev/football-forever.git'
+PUSH gitlab /home/dracon/Dev/dracon-platform/web/games/wip/football-forever 6d2d5baea7b4..9723a12c335d
+{
+  "ok": false,
+  "code": "BUCKET_STRATEGY_GUARD_UNMEASURABLE",
+  "message": "GIT_DIR overrides are not supported for provider high-water sizing",
+  "details": []
+}
+pre-push: bucket high-water/forward-only guard blocked this push
+error: failed to push some refs to 'gitlab.com:DraconDev/football-forever.git'
+PUSH github /home/dracon/Dev/dracon-platform/web/games/wip/freeport a262886eac30..300d70681ed3
+{
+  "ref": "refs/heads/main",
+  "refs": [
+    {
+      "name": "refs/heads/main",
+      "ref": "refs/heads/main",
+      "remoteRef": "refs/heads/main",
+      "objectId": "300d70681ed33cd9d47160b5bba0481348d50f37",
+      "remoteTip": "a262886eac30d59f9aead395f04e475c79eff68e"
+    }
+  ],
+  "targetRemote": {
+    "name": "github",
+    "url": "git@github.com:DraconDev/web-games-freeport.git"
+  },
+  "effectiveLimitBytes": 2147483648,
+  "limitingRemote": "github",
+  "limitingProvider": "github",
+  "scenarios": [
+    {
+      "remote": "github",
+      "url": "git@github.com:DraconDev/web-games-freeport.git",
+      "provider": "github",
+      "limitBytes": 2147483648,
+      "target": true,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "300d70681ed33cd9d47160b5bba0481348d50f37",
+          "remoteTip": "a262886eac30d59f9aead395f04e475c79eff68e",
+          "trackingTip": "a262886eac30d59f9aead395f04e475c79eff68e"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "a262886eac30d59f9aead395f04e475c79eff68e"
+      ],
+      "objectCount": 3609,
+      "reachableObjectCount": 3609,
+      "deltaBaseCount": 0,
+      "uncompressedBytes": 42715531,
+      "storedBytes": 35376087,
+      "policyEstimateBytes": 47514573,
+      "packPolicyEstimateBytes": 47514573,
+      "packUpperBoundBytes": 47514573,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 47514573
+    },
+    {
+      "remote": "gitlab",
+      "url": "git@gitlab.com:DraconDev/web-games-freeport.git",
+      "provider": "gitlab",
+      "limitBytes": 5239860101,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "300d70681ed33cd9d47160b5bba0481348d50f37",
+          "remoteTip": "a262886eac30d59f9aead395f04e475c79eff68e",
+          "trackingTip": "a262886eac30d59f9aead395f04e475c79eff68e"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "a262886eac30d59f9aead395f04e475c79eff68e"
+      ],
+      "objectCount": 3609,
+      "reachableObjectCount": 3609,
+      "deltaBaseCount": 0,
+      "uncompressedBytes": 42715531,
+      "storedBytes": 35376087,
+      "policyEstimateBytes": 47514573,
+      "packPolicyEstimateBytes": 47514573,
+      "packUpperBoundBytes": 47514573,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 47514573
+    },
+    {
+      "remote": "origin",
+      "url": "git@github.com:DraconDev/web-games-freeport.git",
+      "provider": "github",
+      "limitBytes": 2147483648,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "300d70681ed33cd9d47160b5bba0481348d50f37",
+          "remoteTip": "a262886eac30d59f9aead395f04e475c79eff68e",
+          "trackingTip": "a262886eac30d59f9aead395f04e475c79eff68e"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "a262886eac30d59f9aead395f04e475c79eff68e"
+      ],
+      "objectCount": 3609,
+      "reachableObjectCount": 3609,
+      "deltaBaseCount": 0,
+      "uncompressedBytes": 42715531,
+      "storedBytes": 35376087,
+      "policyEstimateBytes": 47514573,
+      "packPolicyEstimateBytes": 47514573,
+      "packUpperBoundBytes": 47514573,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 47514573
+    }
+  ],
+  "maxBasisBytes": 47514573,
+  "stagedBytes": 0,
+  "stagedTree": null,
+  "projectedBytes": 47514573,
+  "highWaterBytes": 2147483648,
+  "atOrAboveLimit": false,
+  "measurable": true,
+  "ok": true,
+  "code": "OK",
+  "limitBytes": 2147483648,
+  "remainingBytes": 2099969075,
+  "errors": [],
+  "forwardOnly": {
+    "ok": true,
+    "code": "OK",
+    "checked": {
+      "staged": false,
+      "refs": 1
+    },
+    "violations": [],
+    "errors": []
+  }
+}
+To github.com:DraconDev/web-games-freeport.git
+   a262886..300d706  main -> main
+DONE github 300d70681ed3
+PUSH gitlab /home/dracon/Dev/dracon-platform/web/games/wip/freeport a262886eac30..300d70681ed3
+{
+  "ref": "refs/heads/main",
+  "refs": [
+    {
+      "name": "refs/heads/main",
+      "ref": "refs/heads/main",
+      "remoteRef": "refs/heads/main",
+      "objectId": "300d70681ed33cd9d47160b5bba0481348d50f37",
+      "remoteTip": "a262886eac30d59f9aead395f04e475c79eff68e"
+    }
+  ],
+  "targetRemote": {
+    "name": "gitlab",
+    "url": "git@gitlab.com:DraconDev/web-games-freeport.git"
+  },
+  "effectiveLimitBytes": 2147483648,
+  "limitingRemote": "github",
+  "limitingProvider": "github",
+  "scenarios": [
+    {
+      "remote": "github",
+      "url": "git@github.com:DraconDev/web-games-freeport.git",
+      "provider": "github",
+      "limitBytes": 2147483648,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "300d70681ed33cd9d47160b5bba0481348d50f37",
+          "remoteTip": "a262886eac30d59f9aead395f04e475c79eff68e",
+          "trackingTip": "300d70681ed33cd9d47160b5bba0481348d50f37"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "300d70681ed33cd9d47160b5bba0481348d50f37"
+      ],
+      "objectCount": 3609,
+      "reachableObjectCount": 3609,
+      "deltaBaseCount": 0,
+      "uncompressedBytes": 42715531,
+      "storedBytes": 35376087,
+      "policyEstimateBytes": 47514573,
+      "packPolicyEstimateBytes": 47514573,
+      "packUpperBoundBytes": 47514573,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 47514573
+    },
+    {
+      "remote": "gitlab",
+      "url": "git@gitlab.com:DraconDev/web-games-freeport.git",
+      "provider": "gitlab",
+      "limitBytes": 5239860101,
+      "target": true,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "300d70681ed33cd9d47160b5bba0481348d50f37",
+          "remoteTip": "a262886eac30d59f9aead395f04e475c79eff68e",
+          "trackingTip": "a262886eac30d59f9aead395f04e475c79eff68e"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "a262886eac30d59f9aead395f04e475c79eff68e"
+      ],
+      "objectCount": 3609,
+      "reachableObjectCount": 3609,
+      "deltaBaseCount": 0,
+      "uncompressedBytes": 42715531,
+      "storedBytes": 35376087,
+      "policyEstimateBytes": 47514573,
+      "packPolicyEstimateBytes": 47514573,
+      "packUpperBoundBytes": 47514573,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 47514573
+    },
+    {
+      "remote": "origin",
+      "url": "git@github.com:DraconDev/web-games-freeport.git",
+      "provider": "github",
+      "limitBytes": 2147483648,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "300d70681ed33cd9d47160b5bba0481348d50f37",
+          "remoteTip": "a262886eac30d59f9aead395f04e475c79eff68e",
+          "trackingTip": "a262886eac30d59f9aead395f04e475c79eff68e"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "a262886eac30d59f9aead395f04e475c79eff68e"
+      ],
+      "objectCount": 3609,
+      "reachableObjectCount": 3609,
+      "deltaBaseCount": 0,
+      "uncompressedBytes": 42715531,
+      "storedBytes": 35376087,
+      "policyEstimateBytes": 47514573,
+      "packPolicyEstimateBytes": 47514573,
+      "packUpperBoundBytes": 47514573,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 47514573
+    }
+  ],
+  "maxBasisBytes": 47514573,
+  "stagedBytes": 0,
+  "stagedTree": null,
+  "projectedBytes": 47514573,
+  "highWaterBytes": 2147483648,
+  "atOrAboveLimit": false,
+  "measurable": true,
+  "ok": true,
+  "code": "OK",
+  "limitBytes": 2147483648,
+  "remainingBytes": 2099969075,
+  "errors": [],
+  "forwardOnly": {
+    "ok": true,
+    "code": "OK",
+    "checked": {
+      "staged": false,
+      "refs": 1
+    },
+    "violations": [],
+    "errors": []
+  }
+}
+remote:
+remote: ========================================================================
+remote:
+remote:     You have reached the free storage limit of 10 GiB on one or more
+remote:      projects. To unlock your projects over the free 10 GiB project
+remote:   limit, you must purchase additional storage. You can't push to your
+remote:     repository, create pipelines, create issues, or add comments. To
+remote:       reduce storage capacity, you can delete unused repositories,
+remote:                 artifacts, wikis, issues, and pipelines.
+remote:
+remote: ========================================================================
+remote:
+To gitlab.com:DraconDev/web-games-freeport.git
+   a262886..300d706  main -> main
+DONE gitlab 300d70681ed3
+PUSH github /home/dracon/Dev/dracon-strategy c42f4f419963..83a2fe89b150
+To github.com:DraconDev/dracon-strategy.git
+   c42f4f41..83a2fe89  main -> main
+DONE github 83a2fe89b150
+PUSH gitlab /home/dracon/Dev/dracon-strategy c42f4f419963..83a2fe89b150
+remote:
+remote: ========================================================================
+remote:
+remote:     You have reached the free storage limit of 10 GiB on one or more
+remote:      projects. To unlock your projects over the free 10 GiB project
+remote:   limit, you must purchase additional storage. You can't push to your
+remote:     repository, create pipelines, create issues, or add comments. To
+remote:       reduce storage capacity, you can delete unused repositories,
+remote:                 artifacts, wikis, issues, and pipelines.
+remote:
+remote: ========================================================================
+remote:
+To gitlab.com:DraconDev/dracon-strategy.git
+   c42f4f41..83a2fe89  main -> main
+DONE gitlab 83a2fe89b150
+PUSH gitlab /home/dracon/Dev/pi-plugins/pi-goal-list-loop-audit 20d2ba1aa773..ba413a067786
+remote:
+remote: ========================================================================
+remote:
+remote:     You have reached the free storage limit of 10 GiB on one or more
+remote:      projects. To unlock your projects over the free 10 GiB project
+remote:   limit, you must purchase additional storage. You can't push to your
+remote:     repository, create pipelines, create issues, or add comments. To
+remote:       reduce storage capacity, you can delete unused repositories,
+remote:                 artifacts, wikis, issues, and pipelines.
+remote:
+remote: ========================================================================
+remote:
+To gitlab.com:DraconDev/pi-goal-list-loop-audit.git
+   20d2ba1a..ba413a06  main -> main
+DONE gitlab ba413a067786
+ERRORS:
+push failed: /home/dracon/Dev/dracon-platform github rc=1: {
+  "ref": "refs/heads/main",
+  "refs": [
+    {
+      "name": "refs/heads/main",
+      "ref": "refs/heads/main",
+      "remoteRef": "refs/heads/main",
+      "objectId": "ea59ab42913964953fce2e9f3a5c995e5bf8a39b",
+      "remoteTip": "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51"
+    }
+  ],
+  "targetRemote": {
+    "name": "github",
+    "url": "git@github.com:DraconDev/dracon-platform.git"
+  },
+  "effectiveLimitBytes": 2147483648,
+  "limitingRemote": "github",
+  "limitingProvider": "github",
+  "scenarios": [
+    {
+      "remote": "github",
+      "url": "git@github.com:DraconDev/dracon-platform.git",
+      "provider": "github",
+      "limitBytes": 2147483648,
+      "target": true,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "ea59ab42913964953fce2e9f3a5c995e5bf8a39b",
+          "remoteTip": "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51",
+          "trackingTip": "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51"
+      ],
+      "objectCount": 266036,
+      "reachableObjectCount": 266027,
+      "deltaBaseCount": 172369,
+      "uncompressedBytes": 25963659222,
+      "storedBytes": 4469518996,
+      "policyEstimateBytes": 28594143289,
+      "packPolicyEstimateBytes": 28594143289,
+      "packUpperBoundBytes": 28594143289,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 28594143289
+    },
+    {
+      "remote": "gitlab",
+      "url": "git@gitlab.com:DraconDev/dracon-platform.git",
+      "provider": "gitlab",
+      "limitBytes": 5239860101,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "ea59ab42913964953fce2e9f3a5c995e5bf8a39b",
+          "remoteTip": "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51",
+          "trackingTip": "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51"
+      ],
+      "objectCount": 266036,
+      "reachableObjectCount": 266027,
+      "deltaBaseCount": 172369,
+      "uncompressedBytes": 25963659222,
+      "storedBytes": 4469518996,
+      "policyEstimateBytes": 28594143289,
+      "packPolicyEstimateBytes": 28594143289,
+      "packUpperBoundBytes": 28594143289,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 28594143289
+    },
+    {
+      "remote": "origin",
+      "url": "git@github.com:DraconDev/dracon-platform.git",
+      "provider": "github",
+      "limitBytes": 2147483648,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "ea59ab42913964953fce2e9f3a5c995e5bf8a39b",
+          "remoteTip": "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51",
+          "trackingTip": "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51"
+      ],
+      "objectCount": 266036,
+      "reachableObjectCount": 266027,
+      "deltaBaseCount": 172369,
+      "uncompressedBytes": 25963659222,
+      "storedBytes": 4469518996,
+      "policyEstimateBytes": 28594143289,
+      "packPolicyEstimateBytes": 28594143289,
+      "packUpperBoundBytes": 28594143289,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 28594143289
+    }
+  ],
+  "maxBasisBytes": 28594143289,
+  "stagedBytes": 0,
+  "stagedTree": null,
+  "projectedBytes": 28594143289,
+  "highWaterBytes": 2147483648,
+  "atOrAboveLimit": true,
+  "measurable": true,
+  "ok": false,
+  "code": "BUCKET_STRATEGY_HIGH_WATER",
+  "limitBytes": 2147483648,
+  "remainingBytes": -26446659641,
+  "errors": [
+    "projected pushable size 28594143289 is at or above provider limit 2147483648"
+  ],
+  "forwardOnly": {
+    "ok": true,
+    "code": "OK",
+    "checked": {
+      "staged": false,
+      "refs": 1
+    },
+    "violations": [],
+    "errors": []
+  }
+}
+pre-push: bucket high-water guard blocked this push
+error: failed to push some refs to 'github.com:DraconDev/dracon-platform.git'
+
+push failed: /home/dracon/Dev/dracon-platform gitlab rc=1: {
+  "ref": "refs/heads/main",
+  "refs": [
+    {
+      "name": "refs/heads/main",
+      "ref": "refs/heads/main",
+      "remoteRef": "refs/heads/main",
+      "objectId": "ea59ab42913964953fce2e9f3a5c995e5bf8a39b",
+      "remoteTip": "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51"
+    }
+  ],
+  "targetRemote": {
+    "name": "gitlab",
+    "url": "git@gitlab.com:DraconDev/dracon-platform.git"
+  },
+  "effectiveLimitBytes": 2147483648,
+  "limitingRemote": "github",
+  "limitingProvider": "github",
+  "scenarios": [
+    {
+      "remote": "github",
+      "url": "git@github.com:DraconDev/dracon-platform.git",
+      "provider": "github",
+      "limitBytes": 2147483648,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "ea59ab42913964953fce2e9f3a5c995e5bf8a39b",
+          "remoteTip": "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51",
+          "trackingTip": "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51"
+      ],
+      "objectCount": 266036,
+      "reachableObjectCount": 266027,
+      "deltaBaseCount": 172369,
+      "uncompressedBytes": 25963659222,
+      "storedBytes": 4469518996,
+      "policyEstimateBytes": 28594143289,
+      "packPolicyEstimateBytes": 28594143289,
+      "packUpperBoundBytes": 28594143289,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 28594143289
+    },
+    {
+      "remote": "gitlab",
+      "url": "git@gitlab.com:DraconDev/dracon-platform.git",
+      "provider": "gitlab",
+      "limitBytes": 5239860101,
+      "target": true,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "ea59ab42913964953fce2e9f3a5c995e5bf8a39b",
+          "remoteTip": "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51",
+          "trackingTip": "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51"
+      ],
+      "objectCount": 266036,
+      "reachableObjectCount": 266027,
+      "deltaBaseCount": 172369,
+      "uncompressedBytes": 25963659222,
+      "storedBytes": 4469518996,
+      "policyEstimateBytes": 28594143289,
+      "packPolicyEstimateBytes": 28594143289,
+      "packUpperBoundBytes": 28594143289,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 28594143289
+    },
+    {
+      "remote": "origin",
+      "url": "git@github.com:DraconDev/dracon-platform.git",
+      "provider": "github",
+      "limitBytes": 2147483648,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "ea59ab42913964953fce2e9f3a5c995e5bf8a39b",
+          "remoteTip": "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51",
+          "trackingTip": "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51"
+      ],
+      "objectCount": 266036,
+      "reachableObjectCount": 266027,
+      "deltaBaseCount": 172369,
+      "uncompressedBytes": 25963659222,
+      "storedBytes": 4469518996,
+      "policyEstimateBytes": 28594143289,
+      "packPolicyEstimateBytes": 28594143289,
+      "packUpperBoundBytes": 28594143289,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 28594143289
+    }
+  ],
+  "maxBasisBytes": 28594143289,
+  "stagedBytes": 0,
+  "stagedTree": null,
+  "projectedBytes": 28594143289,
+  "highWaterBytes": 2147483648,
+  "atOrAboveLimit": true,
+  "measurable": true,
+  "ok": false,
+  "code": "BUCKET_STRATEGY_HIGH_WATER",
+  "limitBytes": 2147483648,
+  "remainingBytes": -26446659641,
+  "errors": [
+    "projected pushable size 28594143289 is at or above provider limit 2147483648"
+  ],
+  "forwardOnly": {
+    "ok": true,
+    "code": "OK",
+    "checked": {
+      "staged": false,
+      "refs": 1
+    },
+    "violations": [],
+    "errors": []
+  }
+}
+pre-push: bucket high-water guard blocked this push
+error: failed to push some refs to 'gitlab.com:DraconDev/dracon-platform.git'
+
+HEAD drift: /home/dracon/Dev/dracon-platform/web/games/released/come-get-me: 8a67ab92dec42a546581725b7a3cbe234592510a != e7792054e3a70a257ddf1137350ccfc5df4c95dc
+push failed: /home/dracon/Dev/dracon-platform/web/games/wip/capture-anime-girls github rc=1: {
+  "ok": false,
+  "code": "BUCKET_STRATEGY_GUARD_UNMEASURABLE",
+  "message": "GIT_DIR overrides are not supported for provider high-water sizing",
+  "details": []
+}
+pre-push: bucket high-water/forward-only guard blocked this push
+error: failed to push some refs to 'github.com:DraconDev/web-games-capture-anime-girls.git'
+
+push failed: /home/dracon/Dev/dracon-platform/web/games/wip/capture-anime-girls gitlab rc=1: {
+  "ok": false,
+  "code": "BUCKET_STRATEGY_GUARD_UNMEASURABLE",
+  "message": "GIT_DIR overrides are not supported for provider high-water sizing",
+  "details": []
+}
+pre-push: bucket high-water/forward-only guard blocked this push
+error: failed to push some refs to 'gitlab.com:DraconDev/web-games-capture-anime-girls.git'
+
+push failed: /home/dracon/Dev/dracon-platform/web/games/wip/deathrun github rc=1: {
+  "ok": false,
+  "code": "BUCKET_STRATEGY_GUARD_UNMEASURABLE",
+  "message": "GIT_DIR overrides are not supported for provider high-water sizing",
+  "details": []
+}
+pre-push: bucket high-water/forward-only guard blocked this push
+error: failed to push some refs to 'github.com:DraconDev/web-games-deathrun.git'
+
+push failed: /home/dracon/Dev/dracon-platform/web/games/wip/deathrun gitlab rc=1: {
+  "ok": false,
+  "code": "BUCKET_STRATEGY_GUARD_UNMEASURABLE",
+  "message": "GIT_DIR overrides are not supported for provider high-water sizing",
+  "details": []
+}
+pre-push: bucket high-water/forward-only guard blocked this push
+error: failed to push some refs to 'gitlab.com:DraconDev/web-games-deathrun.git'
+
+push failed: /home/dracon/Dev/dracon-platform/web/games/wip/football-forever github rc=1: {
+  "ok": false,
+  "code": "BUCKET_STRATEGY_GUARD_UNMEASURABLE",
+  "message": "GIT_DIR overrides are not supported for provider high-water sizing",
+  "details": []
+}
+pre-push: bucket high-water/forward-only guard blocked this push
+error: failed to push some refs to 'github.com:DraconDev/football-forever.git'
+
+push failed: /home/dracon/Dev/dracon-platform/web/games/wip/football-forever gitlab rc=1: {
+  "ok": false,
+  "code": "BUCKET_STRATEGY_GUARD_UNMEASURABLE",
+  "message": "GIT_DIR overrides are not supported for provider high-water sizing",
+  "details": []
+}
+pre-push: bucket high-water/forward-only guard blocked this push
+error: failed to push some refs to 'gitlab.com:DraconDev/football-forever.git'

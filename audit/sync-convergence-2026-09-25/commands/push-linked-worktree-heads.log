@@ -1,0 +1,865 @@
+### /home/dracon/Dev/dracon-platform/web/games/wip/capture-anime-girls
+remote=github before=6721c2ef05093ca5321b03447cd1bfdaf4570ff4 expected=f043ae7070e04c8d4ad97642014c685871a70505
+{
+  "ref": "refs/heads/main",
+  "refs": [
+    {
+      "name": "refs/heads/main",
+      "ref": "refs/heads/main",
+      "remoteRef": "refs/heads/main",
+      "objectId": "f043ae7070e04c8d4ad97642014c685871a70505",
+      "remoteTip": "6721c2ef05093ca5321b03447cd1bfdaf4570ff4"
+    }
+  ],
+  "targetRemote": {
+    "name": "github",
+    "url": "git@github.com:DraconDev/web-games-capture-anime-girls.git"
+  },
+  "effectiveLimitBytes": 2147483648,
+  "limitingRemote": "github",
+  "limitingProvider": "github",
+  "scenarios": [
+    {
+      "remote": "github",
+      "url": "git@github.com:DraconDev/web-games-capture-anime-girls.git",
+      "provider": "github",
+      "limitBytes": 2147483648,
+      "target": true,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "f043ae7070e04c8d4ad97642014c685871a70505",
+          "remoteTip": "6721c2ef05093ca5321b03447cd1bfdaf4570ff4",
+          "trackingTip": "6721c2ef05093ca5321b03447cd1bfdaf4570ff4"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "6721c2ef05093ca5321b03447cd1bfdaf4570ff4"
+      ],
+      "objectCount": 32640,
+      "reachableObjectCount": 32639,
+      "deltaBaseCount": 20145,
+      "uncompressedBytes": 3186626035,
+      "storedBytes": 2799358698,
+      "policyEstimateBytes": 3509532095,
+      "packPolicyEstimateBytes": 3509532095,
+      "packUpperBoundBytes": 3509532095,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 3509532095
+    },
+    {
+      "remote": "gitlab",
+      "url": "git@gitlab.com:DraconDev/web-games-capture-anime-girls.git",
+      "provider": "gitlab",
+      "limitBytes": 5239860101,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "f043ae7070e04c8d4ad97642014c685871a70505",
+          "remoteTip": "6721c2ef05093ca5321b03447cd1bfdaf4570ff4",
+          "trackingTip": "6721c2ef05093ca5321b03447cd1bfdaf4570ff4"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "6721c2ef05093ca5321b03447cd1bfdaf4570ff4"
+      ],
+      "objectCount": 32640,
+      "reachableObjectCount": 32639,
+      "deltaBaseCount": 20145,
+      "uncompressedBytes": 3186626035,
+      "storedBytes": 2799358698,
+      "policyEstimateBytes": 3509532095,
+      "packPolicyEstimateBytes": 3509532095,
+      "packUpperBoundBytes": 3509532095,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 3509532095
+    },
+    {
+      "remote": "origin",
+      "url": "git@gitlab.com:DraconDev/web-games-capture-anime-girls.git",
+      "provider": "gitlab",
+      "limitBytes": 5239860101,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "f043ae7070e04c8d4ad97642014c685871a70505",
+          "remoteTip": "6721c2ef05093ca5321b03447cd1bfdaf4570ff4",
+          "trackingTip": "6721c2ef05093ca5321b03447cd1bfdaf4570ff4"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "6721c2ef05093ca5321b03447cd1bfdaf4570ff4"
+      ],
+      "objectCount": 32640,
+      "reachableObjectCount": 32639,
+      "deltaBaseCount": 20145,
+      "uncompressedBytes": 3186626035,
+      "storedBytes": 2799358698,
+      "policyEstimateBytes": 3509532095,
+      "packPolicyEstimateBytes": 3509532095,
+      "packUpperBoundBytes": 3509532095,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 3509532095
+    }
+  ],
+  "maxBasisBytes": 3509532095,
+  "stagedBytes": 0,
+  "stagedTree": null,
+  "projectedBytes": 3509532095,
+  "highWaterBytes": 2147483648,
+  "atOrAboveLimit": true,
+  "measurable": true,
+  "ok": false,
+  "code": "BUCKET_STRATEGY_HIGH_WATER",
+  "limitBytes": 2147483648,
+  "remainingBytes": -1362048447,
+  "errors": [
+    "projected pushable size 3509532095 is at or above provider limit 2147483648"
+  ],
+  "forwardOnly": {
+    "ok": true,
+    "code": "OK",
+    "checked": {
+      "staged": false,
+      "refs": 1
+    },
+    "violations": [],
+    "errors": []
+  }
+}
+pre-push: bucket high-water/forward-only guard blocked this push
+error: failed to push some refs to 'github.com:DraconDev/web-games-capture-anime-girls.git'
+### /home/dracon/Dev/dracon-platform/web/games/wip/deathrun remote=github
+### /home/dracon/Dev/dracon-platform/web/games/wip/deathrun
+github before=c1a1fb22530c7e9e32a3c9b396712be433ff5eb6 expected=2271f0033bab0fc491392f12b31295d93ae48dc8
+{
+  "ref": "refs/heads/main",
+  "refs": [
+    {
+      "name": "refs/heads/main",
+      "ref": "refs/heads/main",
+      "remoteRef": "refs/heads/main",
+      "objectId": "2271f0033bab0fc491392f12b31295d93ae48dc8",
+      "remoteTip": "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6"
+    }
+  ],
+  "targetRemote": {
+    "name": "github",
+    "url": "git@github.com:DraconDev/web-games-deathrun.git"
+  },
+  "effectiveLimitBytes": 2147483648,
+  "limitingRemote": "github",
+  "limitingProvider": "github",
+  "scenarios": [
+    {
+      "remote": "github",
+      "url": "git@github.com:DraconDev/web-games-deathrun.git",
+      "provider": "github",
+      "limitBytes": 2147483648,
+      "target": true,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "2271f0033bab0fc491392f12b31295d93ae48dc8",
+          "remoteTip": "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6",
+          "trackingTip": "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6"
+      ],
+      "objectCount": 43695,
+      "reachableObjectCount": 43695,
+      "deltaBaseCount": 21595,
+      "uncompressedBytes": 2147128608,
+      "storedBytes": 1564200602,
+      "policyEstimateBytes": 2367499965,
+      "packPolicyEstimateBytes": 2367499965,
+      "packUpperBoundBytes": 2367499965,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 2367499965
+    },
+    {
+      "remote": "gitlab",
+      "url": "git@gitlab.com:DraconDev/web-games-deathrun.git",
+      "provider": "gitlab",
+      "limitBytes": 5239860101,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "2271f0033bab0fc491392f12b31295d93ae48dc8",
+          "remoteTip": "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6",
+          "trackingTip": "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6"
+      ],
+      "objectCount": 43695,
+      "reachableObjectCount": 43695,
+      "deltaBaseCount": 21595,
+      "uncompressedBytes": 2147128608,
+      "storedBytes": 1564200602,
+      "policyEstimateBytes": 2367499965,
+      "packPolicyEstimateBytes": 2367499965,
+      "packUpperBoundBytes": 2367499965,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 2367499965
+    },
+    {
+      "remote": "origin",
+      "url": "git@github.com:DraconDev/web-games-deathrun.git",
+      "provider": "github",
+      "limitBytes": 2147483648,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "2271f0033bab0fc491392f12b31295d93ae48dc8",
+          "remoteTip": "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6",
+          "trackingTip": "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6"
+      ],
+      "objectCount": 43695,
+      "reachableObjectCount": 43695,
+      "deltaBaseCount": 21595,
+      "uncompressedBytes": 2147128608,
+      "storedBytes": 1564200602,
+      "policyEstimateBytes": 2367499965,
+      "packPolicyEstimateBytes": 2367499965,
+      "packUpperBoundBytes": 2367499965,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 2367499965
+    }
+  ],
+  "maxBasisBytes": 2367499965,
+  "stagedBytes": 0,
+  "stagedTree": null,
+  "projectedBytes": 2367499965,
+  "highWaterBytes": 2147483648,
+  "atOrAboveLimit": true,
+  "measurable": true,
+  "ok": false,
+  "code": "BUCKET_STRATEGY_HIGH_WATER",
+  "limitBytes": 2147483648,
+  "remainingBytes": -220016317,
+  "errors": [
+    "projected pushable size 2367499965 is at or above provider limit 2147483648"
+  ],
+  "forwardOnly": {
+    "ok": true,
+    "code": "OK",
+    "checked": {
+      "staged": false,
+      "refs": 1
+    },
+    "violations": [],
+    "errors": []
+  }
+}
+pre-push: bucket high-water/forward-only guard blocked this push
+error: failed to push some refs to 'github.com:DraconDev/web-games-deathrun.git'
+gitlab before=c1a1fb22530c7e9e32a3c9b396712be433ff5eb6 expected=2271f0033bab0fc491392f12b31295d93ae48dc8
+{
+  "ref": "refs/heads/main",
+  "refs": [
+    {
+      "name": "refs/heads/main",
+      "ref": "refs/heads/main",
+      "remoteRef": "refs/heads/main",
+      "objectId": "2271f0033bab0fc491392f12b31295d93ae48dc8",
+      "remoteTip": "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6"
+    }
+  ],
+  "targetRemote": {
+    "name": "gitlab",
+    "url": "git@gitlab.com:DraconDev/web-games-deathrun.git"
+  },
+  "effectiveLimitBytes": 2147483648,
+  "limitingRemote": "github",
+  "limitingProvider": "github",
+  "scenarios": [
+    {
+      "remote": "github",
+      "url": "git@github.com:DraconDev/web-games-deathrun.git",
+      "provider": "github",
+      "limitBytes": 2147483648,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "2271f0033bab0fc491392f12b31295d93ae48dc8",
+          "remoteTip": "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6",
+          "trackingTip": null
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        null
+      ],
+      "objectCount": 43695,
+      "reachableObjectCount": 43695,
+      "deltaBaseCount": 21595,
+      "uncompressedBytes": 2147128608,
+      "storedBytes": 1564200602,
+      "policyEstimateBytes": 2367499965,
+      "packPolicyEstimateBytes": 2367499965,
+      "packUpperBoundBytes": 2367499965,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 2367499965
+    },
+    {
+      "remote": "gitlab",
+      "url": "git@gitlab.com:DraconDev/web-games-deathrun.git",
+      "provider": "gitlab",
+      "limitBytes": 5239860101,
+      "target": true,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "2271f0033bab0fc491392f12b31295d93ae48dc8",
+          "remoteTip": "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6",
+          "trackingTip": "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6"
+      ],
+      "objectCount": 43695,
+      "reachableObjectCount": 43695,
+      "deltaBaseCount": 21595,
+      "uncompressedBytes": 2147128608,
+      "storedBytes": 1564200602,
+      "policyEstimateBytes": 2367499965,
+      "packPolicyEstimateBytes": 2367499965,
+      "packUpperBoundBytes": 2367499965,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 2367499965
+    },
+    {
+      "remote": "origin",
+      "url": "git@github.com:DraconDev/web-games-deathrun.git",
+      "provider": "github",
+      "limitBytes": 2147483648,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "2271f0033bab0fc491392f12b31295d93ae48dc8",
+          "remoteTip": "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6",
+          "trackingTip": "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "c1a1fb22530c7e9e32a3c9b396712be433ff5eb6"
+      ],
+      "objectCount": 43695,
+      "reachableObjectCount": 43695,
+      "deltaBaseCount": 21595,
+      "uncompressedBytes": 2147128608,
+      "storedBytes": 1564200602,
+      "policyEstimateBytes": 2367499965,
+      "packPolicyEstimateBytes": 2367499965,
+      "packUpperBoundBytes": 2367499965,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 2367499965
+    }
+  ],
+  "maxBasisBytes": 2367499965,
+  "stagedBytes": 0,
+  "stagedTree": null,
+  "projectedBytes": 2367499965,
+  "highWaterBytes": 2147483648,
+  "atOrAboveLimit": true,
+  "measurable": true,
+  "ok": false,
+  "code": "BUCKET_STRATEGY_HIGH_WATER",
+  "limitBytes": 2147483648,
+  "remainingBytes": -220016317,
+  "errors": [
+    "projected pushable size 2367499965 is at or above provider limit 2147483648"
+  ],
+  "forwardOnly": {
+    "ok": true,
+    "code": "OK",
+    "checked": {
+      "staged": false,
+      "refs": 1
+    },
+    "violations": [],
+    "errors": []
+  }
+}
+pre-push: bucket high-water/forward-only guard blocked this push
+error: failed to push some refs to 'gitlab.com:DraconDev/web-games-deathrun.git'
+### /home/dracon/Dev/dracon-platform/web/games/wip/football-forever
+github before=6d2d5baea7b4f5ee0293dfcf692508d1a4728198 expected=9723a12c335dd427a36aee1ae04678ae7eb4e8ec
+{
+  "ref": "refs/heads/main",
+  "refs": [
+    {
+      "name": "refs/heads/main",
+      "ref": "refs/heads/main",
+      "remoteRef": "refs/heads/main",
+      "objectId": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec",
+      "remoteTip": "6d2d5baea7b4f5ee0293dfcf692508d1a4728198"
+    }
+  ],
+  "targetRemote": {
+    "name": "github",
+    "url": "git@github.com:DraconDev/football-forever.git"
+  },
+  "effectiveLimitBytes": 2147483648,
+  "limitingRemote": "github",
+  "limitingProvider": "github",
+  "scenarios": [
+    {
+      "remote": "github",
+      "url": "git@github.com:DraconDev/football-forever.git",
+      "provider": "github",
+      "limitBytes": 2147483648,
+      "target": true,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec",
+          "remoteTip": "6d2d5baea7b4f5ee0293dfcf692508d1a4728198",
+          "trackingTip": "6d2d5baea7b4f5ee0293dfcf692508d1a4728198"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "6d2d5baea7b4f5ee0293dfcf692508d1a4728198"
+      ],
+      "objectCount": 10950,
+      "reachableObjectCount": 10950,
+      "deltaBaseCount": 5653,
+      "uncompressedBytes": 1194526168,
+      "storedBytes": 702474324,
+      "policyEstimateBytes": 1315445921,
+      "packPolicyEstimateBytes": 1315445921,
+      "packUpperBoundBytes": 1315445921,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 1315445921
+    },
+    {
+      "remote": "gitlab",
+      "url": "git@gitlab.com:DraconDev/football-forever.git",
+      "provider": "gitlab",
+      "limitBytes": 5239860101,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec",
+          "remoteTip": "6d2d5baea7b4f5ee0293dfcf692508d1a4728198",
+          "trackingTip": "6d2d5baea7b4f5ee0293dfcf692508d1a4728198"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "6d2d5baea7b4f5ee0293dfcf692508d1a4728198"
+      ],
+      "objectCount": 10950,
+      "reachableObjectCount": 10950,
+      "deltaBaseCount": 5653,
+      "uncompressedBytes": 1194526168,
+      "storedBytes": 702474324,
+      "policyEstimateBytes": 1315445921,
+      "packPolicyEstimateBytes": 1315445921,
+      "packUpperBoundBytes": 1315445921,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 1315445921
+    },
+    {
+      "remote": "mirror-github",
+      "url": "git@github.com:DraconDev/web-games-football-forever.git",
+      "provider": "github",
+      "limitBytes": 2147483648,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec",
+          "remoteTip": "6d2d5baea7b4f5ee0293dfcf692508d1a4728198",
+          "trackingTip": "241c92289a26a2622c40ff2abf92d9cdad31eb55"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "241c92289a26a2622c40ff2abf92d9cdad31eb55"
+      ],
+      "objectCount": 10950,
+      "reachableObjectCount": 10950,
+      "deltaBaseCount": 5653,
+      "uncompressedBytes": 1194526168,
+      "storedBytes": 702474324,
+      "policyEstimateBytes": 1315445921,
+      "packPolicyEstimateBytes": 1315445921,
+      "packUpperBoundBytes": 1315445921,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 1315445921
+    },
+    {
+      "remote": "mirror-gitlab",
+      "url": "git@gitlab.com:DraconDev/web-games-football-forever.git",
+      "provider": "gitlab",
+      "limitBytes": 5239860101,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec",
+          "remoteTip": "6d2d5baea7b4f5ee0293dfcf692508d1a4728198",
+          "trackingTip": "241c92289a26a2622c40ff2abf92d9cdad31eb55"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "241c92289a26a2622c40ff2abf92d9cdad31eb55"
+      ],
+      "objectCount": 10950,
+      "reachableObjectCount": 10950,
+      "deltaBaseCount": 5653,
+      "uncompressedBytes": 1194526168,
+      "storedBytes": 702474324,
+      "policyEstimateBytes": 1315445921,
+      "packPolicyEstimateBytes": 1315445921,
+      "packUpperBoundBytes": 1315445921,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 1315445921
+    },
+    {
+      "remote": "origin",
+      "url": "git@github.com:DraconDev/football-forever.git",
+      "provider": "github",
+      "limitBytes": 2147483648,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec",
+          "remoteTip": "6d2d5baea7b4f5ee0293dfcf692508d1a4728198",
+          "trackingTip": "6d2d5baea7b4f5ee0293dfcf692508d1a4728198"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "6d2d5baea7b4f5ee0293dfcf692508d1a4728198"
+      ],
+      "objectCount": 10950,
+      "reachableObjectCount": 10950,
+      "deltaBaseCount": 5653,
+      "uncompressedBytes": 1194526168,
+      "storedBytes": 702474324,
+      "policyEstimateBytes": 1315445921,
+      "packPolicyEstimateBytes": 1315445921,
+      "packUpperBoundBytes": 1315445921,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 1315445921
+    }
+  ],
+  "maxBasisBytes": 1315445921,
+  "stagedBytes": 0,
+  "stagedTree": null,
+  "projectedBytes": 1315445921,
+  "highWaterBytes": 2147483648,
+  "atOrAboveLimit": false,
+  "measurable": true,
+  "ok": true,
+  "code": "OK",
+  "limitBytes": 2147483648,
+  "remainingBytes": 832037727,
+  "errors": [],
+  "forwardOnly": {
+    "ok": true,
+    "code": "OK",
+    "checked": {
+      "staged": false,
+      "refs": 1
+    },
+    "violations": [],
+    "errors": []
+  }
+}
+To github.com:DraconDev/football-forever.git
+   6d2d5ba..9723a12  main -> main
+github after=9723a12c335dd427a36aee1ae04678ae7eb4e8ec
+gitlab before=6d2d5baea7b4f5ee0293dfcf692508d1a4728198 expected=9723a12c335dd427a36aee1ae04678ae7eb4e8ec
+{
+  "ref": "refs/heads/main",
+  "refs": [
+    {
+      "name": "refs/heads/main",
+      "ref": "refs/heads/main",
+      "remoteRef": "refs/heads/main",
+      "objectId": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec",
+      "remoteTip": "6d2d5baea7b4f5ee0293dfcf692508d1a4728198"
+    }
+  ],
+  "targetRemote": {
+    "name": "gitlab",
+    "url": "git@gitlab.com:DraconDev/football-forever.git"
+  },
+  "effectiveLimitBytes": 2147483648,
+  "limitingRemote": "github",
+  "limitingProvider": "github",
+  "scenarios": [
+    {
+      "remote": "github",
+      "url": "git@github.com:DraconDev/football-forever.git",
+      "provider": "github",
+      "limitBytes": 2147483648,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec",
+          "remoteTip": "6d2d5baea7b4f5ee0293dfcf692508d1a4728198",
+          "trackingTip": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "9723a12c335dd427a36aee1ae04678ae7eb4e8ec"
+      ],
+      "objectCount": 10950,
+      "reachableObjectCount": 10950,
+      "deltaBaseCount": 5653,
+      "uncompressedBytes": 1194526168,
+      "storedBytes": 702474324,
+      "policyEstimateBytes": 1315445921,
+      "packPolicyEstimateBytes": 1315445921,
+      "packUpperBoundBytes": 1315445921,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 1315445921
+    },
+    {
+      "remote": "gitlab",
+      "url": "git@gitlab.com:DraconDev/football-forever.git",
+      "provider": "gitlab",
+      "limitBytes": 5239860101,
+      "target": true,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec",
+          "remoteTip": "6d2d5baea7b4f5ee0293dfcf692508d1a4728198",
+          "trackingTip": "6d2d5baea7b4f5ee0293dfcf692508d1a4728198"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "6d2d5baea7b4f5ee0293dfcf692508d1a4728198"
+      ],
+      "objectCount": 10950,
+      "reachableObjectCount": 10950,
+      "deltaBaseCount": 5653,
+      "uncompressedBytes": 1194526168,
+      "storedBytes": 702474324,
+      "policyEstimateBytes": 1315445921,
+      "packPolicyEstimateBytes": 1315445921,
+      "packUpperBoundBytes": 1315445921,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 1315445921
+    },
+    {
+      "remote": "mirror-github",
+      "url": "git@github.com:DraconDev/web-games-football-forever.git",
+      "provider": "github",
+      "limitBytes": 2147483648,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec",
+          "remoteTip": "6d2d5baea7b4f5ee0293dfcf692508d1a4728198",
+          "trackingTip": "241c92289a26a2622c40ff2abf92d9cdad31eb55"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "241c92289a26a2622c40ff2abf92d9cdad31eb55"
+      ],
+      "objectCount": 10950,
+      "reachableObjectCount": 10950,
+      "deltaBaseCount": 5653,
+      "uncompressedBytes": 1194526168,
+      "storedBytes": 702474324,
+      "policyEstimateBytes": 1315445921,
+      "packPolicyEstimateBytes": 1315445921,
+      "packUpperBoundBytes": 1315445921,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 1315445921
+    },
+    {
+      "remote": "mirror-gitlab",
+      "url": "git@gitlab.com:DraconDev/web-games-football-forever.git",
+      "provider": "gitlab",
+      "limitBytes": 5239860101,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec",
+          "remoteTip": "6d2d5baea7b4f5ee0293dfcf692508d1a4728198",
+          "trackingTip": "241c92289a26a2622c40ff2abf92d9cdad31eb55"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "241c92289a26a2622c40ff2abf92d9cdad31eb55"
+      ],
+      "objectCount": 10950,
+      "reachableObjectCount": 10950,
+      "deltaBaseCount": 5653,
+      "uncompressedBytes": 1194526168,
+      "storedBytes": 702474324,
+      "policyEstimateBytes": 1315445921,
+      "packPolicyEstimateBytes": 1315445921,
+      "packUpperBoundBytes": 1315445921,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 1315445921
+    },
+    {
+      "remote": "origin",
+      "url": "git@github.com:DraconDev/football-forever.git",
+      "provider": "github",
+      "limitBytes": 2147483648,
+      "target": false,
+      "refs": [
+        {
+          "name": "refs/heads/main",
+          "ref": "refs/heads/main",
+          "remoteRef": "refs/heads/main",
+          "objectId": "9723a12c335dd427a36aee1ae04678ae7eb4e8ec",
+          "remoteTip": "6d2d5baea7b4f5ee0293dfcf692508d1a4728198",
+          "trackingTip": "6d2d5baea7b4f5ee0293dfcf692508d1a4728198"
+        }
+      ],
+      "measurementBasis": "complete-reachable-raw-plus-framing-policy-estimate",
+      "trackingTips": [
+        "6d2d5baea7b4f5ee0293dfcf692508d1a4728198"
+      ],
+      "objectCount": 10950,
+      "reachableObjectCount": 10950,
+      "deltaBaseCount": 5653,
+      "uncompressedBytes": 1194526168,
+      "storedBytes": 702474324,
+      "policyEstimateBytes": 1315445921,
+      "packPolicyEstimateBytes": 1315445921,
+      "packUpperBoundBytes": 1315445921,
+      "prospectiveCommitAllowanceBytes": 0,
+      "prospectiveCommitMessageBytes": 0,
+      "basisBytes": 1315445921
+    }
+  ],
+  "maxBasisBytes": 1315445921,
+  "stagedBytes": 0,
+  "stagedTree": null,
+  "projectedBytes": 1315445921,
+  "highWaterBytes": 2147483648,
+  "atOrAboveLimit": false,
+  "measurable": true,
+  "ok": true,
+  "code": "OK",
+  "limitBytes": 2147483648,
+  "remainingBytes": 832037727,
+  "errors": [],
+  "forwardOnly": {
+    "ok": true,
+    "code": "OK",
+    "checked": {
+      "staged": false,
+      "refs": 1
+    },
+    "violations": [],
+    "errors": []
+  }
+}
+remote:
+remote: ========================================================================
+remote:
+remote:     You have reached the free storage limit of 10 GiB on one or more
+remote:      projects. To unlock your projects over the free 10 GiB project
+remote:   limit, you must purchase additional storage. You can't push to your
+remote:     repository, create pipelines, create issues, or add comments. To
+remote:       reduce storage capacity, you can delete unused repositories,
+remote:                 artifacts, wikis, issues, and pipelines.
+remote:
+remote: ========================================================================
+remote:
+To gitlab.com:DraconDev/football-forever.git
+   6d2d5ba..9723a12  main -> main
+gitlab after=9723a12c335dd427a36aee1ae04678ae7eb4e8ec
+ERRORS
+/home/dracon/Dev/dracon-platform/web/games/wip/deathrun github: push rc=1
+/home/dracon/Dev/dracon-platform/web/games/wip/deathrun gitlab: push rc=1

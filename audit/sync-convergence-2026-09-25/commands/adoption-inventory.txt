@@ -1,0 +1,550 @@
+### standalone /home/dracon/.dracon
+HEAD 33c46e9e497f0511b1cdc7f886dd0b3dc0b4316f branch main
+status_records 4
+STATUS .M dracon-sync.freeze
+STATUS .M events.jsonl
+STATUS .M utilities/sync/repos-seen-ledger.json
+STATUS ? convos/ bytes=4096
+staged_records 0
+unstaged_records 3
+UNSTAGED M	dracon-sync.freeze
+UNSTAGED M	events.jsonl
+UNSTAGED M	utilities/sync/repos-seen-ledger.json
+REMOTE github ahead=0 behind=0 merge_base=33c46e9e497f0511b1cdc7f886dd0b3dc0b4316f
+REMOTE gitlab ahead=0 behind=0 merge_base=33c46e9e497f0511b1cdc7f886dd0b3dc0b4316f
+
+### parent /home/dracon/Dev/dracon-platform
+HEAD ea59ab42913964953fce2e9f3a5c995e5bf8a39b branch main
+status_records 58
+STATUS .M scripts/tests/caddy-seo-sitemap-routing.test.sh
+STATUS .M seo/seo-growth-delivery.json
+STATUS .M seo/verify-seo-growth-delivery.py
+STATUS .M web/ai-hub/src/lib/data/catalog-stamp.json
+STATUS M. web/chat/check-consistency.cjs
+STATUS M. web/chat/package.json
+STATUS A. web/chat/scripts/check.mjs
+STATUS A. web/chat/scripts/verify-search-privacy.mjs
+STATUS M. web/chat/src/lib/search/SearchResults.svelte
+STATUS M. web/chat/src/lib/search/SearchView.svelte
+STATUS A. web/chat/src/lib/search/clipboard.test.ts
+STATUS A. web/chat/src/lib/search/clipboard.ts
+STATUS M. web/chat/src/lib/search/provider-fallback.ts
+STATUS A. web/chat/src/lib/search/result-rows.test.ts
+STATUS A. web/chat/src/lib/search/result-rows.ts
+STATUS A. web/chat/src/lib/search/run-boundary.test.ts
+STATUS A. web/chat/src/lib/search/run-boundary.ts
+STATUS M. web/chat/src/lib/search/taste.test.ts
+STATUS M. web/chat/src/lib/search/taste.ts
+STATUS M. web/chat/src/routes/+page.svelte
+STATUS M. web/chat/tests/README.md
+STATUS M. web/chat/tests/chat-abort-stopped-marker.test.ts
+STATUS M. web/chat/tests/chat-cross-surface-contracts.test.ts
+STATUS M. web/chat/tests/chat-e2e.cjs
+STATUS M. web/chat/tests/chat-mode-roving.test.ts
+STATUS M. web/chat/tests/chat-path-anchored.test.ts
+STATUS M. web/chat/tests/chat-send-gate.test.ts
+STATUS M. web/chat/tests/chat-visual-overhaul-contract.test.ts
+STATUS M. web/chat/tests/helpers/page-source.ts
+STATUS M. web/chat/tests/lib/static-server.cjs
+STATUS M. web/chat/tests/reroute-legacy-paths.test.ts
+STATUS M. web/chat/tests/router-e2e.cjs
+STATUS M. web/chat/tests/router-export.test.ts
+STATUS M. web/chat/tests/search-e2e.cjs
+STATUS M. web/chat/tests/search-m4-m7.test.ts
+STATUS M. web/chat/tests/search-model-order.test.ts
+STATUS M. web/chat/tests/search-privacy-boundaries.test.ts
+STATUS M. web/chat/tests/search-provider-fallback.test.ts
+STATUS A. web/chat/tests/search-runtime-contract.test.ts
+STATUS M. web/chat/tests/search-spellcheck.test.ts
+STATUS M. web/chat/tests/suggest-general-mode.test.ts
+STATUS M. web/chat/tests/suggest-places.test.ts
+STATUS A. web/chat/tests/vitest-contract.d.ts
+STATUS M. web/chat/tsconfig.json
+STATUS .M web/games/released/come-get-me
+STATUS .M web/games/wip/capture-anime-girls
+STATUS .M web/games/wip/darklord
+STATUS .M web/games/wip/deathrun
+STATUS .M web/games/wip/doomtap
+STATUS .M web/games/wip/football-forever
+STATUS .M web/games/wip/freeport
+STATUS .M web/games/wip/hegemon
+STATUS .M web/games/wip/hellhunter
+STATUS .M web/games/wip/junk-runner
+STATUS .M web/games/wip/polis
+STATUS .M web/music/libs/data/cookbook-track-count.json
+STATUS .M web/studio-launcher/package.json
+STATUS ? seo/verify-seo-baseline-artifacts.py bytes=1545
+staged_records 40
+STAGED M	web/chat/check-consistency.cjs
+STAGED M	web/chat/package.json
+STAGED A	web/chat/scripts/check.mjs
+STAGED A	web/chat/scripts/verify-search-privacy.mjs
+STAGED M	web/chat/src/lib/search/SearchResults.svelte
+STAGED M	web/chat/src/lib/search/SearchView.svelte
+STAGED A	web/chat/src/lib/search/clipboard.test.ts
+STAGED A	web/chat/src/lib/search/clipboard.ts
+STAGED M	web/chat/src/lib/search/provider-fallback.ts
+STAGED A	web/chat/src/lib/search/result-rows.test.ts
+STAGED A	web/chat/src/lib/search/result-rows.ts
+STAGED A	web/chat/src/lib/search/run-boundary.test.ts
+STAGED A	web/chat/src/lib/search/run-boundary.ts
+STAGED M	web/chat/src/lib/search/taste.test.ts
+STAGED M	web/chat/src/lib/search/taste.ts
+STAGED M	web/chat/src/routes/+page.svelte
+STAGED M	web/chat/tests/README.md
+STAGED M	web/chat/tests/chat-abort-stopped-marker.test.ts
+STAGED M	web/chat/tests/chat-cross-surface-contracts.test.ts
+STAGED M	web/chat/tests/chat-e2e.cjs
+STAGED M	web/chat/tests/chat-mode-roving.test.ts
+STAGED M	web/chat/tests/chat-path-anchored.test.ts
+STAGED M	web/chat/tests/chat-send-gate.test.ts
+STAGED M	web/chat/tests/chat-visual-overhaul-contract.test.ts
+STAGED M	web/chat/tests/helpers/page-source.ts
+STAGED M	web/chat/tests/lib/static-server.cjs
+STAGED M	web/chat/tests/reroute-legacy-paths.test.ts
+STAGED M	web/chat/tests/router-e2e.cjs
+STAGED M	web/chat/tests/router-export.test.ts
+STAGED M	web/chat/tests/search-e2e.cjs
+STAGED M	web/chat/tests/search-m4-m7.test.ts
+STAGED M	web/chat/tests/search-model-order.test.ts
+STAGED M	web/chat/tests/search-privacy-boundaries.test.ts
+STAGED M	web/chat/tests/search-provider-fallback.test.ts
+STAGED A	web/chat/tests/search-runtime-contract.test.ts
+STAGED M	web/chat/tests/search-spellcheck.test.ts
+STAGED M	web/chat/tests/suggest-general-mode.test.ts
+STAGED M	web/chat/tests/suggest-places.test.ts
+STAGED A	web/chat/tests/vitest-contract.d.ts
+STAGED M	web/chat/tsconfig.json
+unstaged_records 17
+UNSTAGED M	scripts/tests/caddy-seo-sitemap-routing.test.sh
+UNSTAGED M	seo/seo-growth-delivery.json
+UNSTAGED M	seo/verify-seo-growth-delivery.py
+UNSTAGED M	web/ai-hub/src/lib/data/catalog-stamp.json
+UNSTAGED M	web/games/released/come-get-me
+UNSTAGED M	web/games/wip/capture-anime-girls
+UNSTAGED M	web/games/wip/darklord
+UNSTAGED M	web/games/wip/deathrun
+UNSTAGED M	web/games/wip/doomtap
+UNSTAGED M	web/games/wip/football-forever
+UNSTAGED M	web/games/wip/freeport
+UNSTAGED M	web/games/wip/hegemon
+UNSTAGED M	web/games/wip/hellhunter
+UNSTAGED M	web/games/wip/junk-runner
+UNSTAGED M	web/games/wip/polis
+UNSTAGED M	web/music/libs/data/cookbook-track-count.json
+UNSTAGED M	web/studio-launcher/package.json
+REMOTE github ahead=5 behind=0 merge_base=a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51
+LOCAL_ONLY github ea59ab42913964953fce2e9f3a5c995e5bf8a39b	DraconDev	dracsharp@gmail.com	fix(ai): keep ambiguous retries and config fail-closed
+LOCAL_ONLY github f4cca6f867f4eec8db92d8fa28c275cab0ac1336	DraconDev	dracsharp@gmail.com	fix(books): keep large catalog plaque colors distinct
+LOCAL_ONLY github 8921275ccbbc193eff44edbb3bdb673336eb080d	DraconDev	dracsharp@gmail.com	chore(chat): remove temporary E2E debug harness
+LOCAL_ONLY github 0eb235de1373f2343af483b3b5b0ba1c33d70f8d	DraconDev	dracsharp@gmail.com	test(chat): accept truthful Search cancellation copy
+LOCAL_ONLY github f47f62a0d5fa10a0f7d8665c68d14630d1d3ff8c	DraconDev	dracsharp@gmail.com	test(chat): keep Search E2E assertions explicit
+REMOTE gitlab ahead=5 behind=0 merge_base=a3420c4f5bb935d9c4fbd98b0ccad0e21fe16b51
+LOCAL_ONLY gitlab ea59ab42913964953fce2e9f3a5c995e5bf8a39b	DraconDev	dracsharp@gmail.com	fix(ai): keep ambiguous retries and config fail-closed
+LOCAL_ONLY gitlab f4cca6f867f4eec8db92d8fa28c275cab0ac1336	DraconDev	dracsharp@gmail.com	fix(books): keep large catalog plaque colors distinct
+LOCAL_ONLY gitlab 8921275ccbbc193eff44edbb3bdb673336eb080d	DraconDev	dracsharp@gmail.com	chore(chat): remove temporary E2E debug harness
+LOCAL_ONLY gitlab 0eb235de1373f2343af483b3b5b0ba1c33d70f8d	DraconDev	dracsharp@gmail.com	test(chat): accept truthful Search cancellation copy
+LOCAL_ONLY gitlab f47f62a0d5fa10a0f7d8665c68d14630d1d3ff8c	DraconDev	dracsharp@gmail.com	test(chat): keep Search E2E assertions explicit
+
+### nested-required /home/dracon/Dev/dracon-platform/web/games/released/come-get-me
+HEAD e7792054e3a70a257ddf1137350ccfc5df4c95dc branch main
+status_records 0
+staged_records 0
+unstaged_records 0
+REMOTE github no merge-base
+REMOTE gitlab ahead=22 behind=0 merge_base=ef6f7a6327c3b04bcf4d9ce83bbd5a63d6429e2d
+LOCAL_ONLY gitlab e7792054e3a70a257ddf1137350ccfc5df4c95dc	dracon	dracon@local	fix: lift narrow labels to readable threshold
+LOCAL_ONLY gitlab 4ecc16e3c4afa36c61b30abf1b548bd6d670ef8a	dracon	dracon@local	fix: make narrow metadata readable at native scale
+LOCAL_ONLY gitlab f0bc92d32e441dffbca6470612f0a0b1dbd0aac6	dracon	dracon@local	fix: enforce readable narrow typography and audio capture
+LOCAL_ONLY gitlab 3b60a8320e2fbc44b8914658ee0fb779cd75e43b	dracon	dracon@local	fix: reflow 900px hardpoints for readable names
+LOCAL_ONLY gitlab 0df99f773de3f19e30a78dc3147ab3f3f23d1bc6	dracon	dracon@local	fix: use readable hardpoint grid at 900px
+LOCAL_ONLY gitlab bc28965cc9c9d194fa015bf576227907978a4ac6	dracon	dracon@local	fix: keep hardpoint metadata within compact cards
+LOCAL_ONLY gitlab ee574f09c3d79d039841f4fbc5be9ad2dd429132	dracon	dracon@local	fix: give narrow hardpoint names readable tracks
+LOCAL_ONLY gitlab b0aca7e93f09a24f2abe40046621afdb17c09a2a	dracon	dracon@local	fix: allocate command rail for full objective set
+LOCAL_ONLY gitlab 856724de9cb25a908260b7ed24941e218b630d08	dracon	dracon@local	fix: keep objective rail inside command panel
+LOCAL_ONLY gitlab fe31da8ce96354e704503328845e4e693f65ecdf	dracon	dracon@local	fix: keep compact desktop labels within owners
+LOCAL_ONLY gitlab 8834f4fab9729bfc314c0e3795686c3e7864b4ce	dracon	dracon@local	fix: fit snapped objective and socket labels
+LOCAL_ONLY gitlab fe6f61f860880af936b2011e0979b2713cb4240f	dracon	dracon@local	fix: close strict narrow visual contracts
+LOCAL_ONLY gitlab daa636115790490ec8b9b1ae49a923489834c7f6	dracon	dracon@local	fix: enforce narrow visual contracts
+LOCAL_ONLY gitlab ce0ab0c692994ac3f78ecc36cc2a8f763348baa6	dracon	dracon@local	fix: preserve readable narrow Armory labels
+LOCAL_ONLY gitlab 06332f22a304410ab78afa0a04cc379e6e63269a	dracon	dracon@local	fix: reserve full objective rail at 900px
+LOCAL_ONLY gitlab 8a4df1ab3505cda6d3f64cec32348e51e077565d	dracon	dracon@local	test: reject clipped narrow controls
+LOCAL_ONLY gitlab e6e4ee6aa87fd6b07bdef2b0bbd8d4dbc475bc14	dracon	dracon@local	fix: keep narrow Armory actions visible
+LOCAL_ONLY gitlab 86c919a4718951fa8f7d3966c5188d567b8dd2e2	dracon	dracon@local	fix: preserve launch audio quantum boundaries
+LOCAL_ONLY gitlab e2699c120a3274e92286f725545517ac566743fc	dracon	dracon@local	fix: tolerate worklet arm handoff
+LOCAL_ONLY gitlab 3a1af7a9e440993bfb0bddabe200e1039ecef661	dracon	dracon@local	test: update renderer harness contract
+LOCAL_ONLY gitlab 311eb214849ae8cacc0cbff68f4735ed7de85ff4	dracon	dracon@local	test: finalize E2E worker budget
+LOCAL_ONLY gitlab 09704581b4a6c2291898408677ee05fb9e5dd3cd	dracon	dracon@local	test: streamline E2E world rendering
+
+### nested-required /home/dracon/Dev/dracon-platform/web/games/wip/capture-anime-girls
+HEAD f043ae7070e04c8d4ad97642014c685871a70505 branch main
+status_records 0
+staged_records 0
+unstaged_records 0
+REMOTE github ahead=3 behind=0 merge_base=6721c2ef05093ca5321b03447cd1bfdaf4570ff4
+LOCAL_ONLY github f043ae7070e04c8d4ad97642014c685871a70505	DraconDev	dracsharp@gmail.com	docs: align playtests with dossier-first interactions
+LOCAL_ONLY github 31a54653493414d8c402d8299107bc29a540cc42	DraconDev	dracsharp@gmail.com	test: wait for hydrated deck builder in dossier gate
+LOCAL_ONLY github af888db09c1bc43efcae7153138ce12efb2717a2	DraconDev	dracsharp@gmail.com	test: enforce dossier scroll and retire stale hover audit
+REMOTE gitlab ahead=3 behind=0 merge_base=6721c2ef05093ca5321b03447cd1bfdaf4570ff4
+LOCAL_ONLY gitlab f043ae7070e04c8d4ad97642014c685871a70505	DraconDev	dracsharp@gmail.com	docs: align playtests with dossier-first interactions
+LOCAL_ONLY gitlab 31a54653493414d8c402d8299107bc29a540cc42	DraconDev	dracsharp@gmail.com	test: wait for hydrated deck builder in dossier gate
+LOCAL_ONLY gitlab af888db09c1bc43efcae7153138ce12efb2717a2	DraconDev	dracsharp@gmail.com	test: enforce dossier scroll and retire stale hover audit
+
+### nested-required /home/dracon/Dev/dracon-platform/web/games/wip/darklord
+HEAD d3a71a933b2473cf1d2a5aa2348e00b77f1a91c2 branch main
+status_records 46
+STATUS .M .pi-glla/active.jsonl
+STATUS .M SPEC.md
+STATUS .M docs/audits/phase-a/feature-content-gap-matrix.md
+STATUS .M docs/plans/V1_1_CORE_LOOP.md
+STATUS .M src/lib/dev/performance/startingEconomyStrategies.test.ts
+STATUS .M src/lib/readmeCurrentFlatMapAndBaselineDocsSourceContract.test.ts
+STATUS .M src/lib/sim/combat/melee.ts
+STATUS .M src/lib/sim/combat/meleeMCMBCounterDamageSourceContract.test.ts
+STATUS .M src/lib/sim/combat/meleeMCMBLineCitationAuditLoopSourceContract.test.ts
+STATUS .M src/lib/sim/g1HeroPathing.test.ts
+STATUS .M src/lib/sim/heroGoldBountyDefaultsAuditLoopSourceContract.test.ts
+STATUS .M src/lib/sim/heroLevelDayScalingAuditLoopSourceContract.test.ts
+STATUS .M src/lib/sim/heroes.ts
+STATUS .M src/lib/sim/heroesMHeroSourceContract.test.ts
+STATUS .M src/lib/sim/heroesMapNarrowLocalAuditLoopSourceContract.test.ts
+STATUS .M src/lib/sim/heroesTickHeroesDeadIterComputationAuditLoopSourceContract.test.ts
+STATUS .M src/lib/sim/mWaveSpecRimworldPickerSourceContract.test.ts
+STATUS .M src/lib/sim/pickHeroKindPerContextDistributionAuditLoopSourceContract.test.ts
+STATUS .M src/lib/sim/raids/scheduler.ts
+STATUS .M src/lib/sim/raids/schedulerHeaderCurveMultiplierMatchesImplAuditLoopSourceContract.test.ts
+STATUS .M src/lib/sim/raids/zeroAttackGateAuditLoopSourceContract.test.ts
+STATUS .M src/lib/sim/runHarness.ts
+STATUS .M src/lib/sim/runHarnessDaysSurvivedAdvanceAuditLoopSourceContract.test.ts
+STATUS .M src/lib/sim/runHarnessGoldBountyLevelRampAuditLoopSourceContract.test.ts
+STATUS .M src/lib/sim/save.ts
+STATUS .M src/lib/sim/saveSchema.ts
+STATUS .M src/lib/sim/simFlatListAuditLoopSourceContract.test.ts
+STATUS .M src/lib/sim/state/gameState.ts
+STATUS .M src/lib/sim/tick.ts
+STATUS .M src/lib/sim/tickForFrameDAYTICKSLineCitationAuditLoopSourceContract.test.ts
+STATUS .M src/lib/sim/tickForFrameTICKMSLineCitationAuditLoopSourceContract.test.ts
+STATUS .M src/lib/sim/tileEconomyMTileLineCitationAuditLoopSourceContract.test.ts
+STATUS .M src/lib/specCiteAuditSourceContract.test.ts
+STATUS .M src/lib/ui/hud.ts
+STATUS ? src/lib/dev/performance/directorReplayFixtures.test.ts bytes=1961
+STATUS ? src/lib/dev/performance/directorReplayFixtures.ts bytes=5761
+STATUS ? src/lib/sim/heroAttackIntent.test.ts bytes=3132
+STATUS ? src/lib/sim/heroPathfinding.test.ts bytes=7941
+STATUS ? src/lib/sim/heroPathfinding.ts bytes=10486
+STATUS ? src/lib/sim/raids/director.test.ts bytes=6575
+STATUS ? src/lib/sim/raids/director.ts bytes=19929
+STATUS ? src/lib/sim/raids/directorHeroFactorySourceContract.test.ts bytes=1588
+STATUS ? src/lib/sim/raids/directorLiveParity.test.ts bytes=2128
+STATUS ? src/lib/sim/raids/directorSaveRoundTrip.test.ts bytes=1965
+STATUS ? src/lib/sim/raids/directorSourceContract.test.ts bytes=1699
+STATUS ? src/lib/ui/authoredDirectorHeroesDetail.test.ts bytes=1360
+staged_records 0
+unstaged_records 34
+UNSTAGED M	.pi-glla/active.jsonl
+UNSTAGED M	SPEC.md
+UNSTAGED M	docs/audits/phase-a/feature-content-gap-matrix.md
+UNSTAGED M	docs/plans/V1_1_CORE_LOOP.md
+UNSTAGED M	src/lib/dev/performance/startingEconomyStrategies.test.ts
+UNSTAGED M	src/lib/readmeCurrentFlatMapAndBaselineDocsSourceContract.test.ts
+UNSTAGED M	src/lib/sim/combat/melee.ts
+UNSTAGED M	src/lib/sim/combat/meleeMCMBCounterDamageSourceContract.test.ts
+UNSTAGED M	src/lib/sim/combat/meleeMCMBLineCitationAuditLoopSourceContract.test.ts
+UNSTAGED M	src/lib/sim/g1HeroPathing.test.ts
+UNSTAGED M	src/lib/sim/heroGoldBountyDefaultsAuditLoopSourceContract.test.ts
+UNSTAGED M	src/lib/sim/heroLevelDayScalingAuditLoopSourceContract.test.ts
+UNSTAGED M	src/lib/sim/heroes.ts
+UNSTAGED M	src/lib/sim/heroesMHeroSourceContract.test.ts
+UNSTAGED M	src/lib/sim/heroesMapNarrowLocalAuditLoopSourceContract.test.ts
+UNSTAGED M	src/lib/sim/heroesTickHeroesDeadIterComputationAuditLoopSourceContract.test.ts
+UNSTAGED M	src/lib/sim/mWaveSpecRimworldPickerSourceContract.test.ts
+UNSTAGED M	src/lib/sim/pickHeroKindPerContextDistributionAuditLoopSourceContract.test.ts
+UNSTAGED M	src/lib/sim/raids/scheduler.ts
+UNSTAGED M	src/lib/sim/raids/schedulerHeaderCurveMultiplierMatchesImplAuditLoopSourceContract.test.ts
+UNSTAGED M	src/lib/sim/raids/zeroAttackGateAuditLoopSourceContract.test.ts
+UNSTAGED M	src/lib/sim/runHarness.ts
+UNSTAGED M	src/lib/sim/runHarnessDaysSurvivedAdvanceAuditLoopSourceContract.test.ts
+UNSTAGED M	src/lib/sim/runHarnessGoldBountyLevelRampAuditLoopSourceContract.test.ts
+UNSTAGED M	src/lib/sim/save.ts
+UNSTAGED M	src/lib/sim/saveSchema.ts
+UNSTAGED M	src/lib/sim/simFlatListAuditLoopSourceContract.test.ts
+UNSTAGED M	src/lib/sim/state/gameState.ts
+UNSTAGED M	src/lib/sim/tick.ts
+UNSTAGED M	src/lib/sim/tickForFrameDAYTICKSLineCitationAuditLoopSourceContract.test.ts
+UNSTAGED M	src/lib/sim/tickForFrameTICKMSLineCitationAuditLoopSourceContract.test.ts
+UNSTAGED M	src/lib/sim/tileEconomyMTileLineCitationAuditLoopSourceContract.test.ts
+UNSTAGED M	src/lib/specCiteAuditSourceContract.test.ts
+UNSTAGED M	src/lib/ui/hud.ts
+REMOTE github no merge-base
+REMOTE gitlab ahead=0 behind=0 merge_base=d3a71a933b2473cf1d2a5aa2348e00b77f1a91c2
+
+### nested-required /home/dracon/Dev/dracon-platform/web/games/wip/deathrun
+HEAD 2271f0033bab0fc491392f12b31295d93ae48dc8 branch main
+status_records 0
+staged_records 0
+unstaged_records 0
+REMOTE github no merge-base
+REMOTE gitlab ahead=4 behind=0 merge_base=c1a1fb22530c7e9e32a3c9b396712be433ff5eb6
+LOCAL_ONLY gitlab 2271f0033bab0fc491392f12b31295d93ae48dc8	deathrun-dev	deathrun@dracon.local	test(audit): accept account-fenced persistence calls
+LOCAL_ONLY gitlab c70fdb35bdc374067c7b0be340597bb39c3fae31	deathrun-dev	deathrun@dracon.local	chore(audit): refresh generated deliverable metadata
+LOCAL_ONLY gitlab c4a5042369276bb9064b06c3a488630652216e05	deathrun-dev	deathrun@dracon.local	fix(audit): restore cold-load music ownership
+LOCAL_ONLY gitlab 015f029e179687cff6445d9de44089e234dce5d6	deathrun-dev	deathrun@dracon.local	fix(play): hydrate track before mounting scene
+
+### nested-required /home/dracon/Dev/dracon-platform/web/games/wip/doomtap
+HEAD 71c0e8b63c6703f14787a284745c4a75dc21a2d2 branch main
+status_records 1
+STATUS .M src/lib/sim/combat.ts
+staged_records 0
+unstaged_records 1
+UNSTAGED M	src/lib/sim/combat.ts
+REMOTE github ahead=0 behind=0 merge_base=71c0e8b63c6703f14787a284745c4a75dc21a2d2
+REMOTE gitlab ahead=0 behind=0 merge_base=71c0e8b63c6703f14787a284745c4a75dc21a2d2
+
+### nested-required /home/dracon/Dev/dracon-platform/web/games/wip/endless-td
+HEAD ab4bcd3c885e0115b8ec9ec33bfe4391c4bf4b28 branch main
+status_records 0
+staged_records 0
+unstaged_records 0
+REMOTE github no merge-base
+REMOTE gitlab ahead=0 behind=0 merge_base=ab4bcd3c885e0115b8ec9ec33bfe4391c4bf4b28
+
+### nested-required /home/dracon/Dev/dracon-platform/web/games/wip/football-forever
+HEAD 9723a12c335dd427a36aee1ae04678ae7eb4e8ec branch main
+status_records 24
+STATUS ? docs/premium/evidence/baseline-season-v1/run-2026-09-25T07-53-53-2026-09-25T07-53-53/checkpoint-w12.json bytes=886054
+STATUS ? docs/premium/evidence/baseline-season-v1/run-2026-09-25T07-53-53-2026-09-25T07-53-53/checkpoint-w16.json bytes=895574
+STATUS ? docs/premium/evidence/baseline-season-v1/run-2026-09-25T07-53-53-2026-09-25T07-53-53/checkpoint-w19.json bytes=898952
+STATUS ? docs/premium/evidence/baseline-season-v1/run-2026-09-25T07-53-53-2026-09-25T07-53-53/checkpoint-w22.json bytes=904459
+STATUS ? docs/premium/evidence/baseline-season-v1/run-2026-09-25T07-53-53-2026-09-25T07-53-53/checkpoint-w4.json bytes=865775
+STATUS ? docs/premium/evidence/baseline-season-v1/run-2026-09-25T07-53-53-2026-09-25T07-53-53/checkpoint-w8.json bytes=875383
+STATUS ? docs/premium/evidence/baseline-season-v1/run-2026-09-25T07-53-53-2026-09-25T07-53-53/run2-notes.json bytes=9919
+STATUS ? docs/premium/evidence/baseline-season-v1/run-2026-09-25T07-53-53-2026-09-25T07-53-53/season2-opening.json bytes=957350
+STATUS ? docs/premium/evidence/baseline-season-v1/run-2026-09-25T08-00-40-2026-09-25T08-00-40/checkpoint-w12.json bytes=886054
+STATUS ? docs/premium/evidence/baseline-season-v1/run-2026-09-25T08-00-40-2026-09-25T08-00-40/checkpoint-w16.json bytes=895574
+STATUS ? docs/premium/evidence/baseline-season-v1/run-2026-09-25T08-00-40-2026-09-25T08-00-40/checkpoint-w19.json bytes=898952
+STATUS ? docs/premium/evidence/baseline-season-v1/run-2026-09-25T08-00-40-2026-09-25T08-00-40/checkpoint-w22.json bytes=904459
+STATUS ? docs/premium/evidence/baseline-season-v1/run-2026-09-25T08-00-40-2026-09-25T08-00-40/checkpoint-w4.json bytes=865775
+STATUS ? docs/premium/evidence/baseline-season-v1/run-2026-09-25T08-00-40-2026-09-25T08-00-40/checkpoint-w8.json bytes=875383
+STATUS ? docs/premium/evidence/baseline-season-v1/run-2026-09-25T08-00-40-2026-09-25T08-00-40/run2-notes.json bytes=9919
+STATUS ? docs/premium/evidence/baseline-season-v1/run-2026-09-25T08-00-40-2026-09-25T08-00-40/season2-opening.json bytes=957350
+STATUS ? docs/premium/evidence/baseline-season-v1/run-2026-09-25T08-04-37-2026-09-25T08-04-37/checkpoint-w12.json bytes=886054
+STATUS ? docs/premium/evidence/baseline-season-v1/run-2026-09-25T08-04-37-2026-09-25T08-04-37/checkpoint-w16.json bytes=895574
+STATUS ? docs/premium/evidence/baseline-season-v1/run-2026-09-25T08-04-37-2026-09-25T08-04-37/checkpoint-w19.json bytes=898952
+STATUS ? docs/premium/evidence/baseline-season-v1/run-2026-09-25T08-04-37-2026-09-25T08-04-37/checkpoint-w22.json bytes=904459
+STATUS ? docs/premium/evidence/baseline-season-v1/run-2026-09-25T08-04-37-2026-09-25T08-04-37/checkpoint-w4.json bytes=865775
+STATUS ? docs/premium/evidence/baseline-season-v1/run-2026-09-25T08-04-37-2026-09-25T08-04-37/checkpoint-w8.json bytes=875383
+STATUS ? docs/premium/evidence/baseline-season-v1/run-2026-09-25T08-04-37-2026-09-25T08-04-37/run2-notes.json bytes=9919
+STATUS ? docs/premium/evidence/baseline-season-v1/run-2026-09-25T08-04-37-2026-09-25T08-04-37/season2-opening.json bytes=957350
+staged_records 0
+unstaged_records 0
+REMOTE github no merge-base
+REMOTE gitlab ahead=1 behind=0 merge_base=6d2d5baea7b4f5ee0293dfcf692508d1a4728198
+LOCAL_ONLY gitlab 9723a12c335dd427a36aee1ae04678ae7eb4e8ec	dracon	dracon@local	test: record successful desktop baseline evidence
+
+### nested-required /home/dracon/Dev/dracon-platform/web/games/wip/freeport
+HEAD 300d70681ed33cd9d47160b5bba0481348d50f37 branch main
+status_records 0
+staged_records 0
+unstaged_records 0
+REMOTE github no merge-base
+REMOTE gitlab ahead=1 behind=0 merge_base=a262886eac30d59f9aead395f04e475c79eff68e
+LOCAL_ONLY gitlab 300d70681ed33cd9d47160b5bba0481348d50f37	DraconDev	dracsharp@gmail.com	docs: bind P07 report to immutable evidence run
+
+### nested-required /home/dracon/Dev/dracon-platform/web/games/wip/hegemon
+HEAD 6b0aeef752ed2d6ae820eee40f1e0206053b2769 branch main
+status_records 49
+STATUS .M scripts/.design-docs-divider-probe.json
+STATUS ? .tmp/start-retry.audit.diff bytes=4479
+STATUS ? docs/uiux-audit-2026-09-22/screens/after/01-main-menu.jpg bytes=165095
+STATUS ? docs/uiux-audit-2026-09-22/screens/after/02-menu-alias.jpg bytes=167818
+STATUS ? docs/uiux-audit-2026-09-22/screens/after/03-how-to-play.jpg bytes=684877
+STATUS ? docs/uiux-audit-2026-09-22/screens/after/04-settings.jpg bytes=203193
+STATUS ? docs/uiux-audit-2026-09-22/screens/after/05-runs.jpg bytes=185713
+STATUS ? docs/uiux-audit-2026-09-22/screens/after/06-credits.jpg bytes=522947
+STATUS ? docs/uiux-audit-2026-09-22/screens/after/07-end-recap.jpg bytes=106133
+STATUS ? docs/uiux-audit-2026-09-22/screens/after/08-error-404.jpg bytes=42063
+STATUS ? docs/uiux-audit-2026-09-22/screens/after/09-new-game.jpg bytes=213812
+STATUS ? docs/uiux-audit-2026-09-22/screens/after/10-new-game-selected.jpg bytes=205990
+STATUS ? docs/uiux-audit-2026-09-22/screens/after/11-play-fresh-boot.jpg bytes=605385
+STATUS ? docs/uiux-audit-2026-09-22/screens/after/12-hero.jpg bytes=420494
+STATUS ? docs/uiux-audit-2026-09-22/screens/after/13-kingdom.jpg bytes=242203
+STATUS ? docs/uiux-audit-2026-09-22/screens/after/14-artifacts.jpg bytes=1790993
+STATUS ? docs/uiux-audit-2026-09-22/screens/after/15-saves.jpg bytes=277419
+STATUS ? docs/uiux-audit-2026-09-22/screens/after/16-secondary-skills.jpg bytes=1352485
+STATUS ? docs/uiux-audit-2026-09-22/screens/after/17-town-screen.jpg bytes=158450
+STATUS ? docs/uiux-audit-2026-09-22/screens/after/18-combat.jpg bytes=157233
+STATUS ? docs/uiux-audit-2026-09-22/screens/after/19-combat-debug.jpg bytes=187292
+STATUS ? docs/uiux-audit-2026-09-22/screens/after/20-spells.jpg bytes=307028
+STATUS ? docs/uiux-audit-2026-09-22/screens/after/21-combat-phaser.jpg bytes=165062
+STATUS ? docs/uiux-audit-2026-09-22/screens/after/22-play-phaser.jpg bytes=606418
+STATUS ? docs/uiux-audit-2026-09-22/screens/before/01-main-menu.jpg bytes=165444
+STATUS ? docs/uiux-audit-2026-09-22/screens/before/02-menu-alias.jpg bytes=164503
+STATUS ? docs/uiux-audit-2026-09-22/screens/before/03-how-to-play.jpg bytes=720675
+STATUS ? docs/uiux-audit-2026-09-22/screens/before/04-settings.jpg bytes=208247
+STATUS ? docs/uiux-audit-2026-09-22/screens/before/05-runs.jpg bytes=190468
+STATUS ? docs/uiux-audit-2026-09-22/screens/before/06-credits.jpg bytes=535002
+STATUS ? docs/uiux-audit-2026-09-22/screens/before/07-end-recap.jpg bytes=111366
+STATUS ? docs/uiux-audit-2026-09-22/screens/before/08-error-404.jpg bytes=41499
+STATUS ? docs/uiux-audit-2026-09-22/screens/before/09-new-game.jpg bytes=224999
+STATUS ? docs/uiux-audit-2026-09-22/screens/before/10-new-game-selected.jpg bytes=217412
+STATUS ? docs/uiux-audit-2026-09-22/screens/before/11-play-fresh-boot.jpg bytes=450199
+STATUS ? docs/uiux-audit-2026-09-22/screens/before/12-hero.jpg bytes=415300
+STATUS ? docs/uiux-audit-2026-09-22/screens/before/13-kingdom.jpg bytes=247072
+STATUS ? docs/uiux-audit-2026-09-22/screens/before/14-artifacts.jpg bytes=1250828
+STATUS ? docs/uiux-audit-2026-09-22/screens/before/15-saves.jpg bytes=275101
+STATUS ? docs/uiux-audit-2026-09-22/screens/before/16-secondary-skills.jpg bytes=1343481
+STATUS ? docs/uiux-audit-2026-09-22/screens/before/17-town-screen.jpg bytes=159727
+STATUS ? docs/uiux-audit-2026-09-22/screens/before/18-combat.jpg bytes=158269
+STATUS ? docs/uiux-audit-2026-09-22/screens/before/19-combat-debug.jpg bytes=188310
+STATUS ? docs/uiux-audit-2026-09-22/screens/before/20-spells.jpg bytes=309424
+STATUS ? docs/uiux-audit-2026-09-22/screens/before/21-combat-phaser.jpg bytes=166106
+STATUS ? docs/uiux-audit-2026-09-22/screens/before/22-play-phaser.jpg bytes=449794
+STATUS ? docs/uiux-audit-2026-09-22/screens/before/captures.json bytes=7601
+STATUS ? scripts/uiux-capture.mjs bytes=35841
+STATUS ? src/lib/game/town-data-dwelling-tier.test.ts bytes=2160
+staged_records 0
+unstaged_records 1
+UNSTAGED M	scripts/.design-docs-divider-probe.json
+
+### nested-required /home/dracon/Dev/dracon-platform/web/games/wip/hellhunter
+HEAD 14f65d1852a2ef132989c99e31185fa6d843b074 branch main
+status_records 0
+staged_records 0
+unstaged_records 0
+REMOTE github ahead=0 behind=0 merge_base=14f65d1852a2ef132989c99e31185fa6d843b074
+REMOTE gitlab ahead=0 behind=0 merge_base=14f65d1852a2ef132989c99e31185fa6d843b074
+
+### nested-required /home/dracon/Dev/dracon-platform/web/games/wip/junk-runner
+HEAD 674864967ac32f2eee4f4e7ae734ef0da6b392d2 branch main
+status_records 2
+STATUS .M .pi-glla/goals/20260924220858-ez3hxq.md
+STATUS .M .pi-glla/owner.json
+staged_records 0
+unstaged_records 2
+UNSTAGED M	.pi-glla/goals/20260924220858-ez3hxq.md
+UNSTAGED M	.pi-glla/owner.json
+REMOTE github no merge-base
+REMOTE gitlab ahead=14 behind=0 merge_base=e05c677efae7e323bad5fa7ced9bc5bd9b57e151
+LOCAL_ONLY gitlab 674864967ac32f2eee4f4e7ae734ef0da6b392d2	junk-runner-dev	junk-runner@dracon.local	premium: finalize media performance evidence
+LOCAL_ONLY gitlab c754dd147e0e9bc49abd4ee343079704b2d51bcd	junk-runner-dev	junk-runner@dracon.local	ops: document authorized one-time history purge
+LOCAL_ONLY gitlab 383d3cafbe056a8b55d599b90500c551d7a33a03	junk-runner-dev	junk-runner@dracon.local	evidence: bind final artifacts to audited source revision
+LOCAL_ONLY gitlab 38752bc570fea35dc0b16a51d20a8906c9a4ace7	junk-runner-dev	junk-runner@dracon.local	audio: keep generation provenance out of runtime bundle
+LOCAL_ONLY gitlab 0f3dbd89806a1c2ca1cafa1676b5abe5cfae8309	junk-runner-dev	junk-runner@dracon.local	evidence: pin scope and performance to current head
+LOCAL_ONLY gitlab 99b99082a8d1529bb5ccff93668b701a04e9aea6	junk-runner-dev	junk-runner@dracon.local	evidence: refresh final performance and scope revisions
+LOCAL_ONLY gitlab c85f47b9b32e42d7c1a3cf66209054db6b9695c0	junk-runner-dev	junk-runner@dracon.local	test: align renderer and audio hook contracts
+LOCAL_ONLY gitlab ce42dbad198e2830aefd2e5e6eaad85c21ec7a96	junk-runner-dev	junk-runner@dracon.local	perf: stabilize map cadence and prove audio fallback
+LOCAL_ONLY gitlab 59e2e84233c7e89f9e23d20c2e531480320cd8d8	junk-runner-dev	junk-runner@dracon.local	evidence: bind scope inventory to final audited head
+LOCAL_ONLY gitlab 1d205c0197fce984106b71a1c976713cf7c525ad	junk-runner-dev	junk-runner@dracon.local	docs: attach zero-retry neighbor evidence
+LOCAL_ONLY gitlab 5a6131131624f45a6ed85e242636a62fb7bfae85	junk-runner-dev	junk-runner@dracon.local	evidence: refresh post-rehearsal range inventory
+LOCAL_ONLY gitlab b514e61aecbf92405d925071dab0adc036533ed4	junk-runner-dev	junk-runner@dracon.local	test: stabilize zero-retry audio neighbor checks
+LOCAL_ONLY gitlab 34c4c9abbd3ecb655bd9d76dda19190b0059922b	junk-runner-dev	junk-runner@dracon.local	evidence: refresh final range scope inventory
+LOCAL_ONLY gitlab 6d894230b9df8f6fc2976afa3666cfdc22eeb500	junk-runner-dev	junk-runner@dracon.local	test: stabilize repeated tutorial and event browser coverage
+
+### nested-required /home/dracon/Dev/dracon-platform/web/games/wip/polis
+HEAD ad6ad5d21057a8a9268cf66bdf7781c48018386c branch main
+status_records 22
+STATUS .M .pi-glla/audit-loop/findings.baseline.md
+STATUS .M .pi-glla/audit-loop/findings.md
+STATUS MM README.md
+STATUS MM SPEC.md
+STATUS MM docs/TODO.md
+STATUS .M src/lib/civic-finance.test.ts
+STATUS .M src/lib/game-loop.ts
+STATUS .M src/lib/game-loop/economy-effects.ts
+STATUS .M src/lib/game-loop/household-service-delivery.ts
+STATUS .M src/lib/game-loop/physical-goods.ts
+STATUS .M src/lib/household-service-delivery.test.ts
+STATUS .M src/lib/housing-progression-integration.test.ts
+STATUS .M src/lib/physical-goods.test.ts
+STATUS .M src/lib/river-bridge-pin.test.ts
+STATUS MM src/lib/spec-16-5-row-14-stale-counts-pin.test.ts
+STATUS .M src/lib/spec-acceptance-pin.test.ts
+STATUS MM src/lib/todo-md-verification-table-pin.test.ts
+STATUS .M tests/e2e/polis02-playthrough-recorded.test.ts
+STATUS .M tests/e2e/polis08-milestone.test.ts
+STATUS .M tests/e2e/road-routing-lifecycle.test.ts
+STATUS .M tests/e2e/road-routing-live.test.ts
+STATUS .M tests/e2e/save-resume-render.test.ts
+staged_records 5
+STAGED M	README.md
+STAGED M	SPEC.md
+STAGED M	docs/TODO.md
+STAGED M	src/lib/spec-16-5-row-14-stale-counts-pin.test.ts
+STAGED M	src/lib/todo-md-verification-table-pin.test.ts
+unstaged_records 22
+UNSTAGED M	.pi-glla/audit-loop/findings.baseline.md
+UNSTAGED M	.pi-glla/audit-loop/findings.md
+UNSTAGED M	README.md
+UNSTAGED M	SPEC.md
+UNSTAGED M	docs/TODO.md
+UNSTAGED M	src/lib/civic-finance.test.ts
+UNSTAGED M	src/lib/game-loop.ts
+UNSTAGED M	src/lib/game-loop/economy-effects.ts
+UNSTAGED M	src/lib/game-loop/household-service-delivery.ts
+UNSTAGED M	src/lib/game-loop/physical-goods.ts
+UNSTAGED M	src/lib/household-service-delivery.test.ts
+UNSTAGED M	src/lib/housing-progression-integration.test.ts
+UNSTAGED M	src/lib/physical-goods.test.ts
+UNSTAGED M	src/lib/river-bridge-pin.test.ts
+UNSTAGED M	src/lib/spec-16-5-row-14-stale-counts-pin.test.ts
+UNSTAGED M	src/lib/spec-acceptance-pin.test.ts
+UNSTAGED M	src/lib/todo-md-verification-table-pin.test.ts
+UNSTAGED M	tests/e2e/polis02-playthrough-recorded.test.ts
+UNSTAGED M	tests/e2e/polis08-milestone.test.ts
+UNSTAGED M	tests/e2e/road-routing-lifecycle.test.ts
+UNSTAGED M	tests/e2e/road-routing-live.test.ts
+UNSTAGED M	tests/e2e/save-resume-render.test.ts
+REMOTE github ahead=0 behind=0 merge_base=ad6ad5d21057a8a9268cf66bdf7781c48018386c
+REMOTE gitlab ahead=0 behind=0 merge_base=ad6ad5d21057a8a9268cf66bdf7781c48018386c
+
+### standalone /home/dracon/Dev/dracon-strategy
+HEAD 83a2fe89b1505a7111a9dfd1801dccd6ad36163e branch main
+status_records 1
+STATUS .M ai-auto-music/catalog/cookbook.json
+staged_records 0
+unstaged_records 1
+UNSTAGED M	ai-auto-music/catalog/cookbook.json
+REMOTE github no merge-base
+REMOTE gitlab ahead=1 behind=0 merge_base=c42f4f41996309d442c01167800a22f76ae97275
+LOCAL_ONLY gitlab 83a2fe89b1505a7111a9dfd1801dccd6ad36163e	DraconDev	dracsharp@gmail.com	wave11: checkpoint mmx renders
+
+### standalone /home/dracon/Dev/pi-plugins/pi-goal-list-loop-audit
+HEAD ba413a06778695bd4eb3fc183589228ed59a7f99 branch main
+status_records 10
+STATUS .M .pi-glla/active.jsonl
+STATUS .M extensions/goal-loop-core.ts
+STATUS .M extensions/goal-loop-display.ts
+STATUS .M extensions/loops/goal-activation.ts
+STATUS .M extensions/loops/goal-auditor-hooks.ts
+STATUS .M note.md
+STATUS .M tests/display.test.ts
+STATUS ? extensions/audit-lifecycle.ts bytes=16670
+STATUS ? tests/audit-lifecycle.test.ts bytes=9062
+STATUS ? tests/audit-settlement-restart.test.ts bytes=12311
+staged_records 0
+unstaged_records 7
+UNSTAGED M	.pi-glla/active.jsonl
+UNSTAGED M	extensions/goal-loop-core.ts
+UNSTAGED M	extensions/goal-loop-display.ts
+UNSTAGED M	extensions/loops/goal-activation.ts
+UNSTAGED M	extensions/loops/goal-auditor-hooks.ts
+UNSTAGED M	note.md
+UNSTAGED M	tests/display.test.ts
+REMOTE github ahead=8 behind=0 merge_base=20d2ba1aa7730486a536ce4375a2fc9b8d6e1f5a
+LOCAL_ONLY github ba413a06778695bd4eb3fc183589228ed59a7f99	DraconDev	dracsharp@gmail.com	docs: record renamed compaction cap proof
+LOCAL_ONLY github 255a861d113fddafcec1c07086392de5ed97f382	DraconDev	dracsharp@gmail.com	test: follow context compaction cap rename
+LOCAL_ONLY github 16426056294745fa4895606c092057cd0771cde6	DraconDev	dracsharp@gmail.com	chore: close Lead contract task
+LOCAL_ONLY github 3b8e4d6743d17c7753ef14de4360d0292e704ab5	DraconDev	dracsharp@gmail.com	docs: record final live compaction run
+LOCAL_ONLY github 5a571cb5d52d0d420ddf3b950ba6fbe68b47dda6	DraconDev	dracsharp@gmail.com	docs: record final compaction proof
+LOCAL_ONLY github 06e7b64ac5a7c840bf131b1d1a8c004b2e08b9e5	DraconDev	dracsharp@gmail.com	test: align review vocabulary across status surfaces
+LOCAL_ONLY github b9677a4e9358e4c6d9e1dffac63f79a0ea82f0de	DraconDev	dracsharp@gmail.com	docs: record approved compaction live proof
+LOCAL_ONLY github 0db406cccba4622718924235d730df461abf2846	DraconDev	dracsharp@gmail.com	chore: record completed Lead contract verification
+REMOTE gitlab ahead=8 behind=0 merge_base=20d2ba1aa7730486a536ce4375a2fc9b8d6e1f5a
+LOCAL_ONLY gitlab ba413a06778695bd4eb3fc183589228ed59a7f99	DraconDev	dracsharp@gmail.com	docs: record renamed compaction cap proof
+LOCAL_ONLY gitlab 255a861d113fddafcec1c07086392de5ed97f382	DraconDev	dracsharp@gmail.com	test: follow context compaction cap rename
+LOCAL_ONLY gitlab 16426056294745fa4895606c092057cd0771cde6	DraconDev	dracsharp@gmail.com	chore: close Lead contract task
+LOCAL_ONLY gitlab 3b8e4d6743d17c7753ef14de4360d0292e704ab5	DraconDev	dracsharp@gmail.com	docs: record final live compaction run
+LOCAL_ONLY gitlab 5a571cb5d52d0d420ddf3b950ba6fbe68b47dda6	DraconDev	dracsharp@gmail.com	docs: record final compaction proof
+LOCAL_ONLY gitlab 06e7b64ac5a7c840bf131b1d1a8c004b2e08b9e5	DraconDev	dracsharp@gmail.com	test: align review vocabulary across status surfaces
+LOCAL_ONLY gitlab b9677a4e9358e4c6d9e1dffac63f79a0ea82f0de	DraconDev	dracsharp@gmail.com	docs: record approved compaction live proof
+LOCAL_ONLY gitlab 0db406cccba4622718924235d730df461abf2846	DraconDev	dracsharp@gmail.com	chore: record completed Lead contract verification

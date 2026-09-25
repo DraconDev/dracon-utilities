@@ -1,0 +1,50 @@
+## explicit adoption of daemon-home runtime state
+
+### before
+## main...origin/main
+ M .gitignore
+ M dracon-sync.freeze
+ M events.jsonl
+ M utilities/sync/repos-seen-ledger.json
+
+rm 'dracon-sync.freeze'
+### staged
+M  .gitignore
+D  dracon-sync.freeze
+M  events.jsonl
+M  utilities/sync/repos-seen-ledger.json
+ .gitignore                            |  5 +++++
+ dracon-sync.freeze                    |  1 -
+ events.jsonl                          | 34 ++++++++++++++++++++++++++++++++++
+ utilities/sync/repos-seen-ledger.json |  2 +-
+ 4 files changed, 40 insertions(+), 2 deletions(-)
+### marker preserved
+dracon-sync.freeze 2026-09-25 12:01:08.040616841 +0100 21
+[main 7239acd4e0] chore: separate runtime state from source
+ 4 files changed, 40 insertions(+), 2 deletions(-)
+ delete mode 100644 dracon-sync.freeze
+head_before=33c46e9e497f0511b1cdc7f886dd0b3dc0b4316f
+head_after=7239acd4e023d178a4848bcadd46b87f8c84ad28
+To github.com:DraconDev/dracon-home.git
+   33c46e9e49..7239acd4e0  main -> main
+github=7239acd4e023d178a4848bcadd46b87f8c84ad28
+remote:
+remote: ========================================================================
+remote:
+remote:     You have reached the free storage limit of 10 GiB on one or more
+remote:      projects. To unlock your projects over the free 10 GiB project
+remote:   limit, you must purchase additional storage. You can't push to your
+remote:     repository, create pipelines, create issues, or add comments. To
+remote:       reduce storage capacity, you can delete unused repositories,
+remote:                 artifacts, wikis, issues, and pipelines.
+remote:
+remote: ========================================================================
+remote:
+To gitlab.com:DraconDev/dracon-home.git
+   33c46e9e49..7239acd4e0  main -> main
+gitlab=7239acd4e023d178a4848bcadd46b87f8c84ad28
+Everything up-to-date
+origin=7239acd4e023d178a4848bcadd46b87f8c84ad28
+### after
+## main...origin/main
+ M events.jsonl
