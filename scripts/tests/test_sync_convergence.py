@@ -227,6 +227,22 @@ class SyncConvergenceTests(unittest.TestCase):
             self.fixture.git(self.fixture.remote, "rev-parse", "refs/heads/main"),
         )
 
+    def test_nested_repo_metadata_is_opaque_to_internal_writes(self) -> None:
+        parent = self.root / "parent-opaque"
+        child = parent / "child"
+        child.mkdir(parents=True)
+        self.fixture.git(child, "init", "-q", "-b", "main")
+        self.fixture.git(child, "config", "user.name", "Fixture")
+        self.fixture.git(child, "config", "user.email", "fixture@example.test")
+        (child / "README.md").write_text("child\n", encoding="utf-8")
+        self.fixture.git(child, "add", "README.md")
+        self.fixture.git(child, "commit", "-qm", "child")
+        first = sc.nested_repo_metadata(child, parent)
+        self.assertNotIn("status_sha256", first)
+        (child / "README.md").write_text("child internal change\n", encoding="utf-8")
+        second = sc.nested_repo_metadata(child, parent)
+        self.assertEqual(first, second)
+
     def test_parent_gitlink_and_forward_ancestry(self) -> None:
         parent = self.root / "parent"
         child = parent / "child"

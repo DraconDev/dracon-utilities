@@ -545,7 +545,6 @@ def nested_repo_metadata(path: Path, repo: Path) -> dict[str, Any] | None:
             "kind": "nested-worktree",
             "head": head_sha(path),
             "branch": attached_branch(path),
-            "status_sha256": bytes_sha256(git_status_bytes(path)),
             "mtime_ns": info.st_mtime_ns,
             "ctime_ns": info.st_ctime_ns,
             "git_dir": child["git_dir"],
