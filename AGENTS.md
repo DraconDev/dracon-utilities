@@ -402,6 +402,19 @@ New repos that host agent loops should get the same file (copy the
 Evidence: endless-td's loop agent adapted correctly ON ITS OWN
 ("force-push to protected main is blocked") — explicit policy works.
 
+## Sanctioned slimming (operator maintenance, 2026-09-26)
+
+The loop ban above is absolute — but history itself is not sacred
+when size demands it: under commit-all + never-rewrite, reachable
+history only grows, and worktree deletion never reclaims committed
+bytes. Operator-approved slimming (bundle backup → scratch
+filter-repo → guard-verify → leased force-push to all remotes →
+gitignore excised paths → re-verify) is legitimate maintenance;
+loops must still never do it themselves. No repo is ever cut from
+auto-commit coverage to solve size — quarantine applies to
+convergence scope only. Full procedure:
+`docs/design/sanctioned-slimming-2026-09-26.md`.
+
 ## Daemon commands
 
 - `dracon-sync repos` — live state of all watched repos
