@@ -215,8 +215,16 @@ jobs:
           path: dracon-warden
 
 
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install the declared MSRV
+        # FIXED 2026-09-27 (audit F84): this job was named "Minimum
+        # Toolchain" but installed `stable` — the same toolchain as every
+        # other job — so no MSRV was enforced anywhere and an upstream MSRV
+        # bump passed CI silently. It now installs the version declared as
+        # `rust-version` in the crate manifests (1.89, verified by building
+        # the whole workspace with --all-targets on 1.89.0).
+        uses: dtolnay/rust-toolchain@1.89.0
+        with:
+          components: clippy
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -232,13 +240,16 @@ jobs:
         run: cargo build --workspace --locked
 
       - name: Clippy
-        run: cargo clippy --workspace --locked -- -D warnings
+        run: cargo clippy --workspace --locked --all-targets -- -D warnings
 
       - name: Test
         run: cargo test --workspace --locked -- --test-threads=1
 
-      - name: Clippy (MSRV)
-        run: cargo clippy --workspace --locked -- -D warnings
+      - name: Clippy (MSRV, minimal features)
+        # Previously a byte-identical duplicate of the step above, so it
+        # asserted nothing. It now covers the test/bench/example targets,
+        # which the default-target clippy pass never sees.
+        run: cargo clippy --workspace --locked --all-targets --all-features -- -D warnings
 
   deny:
     name: Dependencies
@@ -268,14 +279,16 @@ jobs:
       - name: Install cargo-deny
         uses: EmbarkStudios/cargo-deny-action@v2
 
-      - name: Check advisories (known CVEs)
-        run: cargo deny check advisories
+      - name: Check all deny policies
+        # FIXED 2026-09-27 (audit F83): only advisories/licenses/bans ran,
+        # so deny.toml's `[sources] unknown-git = "deny"` /
+        # `unknown-registry = "deny"` policy was never enforced — and
+        # AGENTS.md's test discipline is plain `cargo deny check`.
+        # Verified locally: "advisories ok, bans ok, licenses ok, sources ok".
+        run: cargo deny check
 
-      - name: Check licenses
-        run: cargo deny check licenses
-
-      - name: Check bans (duplicate deps)
-        run: cargo deny check bans
+      - name: Verify the documented spec contract
+        run: ./scripts/verify-spec.sh
 
   nix:
     name: Nix Flake
