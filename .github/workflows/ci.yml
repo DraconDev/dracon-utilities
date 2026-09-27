@@ -237,8 +237,22 @@ jobs:
         # Toolchain" but installed `stable` — the same toolchain as every
         # other job — so no MSRV was enforced anywhere and an upstream MSRV
         # bump passed CI silently. It now installs the version declared as
-        # `rust-version` in the crate manifests (1.89, verified by building
-        # the whole workspace with --all-targets on 1.89.0).
+        # `rust-version` in the crate manifests (1.89).
+        #
+        # CORRECTED 2026-09-27 (auditor, rework rounds 1 and 4): this
+        # comment used to claim only that the workspace "builds" on
+        # 1.89.0, which is a build-only statement backing a
+        # `-D warnings` clippy gate. It also claimed the job was green on
+        # arrival, which was false: pinning 1.89.0 exposes six lints that
+        # stable 1.97.1 does not report, so this change turned a green job
+        # red. All six are now fixed at source
+        # (dracon-warden security/src/lib.rs only_used_in_recursion;
+        # dracon-system links.rs + main.rs collapsible_else_if;
+        # dracon-sync exclude.rs unused bindings, daemon.rs + sync.rs
+        # nonminimal_bool). Verified on the PINNED toolchain, not stable:
+        #   cargo +1.89.0 clippy --workspace --locked --all-targets -- -D warnings
+        #   cargo +1.89.0 clippy --workspace --locked --all-targets --all-features -- -D warnings
+        # both exit 0.
         uses: dtolnay/rust-toolchain@1.89.0
         with:
           components: clippy
