@@ -152,7 +152,7 @@ recorded in the dropped note at the end of this section.
 ### parent/meta: CI
 
 - [x] FIX: MED [F83]: the `deny` job runs advisories/licenses/bans only, so deny.toml's `[sources] unknown-git = "deny"` / `unknown-registry = "deny"` policy is never enforced, while AGENTS.md's test discipline is `cargo deny check`; `scripts/check-nested-pins.py` and `scripts/verify-spec.sh`, both documented as required in CONTRIBUTING, are run by no workflow (.github/workflows/ci.yml:272-278, AGENTS.md "Test discipline", CONTRIBUTING.md:57) — fixed in 9c9acaaea, 6e2d1eb62
-- [x] FIX: MED [F84]: the `msrv` job ("Minimum Toolchain") installs `dtolnay/rust-toolchain@stable` — the same toolchain as every other job — and its two Clippy steps are byte-identical, so no MSRV is enforced anywhere and an upstream MSRV bump passes CI silently (.github/workflows/ci.yml:216-247, rust-toolchain.toml:2) — fixed in 6e2d1eb62
+- [x] FIX: MED [F84]: the `msrv` job ("Minimum Toolchain") installs `dtolnay/rust-toolchain@stable` — the same toolchain as every other job — and its two Clippy steps are byte-identical, so no MSRV is enforced anywhere and an upstream MSRV bump passes CI silently (.github/workflows/ci.yml:216-247, rust-toolchain.toml:2) — fixed in 9c9acaaea (MSRV toolchain + both Clippy steps; 6e2d1eb62 carried the F86 shellcheck/`|| true` changes)
 - [x] FIX: LOW [F86]: two CI steps cannot fail — `bash install.sh --help 2>&1 | head -1 || true` swallows every error so the step labelled "can at least parse its args without errors" asserts nothing, and the shellcheck step only covers root `scripts/*.sh`, not the `dracon-*/scripts/*.sh` that AGENTS.md references (.github/workflows/ci.yml:281-289) — fixed in 6e2d1eb62
 
 ### parent/meta: flake.nix
