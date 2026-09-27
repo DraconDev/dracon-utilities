@@ -35,12 +35,16 @@
   };
 
   # The `*-src` inputs have hyphens in their names, which cannot be bound
-  # as positional function arguments in Nix. They are taken from the
-  # attribute set instead; the quotes below are required, not stylistic.
+  # as positional function arguments in Nix, so they are taken from the
+  # attribute set instead. The `...` is REQUIRED: without it Nix rejects
+  # the three extra inputs as unexpected arguments and evaluation fails
+  # (this only shows up on a clean evaluation, e.g. a fresh clone or
+  # `nix flake check`).
   outputs = inputs@{
     self,
     nixpkgs,
     flake-utils,
+    ...
   }:
   let
     draconSyncSrc = inputs."dracon-sync-src";
@@ -112,22 +116,33 @@
         # was literally named `dracon-utilities-0.1.5`. Read the version
         # from each Cargo.toml instead so it can never drift again.
         #
-        # The parent repo does not track the utility sources (they are
-        # gitignored nested checkouts since 2026-09-11), so on a bare
-        # clone the manifest is absent. Fall back to the last known
-        # version rather than turning a BUILD-time failure into an
-        # EVAL-time one, which would break `nix flake check`, direnv and
-        # home-manager evaluation outright.
-        crateVersion = fallback: path:
-          if builtins.pathExists path
-          then (builtins.fromTOML (builtins.readFile path)).package.version
-          else fallback;
+        # RE-READS ITS SOURCE 2026-09-27 (audit decision D1): the first
+        # fix read `./dracon-sync/Cargo.toml` — a path INSIDE this repo.
+        # The parent does not track the utility sources, so that path
+        # exists only in a developer worktree that happens to hold live
+        # checkouts. On a fresh clone `builtins.pathExists` is false and
+        # the function silently fell back to a hardcoded string, which is
+        # how `nix eval` came to report `dracon-utilities-0.113.85` while
+        # the code it actually builds was 0.113.88 — the same drift F85
+        # was raised to kill, reintroduced one level up and invisible on
+        # the machine that reported the original bug.
+        #
+        # The `*-src` inputs are store paths that always exist at eval
+        # time and carry the exact revision flake.lock pins, so the
+        # version is read from the same source the build uses and cannot
+        # disagree with it. The fallback now only guards a genuinely
+        # malformed input.
+        crateVersion = fallback: srcPath:
+          let manifest = srcPath + "/Cargo.toml";
+          in if builtins.pathExists manifest
+             then (builtins.fromTOML (builtins.readFile manifest)).package.version
+             else fallback;
 
       in {
         packages = {
           dracon-sync = pkgs.rustPlatform.buildRustPackage (commonArgs // {
             pname = "dracon-sync";
-            version = crateVersion "0.113.85" ./dracon-sync/Cargo.toml;
+            version = crateVersion "0.113.88" draconSyncSrc;
             buildAndTestSubdir = "dracon-sync";
             cargoBuildFeatures = [ ];
             # Tests need git, serial execution, and network access (some tests hang
@@ -137,7 +152,7 @@
 
           dracon-system = pkgs.rustPlatform.buildRustPackage (commonArgs // {
             pname = "dracon-system";
-            version = crateVersion "0.112.41" ./dracon-system/Cargo.toml;
+            version = crateVersion "0.112.41" draconSystemSrc;
             buildAndTestSubdir = "dracon-system";
             nativeCheckInputs = [ pkgs.git ];
             checkFlags = [
@@ -149,7 +164,7 @@
 
           dracon-warden = pkgs.rustPlatform.buildRustPackage (commonArgs // {
             pname = "dracon-warden";
-            version = crateVersion "0.113.14" ./dracon-warden/Cargo.toml;
+            version = crateVersion "0.113.14" draconWardenSrc;
             buildAndTestSubdir = "dracon-warden";
             # Warden doesn't need openssl/libgit2/libssh2, but they're
             # harmless to include via the shared commonArgs.
