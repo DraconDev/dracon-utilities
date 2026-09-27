@@ -205,6 +205,27 @@ jobs:
           bash -n doctor.sh
           ./doctor.sh
 
+      - name: Verify nested source pins
+        # RESTORED 2026-09-27 (audit decision D1). This gate was removed
+        # in the 2026-08-22 monorepo conversion along with the `*-src`
+        # flake inputs it checked, and never came back — so the 21 floating
+        # `ref: main` checkouts and the flake.lock pins drifted apart
+        # unnoticed, and CI kept building whatever the mirror happened to
+        # hold. It is meaningful again now that all three agree.
+        #
+        # --check-local additionally asserts each checked-out nested repo's
+        # HEAD equals its pin, which is what makes this a real gate: the
+        # checkouts above are pinned, so a pin/lockfile/manifest mismatch
+        # fails here rather than producing a silently wrong build.
+        run: python3 scripts/check-nested-pins.py --check-local
+
+      - name: Verify the documented spec contract
+        # UNBLOCKED 2026-09-27 (audit decision D1): this was left unwired
+        # because its only failing invariant was "Nested source pins", which
+        # the model change of 2026-09-11 had left unsatisfiable. The pins
+        # exist again, so the whole contract can be enforced.
+        run: ./scripts/verify-spec.sh
+
 
   msrv:
     name: Minimum Toolchain
@@ -344,3 +365,14 @@ jobs:
 
       - name: Check flake evaluates
         run: ./scripts/check-flake.sh
+
+      - name: Build the default package
+        # ADDED 2026-09-27 (audit decision D1). This job previously ran
+        # ONLY `nix flake check --no-build`, which evaluates derivations
+        # but never realises one. That is precisely why the 2026-08-22
+        # monorepo conversion went unnoticed: `mergedSrc` was built from
+        # ${self}, which has contained no utility source since 2026-09-11,
+        # so every `nix build` failed while CI stayed green on evaluation
+        # alone. Realising the default package is the assertion that
+        # actually proves the flake can build the utilities.
+        run: nix build .#default --no-link

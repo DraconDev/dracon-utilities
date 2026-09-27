@@ -159,6 +159,23 @@
               "--test-threads=1"
               # Skip tests that require D-Bus (no D-Bus in Nix sandbox)
               "--skip" "guard_report_completes_for_ok_disk"
+              # ADDED 2026-09-27 (audit decision D1): these eight assert the
+              # HOST filesystem layout of /tmp and $HOME. Inside the Nix
+              # sandbox `std::env::temp_dir()` is /build/... rather than /tmp,
+              # so the very containment check under test refuses its own
+              # fixture and the test fails for a reason that has nothing to
+              # do with the code. They are skipped here rather than weakened
+              # so the other ~197 tests still gate the Nix build; the real
+              # coverage is the workspace `cargo test --workspace` job, which
+              # runs them on a normal filesystem.
+              "--skip" "tests::tmp_entry_must_remain_under_validated_root"
+              "--skip" "tests::safe_tmp_root_policy_allows_tmp_descendants_and_rejects_home"
+              "--skip" "tests::clean_tmp_paths_respects_age_dry_run_and_open_fds"
+              "--skip" "tests::clean_tmp_paths_keeps_old_process_cwd_directory"
+              "--skip" "tests::clean_tmp_paths_rejects_home_search_root_before_apply"
+              "--skip" "tests::storage_cleanup_apply_refuses_git_database_dirs"
+              "--skip" "tests::storage_cleanup_apply_accepts_home_artifact_dirs_and_refuses_system_roots"
+              "--skip" "tests::critical_tier_bypass_cleans_fresh_target"
             ];
           });
 
