@@ -3,11 +3,11 @@
     "dracon-sync-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1790541363,
-        "narHash": "sha256-h7Vu1slQiuFbF1ZVdRxr8wb+4qfDSflu4blGx92QfAw=",
+        "lastModified": 1790542947,
+        "narHash": "sha256-INhxluezVvwZ6uqeaTRZWSVqJC+/FfxlN1dgNcMWfQ0=",
         "owner": "DraconDev",
         "repo": "dracon-sync-background-auto-commit-multi-remote",
-        "rev": "f823924e1e76f9fa6ae929ad8de53d266c7e88e9",
+        "rev": "b6e75318b25a548c713ebd6aef9f6cb9d5742d75",
         "type": "github"
       },
       "original": {
