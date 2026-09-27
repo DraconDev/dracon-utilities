@@ -18,6 +18,12 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
+      # RESTORED 2026-09-27 (auditor, round 1): this is the PARENT
+      # repository, not a duplicate. Removing it as "redundant" left every
+      # job running in a directory holding only the three utility checkouts, so
+      # the workspace Cargo.toml, install.sh, scripts/ and flake.nix were all
+      # absent and every step below failed.
+      - uses: actions/checkout@v4
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
@@ -65,6 +71,12 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     steps:
+      # RESTORED 2026-09-27 (auditor, round 1): this is the PARENT
+      # repository, not a duplicate. Removing it as "redundant" left every
+      # job running in a directory holding only the three utility checkouts, so
+      # the workspace Cargo.toml, install.sh, scripts/ and flake.nix were all
+      # absent and every step below failed.
+      - uses: actions/checkout@v4
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
@@ -108,6 +120,12 @@ jobs:
     name: Release Build
     runs-on: ubuntu-latest
     steps:
+      # RESTORED 2026-09-27 (auditor, round 1): this is the PARENT
+      # repository, not a duplicate. Removing it as "redundant" left every
+      # job running in a directory holding only the three utility checkouts, so
+      # the workspace Cargo.toml, install.sh, scripts/ and flake.nix were all
+      # absent and every step below failed.
+      - uses: actions/checkout@v4
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
@@ -158,6 +176,12 @@ jobs:
     name: Scripts
     runs-on: ubuntu-latest
     steps:
+      # RESTORED 2026-09-27 (auditor, round 1): this is the PARENT
+      # repository, not a duplicate. Removing it as "redundant" left every
+      # job running in a directory holding only the three utility checkouts, so
+      # the workspace Cargo.toml, install.sh, scripts/ and flake.nix were all
+      # absent and every step below failed.
+      - uses: actions/checkout@v4
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
@@ -231,6 +255,12 @@ jobs:
     name: Minimum Toolchain
     runs-on: ubuntu-latest
     steps:
+      # RESTORED 2026-09-27 (auditor, round 1): this is the PARENT
+      # repository, not a duplicate. Removing it as "redundant" left every
+      # job running in a directory holding only the three utility checkouts, so
+      # the workspace Cargo.toml, install.sh, scripts/ and flake.nix were all
+      # absent and every step below failed.
+      - uses: actions/checkout@v4
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
@@ -302,6 +332,12 @@ jobs:
     name: Dependencies
     runs-on: ubuntu-latest
     steps:
+      # RESTORED 2026-09-27 (auditor, round 1): this is the PARENT
+      # repository, not a duplicate. Removing it as "redundant" left every
+      # job running in a directory holding only the three utility checkouts, so
+      # the workspace Cargo.toml, install.sh, scripts/ and flake.nix were all
+      # absent and every step below failed.
+      - uses: actions/checkout@v4
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
@@ -344,6 +380,12 @@ jobs:
     name: Nix Flake
     runs-on: ubuntu-latest
     steps:
+      # RESTORED 2026-09-27 (auditor, round 1): this is the PARENT
+      # repository, not a duplicate. Removing it as "redundant" left every
+      # job running in a directory holding only the three utility checkouts, so
+      # the workspace Cargo.toml, install.sh, scripts/ and flake.nix were all
+      # absent and every step below failed.
+      - uses: actions/checkout@v4
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
