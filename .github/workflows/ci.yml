@@ -189,21 +189,26 @@ jobs:
         run: shellcheck install.sh uninstall.sh doctor.sh scripts/*.sh dracon-*/scripts/*.sh
 
       - name: Script dry-run (install.sh)
-        # FIXED 2026-09-27 (audit F86): the `|| true` swallowed every
-        # error, so a step labelled "can at least parse its args without
-        # errors" asserted nothing. The exit status is now propagated.
+        # FIXED 2026-09-27 (audit F86, rework round 2): removing the
+        # `|| true` was NOT enough. Under GitHub's default shell
+        # (`bash -e`, no pipefail) the pipeline's exit status is that of
+        # the LAST command — `head` — which is always 0, so
+        # `install.sh --help 2>&1 | head -1` still asserted nothing.
+        # `shell: bash` runs `bash --noprofile --norc -eo pipefail {0}`,
+        # so the pipeline now fails when install.sh does.
+        shell: bash
         run: |
           bash -n install.sh
           bash install.sh --help 2>&1 | head -1
 
       - name: Script dry-run (uninstall.sh, doctor.sh)
-        # doctor.sh is no longer only syntax-checked: it used to abort at
-        # the first failing check, so `bash -n` proved nothing about it.
-        # It now runs end to end and must produce a report.
+        # Same pipefail requirement as the install.sh step above.
+        shell: bash
         run: |
           bash -n uninstall.sh
           bash -n doctor.sh
           ./doctor.sh
+
 
   msrv:
     name: Minimum Toolchain

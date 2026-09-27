@@ -4,7 +4,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
+# FIXED 2026-09-27 (audit rework round 3, F86): REPO_ROOT was computed and
+# never read (shellcheck SC2034). Removed instead of allow-listed.
 RELEASE_SH="$SCRIPT_DIR/release.sh"
 
 pass=0
@@ -23,6 +24,11 @@ assert() {
 
 assert_match() {
     local label="$1" actual="$2" pattern="$3"
+    # SC2053 is a FALSE POSITIVE here and is disabled deliberately: every
+    # caller passes a glob (`*meta-only*`, `*choose dr...*`), and quoting
+    # the right-hand side would turn those into literal string compares
+    # and silently stop matching.
+    # shellcheck disable=SC2053
     if [[ "$actual" == $pattern ]]; then
         printf '  ✓ %s\n' "$label"
         pass=$((pass + 1))

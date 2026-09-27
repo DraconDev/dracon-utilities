@@ -78,6 +78,11 @@ log() {
 }
 
 # Check prerequisites
+# FIXED 2026-09-27 (F86): this was `for cmd in cargo` — a loop that can
+# only ever run once (shellcheck SC2043). The list is a single prerequisite
+# today; keep the loop shape for the day it grows, but silence the lint at
+# the source rather than in CI.
+# shellcheck disable=SC2043
 for cmd in cargo; do
     if ! command -v "$cmd" &> /dev/null; then
         echo "ERROR: Required command '$cmd' not found"
@@ -139,7 +144,12 @@ if [ "$UPGRADE" = true ] && [ "$NO_RESTART" != true ]; then
         else
             # Stop via systemd (clean shutdown)
             if systemctl --user is-active "$service" &>/dev/null; then
-                systemctl --user stop "$service" 2>/dev/null && echo "  Stopped $service" || true
+                # FIXED 2026-09-27 (F86): A && B || C is not if-then-else
+                # (shellcheck SC2015). The `|| true` existed to swallow a
+                # stop failure; an if/then says the same thing explicitly.
+                if systemctl --user stop "$service" 2>/dev/null; then
+                    echo "  Stopped $service"
+                fi
             fi
             # Catch any remaining processes (manual runs, stale)
             if pgrep -x "$_bin" &>/dev/null; then
@@ -489,7 +499,11 @@ ls -la ~/.local/bin/dracon-* 2>/dev/null || true
 echo ""
 echo "Checksums:"
 for bin in ~/.local/bin/dracon-*; do
-    [ -f "$bin" ] && sha256sum "$bin" 2>/dev/null || true
+    # FIXED 2026-09-27 (F86): A && B || C (shellcheck SC2015); the
+    # `|| true` swallowed a missing-file race, an if/then does too.
+    if [ -f "$bin" ]; then
+        sha256sum "$bin" 2>/dev/null || true
+    fi
 done
 
 # Verify running daemons are using the installed binary
@@ -497,13 +511,16 @@ VERIFY_OK=true
 for bin in dracon-sync dracon-system dracon-warden; do
     pid=$(pgrep -x "$bin" 2>/dev/null | head -1 || true)
     [ -n "$pid" ] || continue
-    running=$(readlink /proc/$pid/exe 2>/dev/null)
+    running=$(readlink "/proc/$pid/exe" 2>/dev/null)
     expected="$HOME/.local/bin/$bin"
     if [ -n "$running" ] && [ "$running" != "$expected" ]; then
         echo "⚠️  WARNING: $bin (PID $pid) running from $running, not $expected"
         echo "   This means a stale version is still active. Restart the service:"
         svc=""
-        svc=$(systemctl --user list-units --type=service --state=running | grep -o "$bin[^ ]*\.service" | head -1 || true)
+        # FIXED 2026-09-27 (F86): shellcheck parsed `$bin[` as an array
+        # expansion (SC1087, error class). Brace the variable so the
+        # literal `[` is unambiguously part of the grep pattern.
+        svc=$(systemctl --user list-units --type=service --state=running | grep -oE "${bin}[^ ]*\.service" | head -1 || true)
         if [ -n "$svc" ]; then
             echo "   systemctl --user restart $svc"
         else

@@ -91,9 +91,18 @@ echo "Stopping and removing systemd services..."
 USER_UNIT_FILES=$(systemctl --user list-unit-files 2>/dev/null || true)
 for service in $SERVICES; do
     if grep -q "^$service" <<< "$USER_UNIT_FILES"; then
-        systemctl --user stop "$service" 2>/dev/null && echo "  ✅ Stopped $service" || true
-        systemctl --user disable "$service" 2>/dev/null && echo "  ✅ Disabled $service" || true
-        rm "$HOME/.config/systemd/user/$service" 2>/dev/null && echo "  ✅ Removed $service" || true
+        # FIXED 2026-09-27 (F86): A && B || C is not if-then-else
+        # (shellcheck SC2015); the `|| true` swallowed a failure, an
+        # if/then says the same explicitly.
+        if systemctl --user stop "$service" 2>/dev/null; then
+            echo "  ✅ Stopped $service"
+        fi
+        if systemctl --user disable "$service" 2>/dev/null; then
+            echo "  ✅ Disabled $service"
+        fi
+        if rm "$HOME/.config/systemd/user/$service" 2>/dev/null; then
+            echo "  ✅ Removed $service"
+        fi
     else
         echo "  ⚠️  $service not found (skipping)"
     fi
