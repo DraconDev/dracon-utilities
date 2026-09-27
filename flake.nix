@@ -54,11 +54,28 @@
           buildInputs = buildDeps;
         };
 
+        # FIXED 2026-09-27 (audit F85): the three package versions were
+        # hardcoded (0.1.5 / 0.2.0 / 0.1.1) and had drifted three orders
+        # of magnitude from the crate manifests, so the default package
+        # was literally named `dracon-utilities-0.1.5`. Read the version
+        # from each Cargo.toml instead so it can never drift again.
+        #
+        # The parent repo does not track the utility sources (they are
+        # gitignored nested checkouts since 2026-09-11), so on a bare
+        # clone the manifest is absent. Fall back to the last known
+        # version rather than turning a BUILD-time failure into an
+        # EVAL-time one, which would break `nix flake check`, direnv and
+        # home-manager evaluation outright.
+        crateVersion = fallback: path:
+          if builtins.pathExists path
+          then (builtins.fromTOML (builtins.readFile path)).package.version
+          else fallback;
+
       in {
         packages = {
           dracon-sync = pkgs.rustPlatform.buildRustPackage (commonArgs // {
             pname = "dracon-sync";
-            version = "0.1.5";
+            version = crateVersion "0.113.85" ./dracon-sync/Cargo.toml;
             buildAndTestSubdir = "dracon-sync";
             cargoBuildFeatures = [ ];
             # Tests need git, serial execution, and network access (some tests hang
@@ -68,7 +85,7 @@
 
           dracon-system = pkgs.rustPlatform.buildRustPackage (commonArgs // {
             pname = "dracon-system";
-            version = "0.2.0";
+            version = crateVersion "0.112.41" ./dracon-system/Cargo.toml;
             buildAndTestSubdir = "dracon-system";
             nativeCheckInputs = [ pkgs.git ];
             checkFlags = [
@@ -80,7 +97,7 @@
 
           dracon-warden = pkgs.rustPlatform.buildRustPackage (commonArgs // {
             pname = "dracon-warden";
-            version = "0.1.1";
+            version = crateVersion "0.113.14" ./dracon-warden/Cargo.toml;
             buildAndTestSubdir = "dracon-warden";
             # Warden doesn't need openssl/libgit2/libssh2, but they're
             # harmless to include via the shared commonArgs.
