@@ -29,6 +29,14 @@ VERBOSE=false
 NO_RESTART=false
 BINARIES_ONLY=false
 
+# Captured once and reused by the unit-file lookups below. See the
+# comment at the `restart_service` call site (audit F97) for why the
+# list is never piped into `grep -q`.
+USER_UNIT_FILES=""
+if command -v systemctl &>/dev/null; then
+    USER_UNIT_FILES=$(systemctl --user list-unit-files 2>/dev/null || true)
+fi
+
 for arg in "$@"; do
     case "$arg" in
         --help|-h)
@@ -146,7 +154,14 @@ if [ "$UPGRADE" = true ] && [ "$NO_RESTART" != true ]; then
 fi
 
 echo "Installing dracon utilities to ~/.local/bin/"
-mkdir -p ~/.local/bin
+# FIXED 2026-09-27 (audit F80): `--dry-run` promises "No changes will be
+# made" but these six directory creations ran unconditionally, so a dry
+# run still mutated $HOME. Guarded now.
+if [ "$DRY_RUN" = true ]; then
+    echo "  Would create ~/.local/bin/"
+else
+    mkdir -p ~/.local/bin
+fi
 
 # Clean up orphaned binaries from previous architectures
 ORPHANS=(
@@ -204,8 +219,21 @@ for _dir in "${_path_dirs[@]}"; do
         if [ "$DRY_RUN" = true ]; then
             echo "  Would remove shadowing binary: $_stale"
         else
-            rm -f "$_stale"
-            echo "  🧹 Removed shadowing binary: $_stale"
+            # FIXED 2026-09-27 (audit F81): a bare `rm -f` under
+            # `set -e` aborted the WHOLE installer with a bare
+            # "Permission denied" when a PATH directory was not
+            # writable (a root-owned /usr/local/bin/dracon-sync, for
+            # instance) — nothing got installed and the message never
+            # said which path failed. Warn and continue instead; the
+            # binary we are about to install still wins whenever
+            # ~/.local/bin precedes the shadowing directory in PATH.
+            if rm -f "$_stale" 2>/dev/null; then
+                echo "  🧹 Removed shadowing binary: $_stale"
+            else
+                echo "  ⚠️  Could not remove shadowing binary: $_stale (not writable)"
+                echo "     If the installed version looks stale, remove it manually or"
+                echo "     check the PATH order (this one shadows ~/.local/bin)."
+            fi
         fi
     done
 done
@@ -348,15 +376,16 @@ else
 fi
 
 # Install systemd service files
-mkdir -p ~/.config/systemd/user
-mkdir -p ~/.dracon/utilities/sync
-mkdir -p ~/.dracon/utilities/system
-mkdir -p ~/.dracon/utilities/warden
-
+# FIXED 2026-09-27 (audit F80): these four mkdir -p calls ran before the
+# DRY_RUN branch below, so a dry run created them anyway.
 if [ "$DRY_RUN" = true ]; then
     echo "Would install systemd services to ~/.config/systemd/user/"
     echo "Would create config directories under ~/.dracon/utilities/"
 else
+    mkdir -p ~/.config/systemd/user
+    mkdir -p ~/.dracon/utilities/sync
+    mkdir -p ~/.dracon/utilities/system
+    mkdir -p ~/.dracon/utilities/warden
     cp dracon-sync/dracon-sync.service ~/.config/systemd/user/dracon-sync.service 2>/dev/null || true
     cp dracon-system/dracon-system-guard.service ~/.config/systemd/user/dracon-system-guard.service 2>/dev/null || true
     systemctl --user daemon-reload 2>/dev/null || true
@@ -393,11 +422,19 @@ echo "Installing example configs..."
 copy_config "dracon-sync/dracon-sync.example.toml" "$HOME/.dracon/utilities/sync/dracon-sync.toml"
 copy_config "dracon-system/dracon-system.example.toml" "$HOME/.dracon/utilities/system/dracon-system.toml"
 copy_config "dracon-warden/dracon-warden.example.toml" "$HOME/.dracon/utilities/warden/dracon-warden.toml"
+# FIXED 2026-09-27 (audit F79): doctor.sh checks for this file, but
+# nothing ever installed it, so the check was a permanent false WARN.
+copy_config "dracon-sync/ai.example.toml" "$HOME/.dracon/utilities/sync/ai.toml"
 
 
 # Create secrets directories with correct permissions
-mkdir -p "$HOME/.dracon/utilities/sync/secrets"
-chmod 700 "$HOME/.dracon/utilities/sync/secrets" 2>/dev/null || true
+# FIXED 2026-09-27 (audit F80): also mutated $HOME under --dry-run.
+if [ "$DRY_RUN" = true ]; then
+    echo "  Would create ~/.dracon/utilities/sync/secrets (mode 700)"
+else
+    mkdir -p "$HOME/.dracon/utilities/sync/secrets"
+    chmod 700 "$HOME/.dracon/utilities/sync/secrets" 2>/dev/null || true
+fi
 
 if [ "$NO_RESTART" = true ]; then
     echo ""
@@ -426,7 +463,13 @@ restart_service() {
         return 0
     fi
 
-    if systemctl --user is-enabled "$service" &>/dev/null || systemctl --user list-unit-files 2>/dev/null | grep -q "^$service"; then
+    # FIXED 2026-09-27 (audit F97): the second disjunct piped
+    # `systemctl --user list-unit-files` into `grep -q`, which is a
+    # false-negative race under `set -o pipefail` (grep -q exits on the
+    # first match → systemctl takes SIGPIPE → exit 141 → the pipeline
+    # reports "not found" even when the unit exists). The unit list is
+    # captured once at the top of the script and grepped as a string.
+    if systemctl --user is-enabled "$service" &>/dev/null || grep -q "^$service" <<< "$USER_UNIT_FILES"; then
         systemctl --user restart "$service" 2>/dev/null && echo "  ✅ $service restarted" || echo "  ⚠️ Could not restart $service"
     else
         echo "  ⚠️ $service not found"

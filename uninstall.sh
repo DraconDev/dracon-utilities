@@ -81,8 +81,16 @@ done
 # Stop and remove systemd services
 echo ""
 echo "Stopping and removing systemd services..."
+# FIXED 2026-09-27 (audit F97): `systemctl ... | grep -q` is a
+# false-negative race under `set -o pipefail` — `grep -q` exits on the
+# first match, systemctl takes SIGPIPE (exit 141) if it was still
+# writing, and the pipeline reports failure. Measured 4/20 on this
+# machine; the consequence here was uninstall silently SKIPPING the
+# stop/disable/unit-file removal, leaving a running service behind.
+# Capture the list once, then grep the string.
+USER_UNIT_FILES=$(systemctl --user list-unit-files 2>/dev/null || true)
 for service in $SERVICES; do
-    if systemctl --user list-unit-files 2>/dev/null | grep -q "^$service"; then
+    if grep -q "^$service" <<< "$USER_UNIT_FILES"; then
         systemctl --user stop "$service" 2>/dev/null && echo "  ✅ Stopped $service" || true
         systemctl --user disable "$service" 2>/dev/null && echo "  ✅ Disabled $service" || true
         rm "$HOME/.config/systemd/user/$service" 2>/dev/null && echo "  ✅ Removed $service" || true
@@ -92,6 +100,33 @@ for service in $SERVICES; do
 done
 
 systemctl --user daemon-reload 2>/dev/null || true
+
+# FIXED 2026-09-27 (audit F82): install.sh runs
+# `dracon-warden setup-hooks --global`, which writes ~/.config/git/hooks
+# and points the GLOBAL git config's core.hooksPath at it. The binary is
+# gone by this point, so every commit and push on the machine would
+# invoke a missing executable — and the global config keeps shadowing
+# each repo's own .git/hooks. Undo it before the binary disappears.
+echo ""
+echo "Removing warden git hooks..."
+HOOKS_DIR="$HOME/.config/git/hooks"
+CURRENT_HOOKS_PATH=""
+if command -v git &>/dev/null; then
+    CURRENT_HOOKS_PATH=$(git config --global --get core.hooksPath 2>/dev/null || true)
+fi
+# Only touch core.hooksPath when it actually points at the warden hooks
+# dir — a user who set it themselves keeps their setting.
+if [ -n "$CURRENT_HOOKS_PATH" ] && [ "$CURRENT_HOOKS_PATH" = "$HOOKS_DIR" ]; then
+    git config --global --unset-all core.hooksPath 2>/dev/null || true
+    echo "  ✅ Unset global core.hooksPath (was $CURRENT_HOOKS_PATH)"
+elif [ -n "$CURRENT_HOOKS_PATH" ]; then
+    echo "  ⚠️  global core.hooksPath is $CURRENT_HOOKS_PATH (not warden) — left alone"
+fi
+if [ -d "$HOOKS_DIR" ]; then
+    rm -f "$HOOKS_DIR/pre-commit" "$HOOKS_DIR/pre-push" "$HOOKS_DIR/pre-rebase"
+    rmdir "$HOOKS_DIR" 2>/dev/null || true
+    echo "  ✅ Removed warden hooks from $HOOKS_DIR"
+fi
 
 # Remove configs if requested
 if [ "$REMOVE_CONFIGS" = true ]; then

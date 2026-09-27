@@ -10,15 +10,21 @@ PASS=0
 FAIL=0
 WARN=0
 
+# FIXED 2026-09-27 (audit F77): this function used to end the failure branch
+# with `return 1`. Every call site is a bare statement, so under
+# `set -euo pipefail` the FIRST failing check killed the whole script —
+# the Results summary, the "Some required checks failed" branch, and
+# every section after the failure were unreachable, and $FAIL could only
+# ever be 0. Failures are now accumulated in the counters and the
+# function always returns 0, so a full report is always produced.
 check() {
     local name="$1"
     local cmd="$2"
     local required="${3:-true}"
-    
+
     if eval "$cmd" &>/dev/null; then
         echo "  ✅ $name"
         PASS=$((PASS + 1))
-        return 0
     else
         if [ "$required" = true ]; then
             echo "  ❌ $name (REQUIRED)"
@@ -27,8 +33,8 @@ check() {
             echo "  ⚠️  $name (optional)"
             WARN=$((WARN + 1))
         fi
-        return 1
     fi
+    return 0
 }
 
 echo "🔍 Dracon Utilities Health Check"
@@ -51,32 +57,43 @@ done
 echo ""
 echo "🔧 Binaries"
 for binary in dracon-sync dracon-system dracon-warden; do
+    # FIXED 2026-09-27 (audit F78): `((VAR++))` is an arithmetic COMMAND,
+    # not an assignment — when the pre-increment value is 0 it evaluates
+    # to 0, exits 1, and `set -e` aborted the doctor mid-section. Use the
+    # assignment form, which always exits 0.
     if [ -f "target/release/$binary" ]; then
         echo "  ✅ $binary (built)"
-        ((PASS++))
+        PASS=$((PASS + 1))
     elif [ -f "$HOME/.local/bin/$binary" ]; then
         echo "  ✅ $binary (installed)"
-        ((PASS++))
+        PASS=$((PASS + 1))
     else
         echo "  ⚠️  $binary (not built or installed)"
-        ((WARN++))
+        WARN=$((WARN + 1))
     fi
 done
 
 echo ""
 echo "⚙️  Systemd Services"
+# FIXED 2026-09-27 (audit F97): the unit-file list was piped straight
+# into `grep -q`. `grep -q` exits on the first match, closing the read
+# end of the pipe; if systemctl was still writing it takes SIGPIPE and
+# exits 141, and `set -o pipefail` turns the whole pipeline into a
+# false negative. Measured 4/20 false "not installed" on this machine.
+# The list is captured once instead, so the grep reads a string.
+USER_UNIT_FILES=$(systemctl --user list-unit-files 2>/dev/null || true)
 for service in dracon-sync.service dracon-system-guard.service; do
-    if systemctl --user list-unit-files 2>/dev/null | grep -q "^$service"; then
+    if grep -q "^$service" <<< "$USER_UNIT_FILES"; then
         if systemctl --user is-active "$service" &>/dev/null; then
             echo "  ✅ $service (active)"
-            ((PASS++))
+            PASS=$((PASS + 1))
         else
             echo "  ⚠️  $service (installed but not running)"
-            ((WARN++))
+            WARN=$((WARN + 1))
         fi
     else
         echo "  ⚠️  $service (not installed)"
-        ((WARN++))
+        WARN=$((WARN + 1))
     fi
 done
 
@@ -88,15 +105,19 @@ for config in \
     "$HOME/.dracon/utilities/warden/dracon-warden.toml"; do
     if [ -f "$config" ]; then
         echo "  ✅ $(basename "$config")"
-        ((PASS++))
+        PASS=$((PASS + 1))
     else
         echo "  ⚠️  $(basename "$config") (not created yet)"
-        ((WARN++))
+        WARN=$((WARN + 1))
     fi
 done
 
 echo ""
 echo "🌐 AI Configuration"
+# FIXED 2026-09-27 (audit F79): install.sh now copies
+# dracon-sync/ai.example.toml here, so this check can pass. Before that the
+# check was a permanent false WARN — install.sh shipped only the three
+# dracon-*.example.toml files and never installed an ai.toml.
 check "AI provider config (ai.toml)" "[ -f $HOME/.dracon/utilities/sync/ai.toml ]" false
 
 echo ""
