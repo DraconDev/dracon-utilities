@@ -65,6 +65,61 @@ def local_head(crate_dir: Path) -> str:
         fail(f"cannot read {crate_dir} HEAD: {error.output.strip()}")
 
 
+def ci_checkout_pins(workflow: str, checkout_path: str) -> list[str]:
+    """Return every `ref:` used by a CI checkout of `checkout_path`.
+
+    RESTORED/REWRITTEN 2026-09-27 (audit decision D1): the original
+    check used one regex requiring `path:` to appear BEFORE `ref:` on
+    the adjacent line.  The real workflow writes them in the opposite
+    order (`repository:`, `ref:`, `path:`), so the pattern never matched
+    and the gate could not have passed even with correct pins in place.
+
+    This walks the file line by line instead. A `repository:` line opens
+    a checkout block; `ref:` and `path:` are both read from within that
+    block regardless of the order they appear in, and a block is only
+    attributed to a utility when BOTH name the same checkout path. That
+    keeps a floating `ref: main` from being mistaken for a pin and keeps
+    the three utilities' pins independent of YAML key ordering.
+    """
+    lines = workflow.split("\n")
+    found: list[str] = []
+    block: list[str] | None = None
+    for line in lines:
+        if re.match(r"^\s*repository:\s*\S+\s*$", line):
+            block = [line]
+            continue
+        if block is not None:
+            if line.strip() == "" or not line.startswith(" " * 6):
+                block = None
+                continue
+            block.append(line)
+            if re.match(r"^\s*path:\s*\S+\s*$", line):
+                ref = next(
+                    (
+                        candidate.group(1)
+                        for candidate in (
+                            re.match(r"^\s*ref:\s*(\S+)\s*$", item) for item in block
+                        )
+                        if candidate
+                    ),
+                    None,
+                )
+                path = line.split(":", 1)[1].strip()
+                if path == checkout_path:
+                    if ref is None:
+                        fail(
+                            f"CI checkout for {checkout_path} has no `ref:` — "
+                            "every utility checkout must pin a 40-hex revision"
+                        )
+                    if not re.fullmatch(r"[0-9a-f]{40}", ref):
+                        fail(
+                            f"CI checkout for {checkout_path} uses ref {ref!r}; "
+                            "expected a 40-hex pinned revision, not a branch or tag"
+                        )
+                    found.append(ref)
+    return found
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -92,10 +147,7 @@ def main() -> int:
         if expected_url not in flake:
             fail(f"flake.nix must pin {checkout_path} to the main branch explicitly")
 
-        matches = re.findall(
-            rf"path:\s*{re.escape(checkout_path)}\s*\n\s*ref:\s*([0-9a-f]{{40}})",
-            workflow,
-        )
+        matches = ci_checkout_pins(workflow, checkout_path)
         if not matches:
             fail(f"CI has no pinned checkout for {checkout_path}")
         if len(set(matches)) != 1:

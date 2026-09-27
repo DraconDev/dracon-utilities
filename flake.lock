@@ -1,5 +1,56 @@
 {
   "nodes": {
+    "dracon-sync-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1790537368,
+        "narHash": "sha256-y5LGM7ZJRNZsVSv47r3A530dsKExuQuHp1gBHml0bgQ=",
+        "owner": "DraconDev",
+        "repo": "dracon-sync-background-auto-commit-multi-remote",
+        "rev": "4525d72d46d62118ff99f1811a354d4cad571650",
+        "type": "github"
+      },
+      "original": {
+        "owner": "DraconDev",
+        "ref": "main",
+        "repo": "dracon-sync-background-auto-commit-multi-remote",
+        "type": "github"
+      }
+    },
+    "dracon-system-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1790533688,
+        "narHash": "sha256-rIn+LnBlDIzdNRD0QQOl53E1N66NpyvCNeBzKW7IRis=",
+        "owner": "DraconDev",
+        "repo": "dracon-system-disk-process-guard-doctor",
+        "rev": "927832b28d1673fe2d900d8ea09b3a12bc5afc8a",
+        "type": "github"
+      },
+      "original": {
+        "owner": "DraconDev",
+        "ref": "main",
+        "repo": "dracon-system-disk-process-guard-doctor",
+        "type": "github"
+      }
+    },
+    "dracon-warden-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1790533668,
+        "narHash": "sha256-1+yo/x3tWXQwYzKInfFWx2woFhc3DhCSPRIAwG9A5GE=",
+        "owner": "DraconDev",
+        "repo": "dracon-warden-secret-encrypt-age-git-filter",
+        "rev": "3aaa9029338877e561fd549b192dab1942f0c694",
+        "type": "github"
+      },
+      "original": {
+        "owner": "DraconDev",
+        "ref": "main",
+        "repo": "dracon-warden-secret-encrypt-age-git-filter",
+        "type": "github"
+      }
+    },
     "flake-utils": {
       "inputs": {
         "systems": "systems"
@@ -36,6 +87,9 @@
     },
     "root": {
       "inputs": {
+        "dracon-sync-src": "dracon-sync-src",
+        "dracon-system-src": "dracon-system-src",
+        "dracon-warden-src": "dracon-warden-src",
         "flake-utils": "flake-utils",
         "nixpkgs": "nixpkgs"
       }

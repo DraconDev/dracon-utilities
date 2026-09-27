@@ -4,13 +4,49 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
+
+    # RESTORED 2026-09-27 (audit decision D1): the utilities are nested
+    # standalone repositories, NOT tracked by this parent (they are listed
+    # in .gitignore and carry their own .git). The 2026-08-22 monorepo
+    # conversion deleted these inputs, and `mergedSrc` below then built
+    # from `${self}` — which, on a fresh clone, contains no utility source
+    # at all, so every `nix build` failed. The invisible half of that
+    # regression was that CI only ever ran `nix flake check --no-build`,
+    # which never realises a derivation.
+    #
+    # Each input names a BRANCH (`/main`); flake.lock is the actual pin.
+    # scripts/check-nested-pins.py asserts that the flake.lock rev, the
+    # ci.yml `ref:`, and the local nested HEAD all agree, so moving a
+    # utility is an explicit, reviewable lockfile change.
+    dracon-sync-src = {
+      url = "github:DraconDev/dracon-sync-background-auto-commit-multi-remote/main";
+      # The utilities ship no flake.nix of their own; they are plain
+      # source trees, not flakes.
+      flake = false;
+    };
+    dracon-system-src = {
+      url = "github:DraconDev/dracon-system-disk-process-guard-doctor/main";
+      flake = false;
+    };
+    dracon-warden-src = {
+      url = "github:DraconDev/dracon-warden-secret-encrypt-age-git-filter/main";
+      flake = false;
+    };
   };
 
-  outputs = {
+  # The `*-src` inputs have hyphens in their names, which cannot be bound
+  # as positional function arguments in Nix. They are taken from the
+  # attribute set instead; the quotes below are required, not stylistic.
+  outputs = inputs@{
     self,
     nixpkgs,
     flake-utils,
   }:
+  let
+    draconSyncSrc = inputs."dracon-sync-src";
+    draconSystemSrc = inputs."dracon-system-src";
+    draconWardenSrc = inputs."dracon-warden-src";
+  in
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; };
@@ -23,9 +59,25 @@
         #   dracon-utilities/dracon-sync/   <- workspace member
         #   dracon-utilities/dracon-system/ <- workspace member
         #   dracon-utilities/dracon-warden/ <- workspace member
+        # REVERTED 2026-09-27 (audit decision D1): that comment described
+        # a layout this repo no longer has. The three utility directories
+        # are gitignored nested clones, so `${self}` contributes no utility
+        # source and `buildRustPackage` had no Cargo.toml to find. Each
+        # `*-src` input is spliced in at its workspace-member path. The
+        # `rm -rf` first makes the result deterministic when a developer
+        # runs the flake from a worktree that happens to hold live
+        # checkouts, instead of silently splicing a mix of the pinned
+        # revision and whatever is on disk.
         mergedSrc = pkgs.runCommand "dracon-merged-src" {} ''
           mkdir -p $out/dracon-utilities
           cp -r ${self}/. $out/dracon-utilities/
+          rm -rf \
+            $out/dracon-utilities/dracon-sync \
+            $out/dracon-utilities/dracon-system \
+            $out/dracon-utilities/dracon-warden
+          cp -r ${draconSyncSrc} $out/dracon-utilities/dracon-sync
+          cp -r ${draconSystemSrc} $out/dracon-utilities/dracon-system
+          cp -r ${draconWardenSrc} $out/dracon-utilities/dracon-warden
           # Make writable for buildRustPackage (Cargo needs to write target/, .cargo/)
           chmod -R u+w $out
         '';
