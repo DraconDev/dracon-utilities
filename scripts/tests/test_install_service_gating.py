@@ -56,6 +56,14 @@ if [ "$1" = "--user" ] && [ "$2" = "is-active" ]; then
     exit 3
 fi
 
+# show <unit> -p ExecStart --value  (install.sh's live-unit guard)
+if [ "$1" = "--user" ] && [ "$2" = "show" ] && [ "$4" = "-p" ] && [ "$5" = "ExecStart" ]; then
+    [ -n "${UNIT_EXEC_PATH:-}" ] && echo "{ path=$UNIT_EXEC_PATH ; argv[]=$UNIT_EXEC_PATH daemon ; }"
+    exit 0
+fi
+
+# getent is stubbed by the sandbox when a test needs a specific "real" home.
+
 # list-unit-files (the script captures this once at the top)
 if [ "$1" = "--user" ] && [ "$2" = "list-unit-files" ]; then
     for svc in ${STUB_EXISTING_SERVICES}; do
@@ -339,6 +347,85 @@ class SandboxIsHermetic(unittest.TestCase):
         self.assertEqual(
             before, after, "a sandboxed install.sh run must not add or remove anything in the real ~/.local/bin"
         )
+
+
+class DeletionGuards(unittest.TestCase):
+    """install.sh must never delete a live or the operator's own installation.
+
+    The 2026-09-28 incident: running the installer with a HOME that is not
+    the operator's made the real `~/.local/bin` look like a "shadowing" PATH
+    directory, and its shadow-scan deleted the live `dracon-warden`, which
+    broke every filtered git operation on the rig. install.sh now has two
+    guards; these tests pin both, hermetically.
+    """
+
+    def _canary(self, directory: Path, name: str = "dracon-warden") -> Path:
+        p = directory / name
+        p.write_text("#!/bin/sh\nexit 0\n")
+        p.chmod(0o755)
+        return p
+
+    def test_the_operators_real_bin_dir_is_never_a_shadowing_target(self) -> None:
+        tmp, run_obj = sandbox(active="", existing="")
+        self.addCleanup(tmp.cleanup)
+        # `getent` reports a "real" home that is NOT the sandbox HOME; its
+        # ~/.local/bin is on PATH and holds a live-looking binary. Without
+        # the guard the shadow-scan deletes it (incident 2026-09-28).
+        real_home = Path(tmp.name) / "real-home"
+        real_bin = real_home / ".local" / "bin"
+        real_bin.mkdir(parents=True, exist_ok=True)
+        canary = self._canary(real_bin)
+        run_obj.env["PATH"] = os.pathsep.join((str(run_obj.stub_dir), str(real_bin), *SANDBOX_PATH_DIRS))
+        getent = run_obj.stub_dir / "getent"
+        getent.write_text(f'#!/usr/bin/env bash\necho "dracon:x:1000:1000:Test:{real_home}:/bin/bash"\n')
+        getent.chmod(0o755)
+
+        res = run_obj.run()
+        self.assertEqual(res.returncode, 0, msg=f"installer failed:\n{res.stdout}\n{res.stderr}")
+        self.assertTrue(
+            canary.exists(),
+            "the operator's real ~/.local/bin must never be treated as a shadowing "
+            "directory (incident 2026-09-28: this deleted the live dracon-warden)",
+        )
+
+    def test_a_binary_a_live_unit_executes_is_never_removed(self) -> None:
+        tmp, run_obj = sandbox(active="", existing=" ".join(SERVICES))
+        self.addCleanup(tmp.cleanup)
+        # The daemon binary a live unit is executing lives in a plain PATH
+        # dir (not the install target) — e.g. /usr/local/bin/dracon-sync.
+        foreign_bin = Path(tmp.name) / "usr-local-bin"
+        foreign_bin.mkdir(parents=True, exist_ok=True)
+        canary = self._canary(foreign_bin, "dracon-sync")
+        run_obj.env["PATH"] = os.pathsep.join((str(run_obj.stub_dir), str(foreign_bin), *SANDBOX_PATH_DIRS))
+        run_obj.env["UNIT_EXEC_PATH"] = str(canary)
+
+        res = run_obj.run()
+        self.assertEqual(res.returncode, 0, msg=f"installer failed:\n{res.stdout}\n{res.stderr}")
+        self.assertTrue(
+            canary.exists(),
+            "a binary a live systemd unit executes must never be removed as a "
+            "shadowing stale copy — the unit would fail to restart",
+        )
+        self.assertIn("a live systemd unit runs it", res.stdout, msg=res.stdout)
+
+    def test_a_stale_foreign_copy_is_still_removed(self) -> None:
+        # The guards must not turn the feature off: a genuine stale copy in
+        # a foreign PATH dir is still cleaned up.
+        tmp, run_obj = sandbox(active="", existing=" ".join(SERVICES))
+        self.addCleanup(tmp.cleanup)
+        foreign_bin = Path(tmp.name) / "usr-local-bin"
+        foreign_bin.mkdir(parents=True, exist_ok=True)
+        canary = self._canary(foreign_bin, "dracon-sync")
+        run_obj.env["PATH"] = os.pathsep.join((str(run_obj.stub_dir), str(foreign_bin), *SANDBOX_PATH_DIRS))
+
+        res = run_obj.run()
+        self.assertEqual(res.returncode, 0, msg=f"installer failed:\n{res.stdout}\n{res.stderr}")
+        self.assertFalse(
+            canary.exists(),
+            "a stale foreign copy that no unit runs must still be removed — the "
+            "shadow-scan feature is unchanged",
+        )
+        self.assertIn("Removed shadowing binary", res.stdout, msg=res.stdout)
 
 
 if __name__ == "__main__":
