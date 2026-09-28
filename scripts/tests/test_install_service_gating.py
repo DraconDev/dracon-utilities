@@ -130,7 +130,18 @@ SANDBOX_PATH_DIRS = ("/run/current-system/sw/bin", "/usr/bin", "/bin")
 
 
 class InstallRun:
-    """One hermetic `install.sh` run: sandbox HOME, stubbed side-effecting tools."""
+    """One hermetic `install.sh` run: sandbox repo+HOME, stubbed tools.
+
+    The script is a BYTE-IDENTICAL COPY of the real one inside a sandbox
+    tree, because `install.sh` starts with `cd "$(dirname "$0")"` and then
+    builds in `./dracon-<name>/target/release/`. Running the real file in
+    place made the stub `cargo` drop fake 17-byte `dracon-*` binaries into
+    the REAL per-crate target directories — a trap for the next
+    `install.sh`, which resolves `$subdir/target/release/$binary` first and
+    would have installed a no-op "daemon". The copy is verified against the
+    real file's hash in `test_the_sandbox_script_is_a_verified_copy`, so the
+    run is still the real logic.
+    """
 
     def __init__(self, root: Path, active: str, existing: str) -> None:
         self.root = root
@@ -140,6 +151,25 @@ class InstallRun:
         self.stub_dir.mkdir(parents=True, exist_ok=True)
         self.log = root / "stub.log"
         self.log.touch()
+
+        # Sandbox repo tree: the script under test plus the crate dirs it
+        # builds in. No source is copied in — the stub `cargo` only needs
+        # the directories to exist, but install.sh refuses to start when a
+        # utility directory has no manifest, so each gets a minimal one.
+        self.repo = root / "repo"
+        self.repo.mkdir(parents=True, exist_ok=True)
+        self.script = self.repo / "install.sh"
+        self.script.write_bytes(INSTALL_SH.read_bytes())
+        self.script.chmod(0o755)
+        for crate in ("dracon-sync", "dracon-system", "dracon-warden"):
+            crate_dir = self.repo / crate
+            crate_dir.mkdir(parents=True, exist_ok=True)
+            (crate_dir / "Cargo.toml").write_text(
+                f'[package]\nname = "{crate}"\nversion = "0.0.0"\nedition = "2021"\n'
+            )
+            (crate_dir / f"{crate}.service").write_text(
+                f"# sandbox stub for {crate}.service\n"
+            )
 
         self._write_stub("systemctl", STUB_SYSTEMCTL)
         self._write_stub("pgrep", STUB_PGREP)
@@ -160,8 +190,8 @@ class InstallRun:
 
     def run(self, *args: str, cwd: Path | None = None) -> subprocess.CompletedProcess:
         return subprocess.run(
-            ["bash", str(INSTALL_SH), *args],
-            cwd=str(cwd or ROOT),
+            ["bash", str(self.script), *args],
+            cwd=str(cwd or self.repo),
             env=dict(self.env),
             capture_output=True,
             text=True,
@@ -408,6 +438,26 @@ class DeletionGuards(unittest.TestCase):
         )
         self.assertIn("a live systemd unit runs it", res.stdout, msg=res.stdout)
 
+    def test_a_unit_exec_path_containing_a_space_is_not_truncated(self) -> None:
+        # The guard compares the candidate path against the unit's ExecStart
+        # verbatim, so the extraction must not cut a path at a space (a
+        # truncated comparison silently matches nothing and the guard fails
+        # OPEN, i.e. the binary gets deleted).
+        tmp, run_obj = sandbox(active="", existing=" ".join(SERVICES))
+        self.addCleanup(tmp.cleanup)
+        spaced_dir = Path(tmp.name) / "bin with spaces"
+        spaced_dir.mkdir(parents=True, exist_ok=True)
+        canary = self._canary(spaced_dir, "dracon-system")
+        run_obj.env["PATH"] = os.pathsep.join((str(run_obj.stub_dir), str(spaced_dir), *SANDBOX_PATH_DIRS))
+        run_obj.env["UNIT_EXEC_PATH"] = str(canary)
+
+        res = run_obj.run()
+        self.assertEqual(res.returncode, 0, msg=f"installer failed:\n{res.stdout}\n{res.stderr}")
+        self.assertTrue(
+            canary.exists(),
+            "an ExecStart path containing a space must still be recognised as live",
+        )
+
     def test_a_stale_foreign_copy_is_still_removed(self) -> None:
         # The guards must not turn the feature off: a genuine stale copy in
         # a foreign PATH dir is still cleaned up.
@@ -426,6 +476,50 @@ class DeletionGuards(unittest.TestCase):
             "shadow-scan feature is unchanged",
         )
         self.assertIn("Removed shadowing binary", res.stdout, msg=res.stdout)
+
+
+    def test_the_sandbox_script_is_a_verified_copy(self) -> None:
+        # The suite runs install.sh from a sandbox copy (so the stub cargo
+        # cannot drop fake binaries into the real per-crate target dirs), so
+        # the copy must be provably the same file.
+        tmp, run_obj = sandbox(active="", existing="")
+        self.addCleanup(tmp.cleanup)
+        self.assertEqual(
+            run_obj.script.read_bytes(),
+            INSTALL_SH.read_bytes(),
+            "the sandbox install.sh must be a byte-identical copy of the real one",
+        )
+
+    def test_a_sandbox_run_writes_nothing_into_the_real_repo(self) -> None:
+        tmp, run_obj = sandbox(active="", existing="")
+        self.addCleanup(tmp.cleanup)
+        before = {
+            crate: sorted(
+                p.name
+                for p in (ROOT / crate / "target" / "release").glob("dracon-*")
+            )
+            if (ROOT / crate / "target" / "release").is_dir()
+            else []
+            for crate in ("dracon-sync", "dracon-system", "dracon-warden")
+        }
+        res = run_obj.run()
+        self.assertEqual(res.returncode, 0, msg=f"installer failed:\n{res.stdout}\n{res.stderr}")
+        after = {
+            crate: sorted(
+                p.name
+                for p in (ROOT / crate / "target" / "release").glob("dracon-*")
+            )
+            if (ROOT / crate / "target" / "release").is_dir()
+            else []
+            for crate in ("dracon-sync", "dracon-system", "dracon-warden")
+        }
+        self.assertEqual(
+            before,
+            after,
+            "a sandboxed run must not create files in the real crates' target dirs — "
+            "install.sh resolves $subdir/target/release/$binary first, so a fake binary "
+            "left there is what the next real install would install",
+        )
 
 
 if __name__ == "__main__":

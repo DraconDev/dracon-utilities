@@ -261,10 +261,17 @@ if command -v getent &>/dev/null; then
     REAL_HOME=$(getent passwd "$(id -un)" 2>/dev/null | cut -d: -f6)
 fi
 # Absolute ExecStart paths of the live user units, one per line.
+# Parsed with `path=\([^;]*\) ;` rather than `grep -oE '/[^ ;{}]*'`: a
+# systemd `--value` line is `{ path=<exe> ; argv[]=<exe> <args> ; … }`, and
+# the old `[^ ;]*` class silently TRUNCATED a path containing a space to a
+# prefix that then matched nothing — the guard failed open and deleted the
+# very binary it exists to protect. `[^;]*` keeps spaces and still stops at
+# the field separator; a literal `;` inside an ExecStart path is not
+# representable in systemd's own output anyway.
 UNIT_EXEC_PATHS=""
 for _u in dracon-sync.service dracon-system-guard.service; do
     if command -v systemctl &>/dev/null; then
-        UNIT_EXEC_PATHS="$UNIT_EXEC_PATHS$(systemctl --user show "$_u" -p ExecStart --value 2>/dev/null | grep -oE '/[^ ;{}]*' || true)
+        UNIT_EXEC_PATHS="$UNIT_EXEC_PATHS$(systemctl --user show "$_u" -p ExecStart --value 2>/dev/null | sed -n 's/.*path=\([^;]*\) ;.*/\1/p' || true)
 "
     fi
 done
