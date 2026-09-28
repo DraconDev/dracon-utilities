@@ -17,6 +17,15 @@ recording shims. Nothing touches the host's systemd user session or `cargo`, and
 every service action the script takes is captured in a log file the test asserts
 against. That makes the regression a behaviour test rather than a grep over the
 script text.
+
+HERMETICITY (learned the hard way, 2026-09-28): `install.sh` scans `PATH` for
+"shadowing" `dracon-*` binaries and removes anything outside
+`$HOME/.local/bin`. A first version of this file inherited the caller's `PATH`,
+which contained the operator's REAL `~/.local/bin` while `HOME` pointed at the
+sandbox — so the script deleted the live installed `dracon-warden` and broke
+every filtered git operation on the rig. The stub `PATH` below therefore
+contains only the stub directory and the system directories, and
+`test_the_sandbox_cannot_see_the_real_install` pins that.
 """
 
 from __future__ import annotations
@@ -104,6 +113,14 @@ exit 0
 """
 
 
+# The sandbox PATH: stub directory + the directories coreutils live in on
+# NixOS. Deliberately NOT the caller's PATH: install.sh removes "shadowing"
+# dracon-* binaries from every PATH dir that is not $HOME/.local/bin, so
+# inheriting the real PATH (which holds the operator's installed binaries)
+# would let a test mutate the rig.
+SANDBOX_PATH_DIRS = ("/run/current-system/sw/bin", "/usr/bin", "/bin")
+
+
 class InstallRun:
     """One hermetic `install.sh` run: sandbox HOME, stubbed side-effecting tools."""
 
@@ -120,12 +137,9 @@ class InstallRun:
         self._write_stub("pgrep", STUB_PGREP)
         self._write_stub("pkill", STUB_PKILL)
         self._write_stub("cargo", STUB_CARGO)
-        # `cargo` above writes into cwd, and the installer runs the build in
-        # the crate subdirectory; a writable repo copy keeps the real tree
-        # clean. The script only needs the three crate dirs to exist.
         self.env = {
             "HOME": str(self.home),
-            "PATH": f"{self.stub_dir}:{os.environ.get('PATH', '')}",
+            "PATH": os.pathsep.join((str(self.stub_dir), *SANDBOX_PATH_DIRS)),
             "STUB_LOG": str(self.log),
             "STUB_ACTIVE_SERVICES": active,
             "STUB_EXISTING_SERVICES": existing,
@@ -140,7 +154,7 @@ class InstallRun:
         return subprocess.run(
             ["bash", str(INSTALL_SH), *args],
             cwd=str(cwd or ROOT),
-            env={**self.env, "PATH": self.env["PATH"]},
+            env=dict(self.env),
             capture_output=True,
             text=True,
             timeout=300,
@@ -285,6 +299,46 @@ class FirstInstallBehaviourIsUnchanged(unittest.TestCase):
                 0,
                 f"a unit that did not exist before the install is not started ({svc})",
             )
+
+
+class SandboxIsHermetic(unittest.TestCase):
+    """The suite must not be able to mutate the operator's real installation."""
+
+    def setUp(self) -> None:
+        self.tmp, self.run_obj = sandbox(active="", existing="")
+        self.addCleanup(self.tmp.cleanup)
+
+    def test_the_sandbox_cannot_see_the_real_install(self) -> None:
+        real_bin = Path(os.path.expanduser("~/.local/bin"))
+        self.assertNotIn(
+            str(real_bin),
+            self.run_obj.env["PATH"].split(os.pathsep),
+            "the sandbox PATH must not contain the operator's real ~/.local/bin: "
+            "install.sh deletes 'shadowing' dracon-* binaries from any PATH dir "
+            "that is not $HOME/.local/bin, and a test with the real bin dir on "
+            "PATH deletes the live installation (incident 2026-09-28)",
+        )
+        self.assertNotEqual(
+            self.run_obj.env["HOME"],
+            os.path.expanduser("~"),
+            "the sandbox HOME must differ from the real home",
+        )
+
+    def test_a_sandbox_run_leaves_the_real_bin_untouched(self) -> None:
+        # Plant a canary in a PATH dir the sandbox DOES see and confirm the
+        # script only ever touches files under the sandbox HOME.
+        canary_dir = self.run_obj.stub_dir
+        canary = canary_dir / "dracon-warden"
+        canary.write_text("#!/bin/sh\nexit 0\n")
+        canary.chmod(0o755)
+        real_bin = Path(os.path.expanduser("~/.local/bin"))
+        before = sorted(p.name for p in real_bin.glob("dracon-*")) if real_bin.is_dir() else []
+        res = self.run_obj.run()
+        self.assertEqual(res.returncode, 0, msg=f"installer failed:\n{res.stdout}\n{res.stderr}")
+        after = sorted(p.name for p in real_bin.glob("dracon-*")) if real_bin.is_dir() else []
+        self.assertEqual(
+            before, after, "a sandboxed install.sh run must not add or remove anything in the real ~/.local/bin"
+        )
 
 
 if __name__ == "__main__":

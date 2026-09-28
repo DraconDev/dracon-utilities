@@ -241,11 +241,43 @@ done
 # Scan PATH for shadowing binaries — any dracon-* in a directory
 # other than ~/.local/bin will take priority depending on PATH order.
 # This catches stale installs in /usr/local/bin, ~/bin, etc.
+#
+# HARDENED 2026-09-28 (incident while shipping D4): this scan deleted the
+# LIVE `~/.local/bin/dracon-warden` when the script ran with a HOME that
+# was not the operator's (a sandbox/test HOME, a service account, `sudo`
+# without `-H`). The install target `$HOME/.local/bin` then did not match
+# the real home's bin directory, so the operator's own installed binaries
+# looked like "shadowing" and were removed — which broke every filtered
+# git operation fleet-wide ("dracon-warden: command not found", daemon
+# classification streaks into the teens). Two guards, both cheap:
+#
+#   1. the REAL home's `~/.local/bin` (from the passwd entry, not `$HOME`)
+#      is never a shadowing target;
+#   2. a binary that a live user unit executes is never removed, whatever
+#      directory it lives in.
 IFS=':' read -ra _path_dirs <<< "$PATH"
+REAL_HOME=""
+if command -v getent &>/dev/null; then
+    REAL_HOME=$(getent passwd "$(id -un)" 2>/dev/null | cut -d: -f6)
+fi
+# Absolute ExecStart paths of the live user units, one per line.
+UNIT_EXEC_PATHS=""
+for _u in dracon-sync.service dracon-system-guard.service; do
+    if command -v systemctl &>/dev/null; then
+        UNIT_EXEC_PATHS="$UNIT_EXEC_PATHS$(systemctl --user show "$_u" -p ExecStart --value 2>/dev/null | grep -oE '/[^ ;{}]*' || true)
+"
+    fi
+done
+unset _u
 for _dir in "${_path_dirs[@]}"; do
     [ "$_dir" = "$HOME/.local/bin" ] && continue
+    [ -n "$REAL_HOME" ] && [ "$_dir" = "$REAL_HOME/.local/bin" ] && continue
     for _stale in "$_dir"/dracon-sync "$_dir"/dracon-system "$_dir"/dracon-warden; do
         [ -f "$_stale" ] || continue
+        if grep -qxF "$_stale" <<< "$UNIT_EXEC_PATHS"; then
+            echo "  ⚠️  Skipped $_stale — a live systemd unit runs it (remove it by hand if it is stale)"
+            continue
+        fi
         if [ "$DRY_RUN" = true ]; then
             echo "  Would remove shadowing binary: $_stale"
         else
