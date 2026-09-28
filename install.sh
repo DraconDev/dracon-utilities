@@ -37,6 +37,26 @@ if command -v systemctl &>/dev/null; then
     USER_UNIT_FILES=$(systemctl --user list-unit-files 2>/dev/null || true)
 fi
 
+# ADDED 2026-09-28 (D4): which services were RUNNING before this install
+# touched anything. `--upgrade` stops them early, so a later live query
+# would report "not running" for a daemon this script itself stopped and
+# then refuse to bring it back. The "was it running" fact has to be
+# captured before the first mutation, exactly like `USER_UNIT_FILES`.
+PRE_ACTIVE_SERVICES=""
+if command -v systemctl &>/dev/null; then
+    for _svc in dracon-sync.service dracon-system-guard.service; do
+        if systemctl --user is-active "$_svc" &>/dev/null; then
+            PRE_ACTIVE_SERVICES="$PRE_ACTIVE_SERVICES $_svc"
+        fi
+    done
+    unset _svc
+fi
+
+# True when the service was running before this install ran.
+service_was_running() {
+    [[ " $PRE_ACTIVE_SERVICES " == *" $1 "* ]]
+}
+
 for arg in "$@"; do
     case "$arg" in
         --help|-h)
@@ -310,11 +330,29 @@ install_binary() {
             # Warden has no daemon — hooks are the primary enforcement layer
         esac
 
-        # Stop service + kill all processes only for a live upgrade.
-        if [ "$NO_RESTART" != true ] && [ -n "$svc_name" ]; then
-            systemctl --user stop "$svc_name" 2>/dev/null || true
+        # CHANGED 2026-09-28 (D4): this block used to be gated on
+        # `NO_RESTART != true` alone, so a plain `./install.sh` — the
+        # first-install and routine-update path — stopped every service,
+        # pkill-ed its binary, and started it again. The help text promises
+        # `--upgrade  Stop services, install, restart (default: only
+        # restart if running)`, so a plain install was quietly doing the
+        # one thing the operator must not get by accident: resurrecting a
+        # service they deliberately stopped.
+        #
+        # A plain install therefore touches NO service state. Only
+        # `--upgrade` quiesces, and even then the restart is gated on
+        # `systemctl --user is-active` captured BEFORE the stop, so a
+        # service the operator had stopped stays stopped.
+        local svc_was_active=false
+        if [ "$UPGRADE" = true ] && [ "$NO_RESTART" != true ] && [ -n "$svc_name" ]; then
+            if service_was_running "$svc_name"; then
+                svc_was_active=true
+                systemctl --user stop "$svc_name" 2>/dev/null || true
+            else
+                echo "  ⏭️  $svc_name was not running before this install — left stopped"
+            fi
         fi
-        if [ "$NO_RESTART" != true ]; then
+        if [ "$UPGRADE" = true ] && [ "$NO_RESTART" != true ]; then
             pkill -x "$binary" 2>/dev/null || true
             # Wait for process to fully exit (up to 3s)
             for _ in $(seq 1 6); do
@@ -328,8 +366,10 @@ install_binary() {
         cp "$resolved" ~/.local/bin/"$binary"
         chmod +x ~/.local/bin/"$binary"
 
-        # Restart the service and track it for the final restart block
-        if [ "$NO_RESTART" != true ] && [ -n "$svc_name" ]; then
+        # Restart only what `--upgrade` found running. An operator-stopped
+        # service is never resurrected here; the final `restart_service`
+        # block applies the same rule.
+        if [ "$UPGRADE" = true ] && [ "$NO_RESTART" != true ] && [ "$svc_was_active" = true ]; then
             systemctl --user start "$svc_name" 2>/dev/null || true
             RESTARTED_SERVICES="$RESTARTED_SERVICES $svc_name"
         fi
@@ -473,13 +513,38 @@ restart_service() {
         return 0
     fi
 
+    # CHANGED 2026-09-28 (D4): this block restarted every ENABLED unit, so
+    # a plain `./install.sh` resurrected a service the operator had
+    # deliberately stopped — the exact opposite of the help text's
+    # "(default: only restart if running)". The rule now:
+    #
+    #   * unit existed and was RUNNING         -> restart it (the
+    #     "only restart if running" promise);
+    #   * unit existed and was NOT running     -> leave it stopped, and say
+    #     so. A stopped daemon is a deliberate operator state; resurrecting
+    #     it is the surprise this removes.
+    #
+    # "Was running" comes from the pre-install snapshot, not a live query:
+    # `--upgrade` stops the service itself before reaching here, and a
+    # live `is-active` would then read "stopped" and strand a daemon this
+    # script quiesced two minutes earlier.
+    local unit_existed=false
+    if grep -q "^$service" <<< "$USER_UNIT_FILES"; then
+        unit_existed=true
+    fi
+
+    if [ "$unit_existed" = true ] && ! service_was_running "$service"; then
+        echo "  ⏭️  $service was not running before this install — left as-is (start it with: systemctl --user start $service)"
+        return 0
+    fi
+
     # FIXED 2026-09-27 (audit F97): the second disjunct piped
     # `systemctl --user list-unit-files` into `grep -q`, which is a
     # false-negative race under `set -o pipefail` (grep -q exits on the
     # first match → systemctl takes SIGPIPE → exit 141 → the pipeline
     # reports "not found" even when the unit exists). The unit list is
     # captured once at the top of the script and grepped as a string.
-    if systemctl --user is-enabled "$service" &>/dev/null || grep -q "^$service" <<< "$USER_UNIT_FILES"; then
+    if systemctl --user is-enabled "$service" &>/dev/null || [ "$unit_existed" = true ]; then
         systemctl --user restart "$service" 2>/dev/null && echo "  ✅ $service restarted" || echo "  ⚠️ Could not restart $service"
     else
         echo "  ⚠️ $service not found"
