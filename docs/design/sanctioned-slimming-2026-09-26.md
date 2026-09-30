@@ -297,3 +297,22 @@ unless the operator explicitly reclassifies them.
       identical 9 errors both ways, so neither the workspace change nor
       this slimming is implicated. Not fixed here — it is hegemon's
       vendored-package problem, outside this goal's scope.
+    - **a verification contract that names a bare `bun test <dir>` after
+      a `cd` is not runnable, and fails for reasons unrelated to the
+      work.** Two audit rounds of this execution were fast-failed by
+      `bun test src/lib` reporting *"The following filters did not match
+      any test files / 54305 files were searched"*. That count reproduces
+      byte-for-byte from `dracon-utilities` — the meta repo — and not
+      from `web/books`, which holds the 8,043-test suite the clause is
+      about. The cause is grammatical: the contract wrote
+      `cd …/web/books && npx svelte-check …`, which binds the directory
+      to the *first* command only, so the `bun test src/lib` clause
+      after the "and" carried no working directory and resolved against
+      whatever cwd the runner already had. Nothing in the books app can
+      influence that — the filter matches zero files there by
+      construction, and the fix must never be to invent a test to satisfy
+      the matcher. Write such clauses as one shell chain,
+      `cd …/web/books && npx svelte-check --threshold error && bun test
+      src/lib`, so the directory binds to every command in the sentence.
+      A gate reporting "no files matched" is a defect in the gate's own
+      wording, not evidence about the code.
