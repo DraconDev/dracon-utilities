@@ -271,3 +271,29 @@ unless the operator explicitly reclassifies them.
       `dracon-sync maintenance --` after confirming no parent-repo git
       process held it. The follow-up stands: the daemon should reap
       its own stale locks after a configurable threshold.
+    - **the books typecheck gate could not be run at all, and the cause
+      was a duplicate-name workspace.** `npx svelte-check --threshold
+      error` inside `web/books` aborted with *"must not have multiple
+      workspaces with the same name"* and exit 1, before type-checking
+      anything. `web/package.json` listed both
+      `games/libs/saves` and `games/wip/hegemon/vendor/@dracon/saves`
+      (likewise `save-backup`) as workspace members. hegemon pins its
+      own snapshots and depends on them with `file:./vendor/@dracon/*`,
+      which installs them into its own `node_modules` — workspace
+      membership was never what made them resolve. Removing the whole
+      `vendor/` namespace fixed it, and fixed the three latent
+      collisions npm was not reporting (`@dracon/art`,
+      `@dracon/audio-unlock`, `@dracon/menu`) at the same time. A
+      duplicate-name workspace is a hard failure, not a warning, and it
+      breaks *every* npm-based tool in the monorepo, so treat a
+      contract gate that "cannot run" as a repo defect to fix rather
+      than a reason to weaken the gate.
+    - **hegemon's own typecheck is red, pre-existing and unrelated.**
+      `cd web/games/wip/hegemon && bun run check` reports 9 errors from
+      one file: the vendored `@dracon/save-backup` contains a relative
+      import `../../../saves/src/local` that does not resolve from its
+      installed location under `node_modules/.bun/`. Confirmed
+      pre-existing by restoring the workspace entries and re-running:
+      identical 9 errors both ways, so neither the workspace change nor
+      this slimming is implicated. Not fixed here — it is hegemon's
+      vendored-package problem, outside this goal's scope.
