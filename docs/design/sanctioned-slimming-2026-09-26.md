@@ -112,3 +112,162 @@ unless the operator explicitly reclassifies them.
       commit in that submodule silently stalls. Worth a follow-up
       (daemon should reap its own stale submodule locks after a
       configurable threshold).
+- **2026-09-30 — dracon-platform (`web/books/static/books/**` image
+  classes). Second execution of this procedure, and the first where the
+  repo was already over the 2 GiB guard rather than trending toward it.**
+  - excised: every image file under `web/books/static/books/` —
+    `cover.jpg` (1,904 paths across both trees), `cover-card.png`
+    (2,224), `cover.png` and ~320 other regenerable art — 571 image
+    paths from the rewrite base's tree, and 0 non-image paths. The
+    four `filter-repo` passes used
+    `--invert-paths --path-glob 'web/books/static/books/**/*.{jpg,png,jpeg,webp}'`
+    (written out as four `--path-glob` flags); `chapters/**` was never
+    in any spec.
+  - **not excised, deliberately**: the 8,886 `chapters/*.md` files
+    (0.264 GiB on disk, duplicated across the two trees) and every
+    `audit-loop/**/*.md` ledger. The procedure forbids excising shipped
+    product and those are shipped product, asserted by
+    `web/books/src/lib/shelf-integrity.test.ts`.
+  - measurable result: reachable stored pack **4,464,493,686 B (4.16 GiB)
+    → 900,157,175 B (0.838 GiB)**, a 79.8% reduction, measured with the
+    guard's own command
+    (`rev-list --objects main | pack-objects --stdout | wc -c`).
+    41.8% of the 2 GiB policy line.
+  - guards: gate PASS. `bucket-strategy-guard.sh --json` on the
+    rewritten tip returned `ok: true`, `code: OK`,
+    `projectedBytes: 940,400,991` against
+    `effectiveLimitBytes: 5,905,580,032` (gitlab, the limiting
+    provider), `forwardOnly.ok: true`, 0 violations.
+  - old tip:  ae5be546d9561831d8508295518d4929a81056f1 (both remotes)
+  - rewrite base: f66f3beebaa6e682640edaf0e0b01c1f7e90539d
+    (27,391 commits rewritten by the first pass)
+  - pushed tip: 7b3cb16c7b6d95564dd93a4e530b6800b07b8a83 — the daemon
+    has since added commits on top (00cb84b874 at the time of writing),
+    so the live main is now the slimmed lineage, not this exact SHA.
+  - bundle: `~/dracon/backups/dracon-platform-pre-slim-20260930.bundle`
+    (4254.9M, sha1, complete history; `git bundle verify` exits 0).
+    A bundle from the previous day also existed
+    (`...-20260929.bundle`, tip 9ca07a416) and also verifies, but its
+    main tip predates the rewrite base, so it could not have recovered
+    the cutover point — a bundle must be taken at or after the rewrite
+    base, not merely "recently".
+  - content preservation, proven rather than asserted: the rewritten
+    tip's **tree SHA is identical** to the pre-rewrite main's
+    (`eeb2703a96e7…`), all 8,886 chapter paths *and their blob SHAs*
+    match the pre-rewrite bundle exactly (0 differences), the
+    `web/books/src/lib/data` cover fields (`coverObject` 952 /
+    `coverCardObject` 1,112) are untouched, and all 2,064 bucket
+    objects (952 covers + 1,112 card derivatives) serve byte-exact over
+    HTTP (`--verify-only --verify 3176` → `pass=2064 fail=0`).
+  - cutover: `git push --force-with-lease=refs/heads/main:<old>
+    --no-verify <new>:refs/heads/main` to both `origin` (github) and
+    `gitlab`, inside one `dracon-sync maintenance --` window, with
+    `DRACON_ALLOW_REWRITE=1`. Local `main` and all 46 local-only
+    `pi-agent-*` branches were moved to their rewritten counterparts
+    *before* the push, so a freeze-watchdog resume mid-window could only
+    ever push the new tip forward.
+  - clones: the only clone of this repo is the live checkout; the scratch
+    rewrite lives in `~/dracon/conv-work/dracon-platform` (outside the
+    watch roots), as the procedure requires.
+  - findings during execution:
+    - **the bucket guard's forward-only check still has no
+      `DRACON_ALLOW_REWRITE` escape.** Confirmed independently this
+      time: `bucket-strategy-core.mjs` reads no `DRACON_ALLOW_REWRITE`
+      (or any) environment variable at all — its only `process.env`
+      read is `GIT_ALTERNATE_OBJECT_DIRECTORIES`. The documented
+      workaround (`--no-verify` for the single force-push) was used, with
+      the guard-verify gate satisfied independently above. The
+      follow-up from the hellhunter entry is still open and is now the
+      only sanctioned way to slim any guarded repo.
+    - **the guard also refuses the *untracking* commit, which is step 5
+      of this very procedure.** The books inventory record declared
+      `legacyRoots: ["static", …]`, so the whole of
+      `web/books/static` was a protected root and the guard blocked the
+      2,224 `git rm --cached` deletions as `delete` violations of a
+      protected path. Step 5 is therefore unexecutable as written
+      against a protected root. Fixed by narrowing the record to the
+      shipped product — `static/books/*/chapters`,
+      `static/books/shelf/*/chapters`, `static/favicon.svg`,
+      `src/assets` — which is also the semantically correct answer now
+      that the covers are in the bucket. Regression-tested: staging the
+      deletion of a chapter is still refused with
+      `BUCKET_STRATEGY_GUARD_FORWARD_ONLY`, and
+      `bucket-strategy-forward-only.test.mjs` +
+      `bucket-strategy-manifest.test.mjs` still pass (15/15).
+      The procedure should say so explicitly: a sanitised class must
+      leave its inventory `legacyRoots` before step 5 can run.
+    - **`*` in a `.gitignore` pattern does not cross a directory
+      boundary.** The pre-existing rules used a single `*`
+      (`web/books/static/books/*/*.jpg`), so they matched only the
+      top-level `static/books/<slug>/` tree and silently left all 2,224
+      `static/books/shelf/<slug>/` images still tracked. Ignorable
+      *and* tracked: gitignore governs untracked paths only. Both
+      depths are now listed. This is the same inert-ignore defect as
+      the hellhunter entry, and the tell is always the same — verify
+      with `git check-ignore --no-index`, since plain `check-ignore`
+      reports "not ignored" for a tracked path and looks like a broken
+      rule.
+    - **a single rewrite pass is not enough when the daemon keeps
+      committing.** The scratch rewrite covered the base cleanly, but
+      the 490-commit delta replayed on top re-introduced 16 daemon
+      auto-commits that still touched covers, putting the tip back to
+      1.82 GiB (under the 2 GiB line, but only by 8.8%). A second
+      `filter-repo` pass over the replayed result returned it to
+      0.837 GiB. The procedure should say: replay the delta *first*,
+      then filter, and re-measure — and note that the delta can only be
+      replayed safely once the class is untracked and ignored, since
+      until then the daemon keeps re-committing it.
+    - **stale worktree registrations kept pre-rewrite history
+      reachable through `git log --all` even after every ref was
+      rewritten.** Nine prunable linked worktrees (`/tmp/ff-bisect`,
+      `~/Deploys/release-…`, the `*-bucket-goal-audit*` ones) still had
+      `.git/worktrees/*/HEAD` files pointing at old commits, so the
+      contract's `--all` check kept reporting ~13,900 cover paths while
+      every individual ref — all 48 heads, 4 tags, 4 remote-tracking
+      refs — individually reported zero. `git worktree prune` cleared
+      them and the check went to 0. The procedure's step 6 ("every other
+      clone must be re-cloned") has no equivalent for worktree
+      registrations; add a `git worktree prune` step.
+    - **`--contains` lies under load; intersect reachable sets instead.**
+      `git for-each-ref --contains <sha>` reported *no* ref containing
+      327 commits that `git rev-list --all` proved were reachable, and a
+      per-ref `git log` loop silently under-counted because each call
+      hit its timeout. Counting per ref is not a valid substitute for
+      the `--all` contract check. Use `comm` over
+      `git rev-list --all` vs the path-limited commit set.
+    - **submodule gitlink conflicts must be resolved with
+      `git update-index --cacheinfo`, not `git checkout --theirs`.**
+      Replaying the delta onto a rewritten base conflicts on ~20
+      actively-committing game submodules. In a scratch clone whose
+      submodules have no checked-out worktree, `checkout --theirs`
+      fails with "does not have a commit checked out / fatal: updating
+      files failed" *after* printing what looks like a successful
+      resolution, so a naive resolve loop spins forever. Read stage 3
+      out of `git ls-files -u` and write the index entry directly.
+    - **`git push <refspec> <remote>` fails in a way that looks like a
+      credential error.** The correct order is
+      `git push <options> <remote> <refspec>`; the wrong order makes
+      git treat the SHA as a hostname
+      ("Could not resolve hostname 7b3cb16c7…"), and a second remote
+      name then fails as "src refspec gitlab does not match any". Both
+      messages name the *remote* first and read like transport faults.
+    - **GitLab's protected-branch API cannot clear
+      `unprotect_access_level`.** The recorded pre-cutover rule for
+      `main` had `unprotect_access_levels: []`; re-creating it via
+      `POST /protected_branches` always produces
+      `unprotect_access_levels: [{access_level: 40}]` instead, and
+      `PATCH` rejects `0`, `null` and the empty string
+      ("does not have a valid value" / "is not supported"). The branch
+      is therefore re-protected with the *same* push/merge levels
+      (Maintainer/40) and `allow_force_push: false`, but Maintainers
+      can now also unprotect `main`, which they could not before. This
+      needs a one-time fix in the GitLab UI to match the old rule; the
+      procedure should warn that step 4 is not perfectly reversible on
+      GitLab.
+    - **a 5-minute-old zero-byte `index.lock` in the platform repo
+      blocked every commit**, and the daemon has no recovery for it —
+      the same class as the stale submodule locks in the hellhunter
+      entry, now observed in the parent repo itself. Cleared under
+      `dracon-sync maintenance --` after confirming no parent-repo git
+      process held it. The follow-up stands: the daemon should reap
+      its own stale locks after a configurable threshold.
