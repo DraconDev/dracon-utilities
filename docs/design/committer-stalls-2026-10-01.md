@@ -66,3 +66,25 @@ Follow-up full-workspace validation completed successfully: 1906
 tests passed (9 ignored), release build succeeded,
 workspace clippy with `-D warnings` clean, cargo deny clean. The earlier
 concurrent dracon-system build blocker is resolved.
+
+## TOUCHED and recurring Strategy dirtiness
+
+The operator asked for TOUCHED to show DraconDev for all confirmed aliases.
+`git_log_meta` now uses `%aN`, Git's mailmap-aware author name, rather than
+raw `%an`. The legend documents the mapping. A global mailmap at
+`~/.config/git/dracon-identities.mailmap` maps seven explicitly confirmed
+loop identities; raw commit author, hash, and time are preserved. An actual
+Git fixture regression verifies mapped output and unchanged hash/raw author.
+All 35 latest authors resolve to DraconDev with `%aN`.
+
+Strategy's catalog was rewritten to 69,680,424 bytes at 12:08 because
+`wave11-micro1-sync.service` had run since the previous day and retained the
+old imported JS writer. Changing the module on disk did not update that
+process. The service was restarted (retaining its existing wave12 drop-in),
+then the live catalog was compacted under shared flock with parsed data
+comparison, to 53,808,741 bytes. `sync-now` committed and synced it. The
+restarted process now loads the bounded writer for subsequent results.
+
+Workspace validation again intersected a new in-progress dracon-system
+syntax error (line 6575), so this report-only change is validated separately
+against dracon-sync. No edits to that other active session were made.
