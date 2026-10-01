@@ -88,3 +88,8 @@ restarted process now loads the bounded writer for subsequent results.
 Workspace validation again intersected a new in-progress dracon-system
 syntax error (line 6575), so this report-only change is validated separately
 against dracon-sync. No edits to that other active session were made.
+
+Mailmap report validation: 1,150 unit tests and 10 integration tests passed
+(3 ignored), release build succeeded, sync clippy clean, cargo deny clean.
+The binary was atomically installed and the daemon restarted. The preceding
+binary is saved at `/tmp/dracon-sync-before-mailmap-20261001`.
