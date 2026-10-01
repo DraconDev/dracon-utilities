@@ -45,3 +45,19 @@ and reported healthy, freeze off, policy valid. The new PID automatically
 committed and synced fresh platform edits, confirming scheduler recovery.
 Validation: dracon-sync 1,149 unit tests + 10 integration tests passed
 (3 ignored), release build and clippy passed, cargo deny clean.
+
+## Identity follow-up — operator confirmed ownership
+
+On 2026-10-01 the operator explicitly confirmed all watched repositories
+belong to DraconDev and requested canonical identity everywhere. All 35
+watched repositories now have local `user.name = DraconDev` and
+`user.email = dracsharp@gmail.com`; effective `git var GIT_AUTHOR_IDENT`
+was verified for each. This matches the pre-existing global Git identity.
+The historical Come Get Me alias `come-get-me-dev` /
+`come-get-me-dev@dracon.local` was explicitly added to the sync policy's
+trusted lists. Its warning is now cleared. No historical commits were
+rewritten or manufactured. Older TOUCHED authors remain historical records.
+SIGHUP reloads the daemon policy without interrupting service.
+
+The concurrent dracon-system syntax error has since been repaired by its
+active session; `cargo check -p dracon-system --locked` succeeds.
