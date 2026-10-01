@@ -61,3 +61,8 @@ SIGHUP reloads the daemon policy without interrupting service.
 
 The concurrent dracon-system syntax error has since been repaired by its
 active session; `cargo check -p dracon-system --locked` succeeds.
+
+Follow-up full-workspace validation completed successfully: 1906
+tests passed (9 ignored), release build succeeded,
+workspace clippy with `-D warnings` clean, cargo deny clean. The earlier
+concurrent dracon-system build blocker is resolved.
