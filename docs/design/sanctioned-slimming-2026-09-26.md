@@ -151,14 +151,35 @@ unless the operator explicitly reclassifies them.
     main tip predates the rewrite base, so it could not have recovered
     the cutover point — a bundle must be taken at or after the rewrite
     base, not merely "recently".
-  - content preservation, proven rather than asserted: the rewritten
-    tip's **tree SHA is identical** to the pre-rewrite main's
-    (`eeb2703a96e7…`), all 8,886 chapter paths *and their blob SHAs*
-    match the pre-rewrite bundle exactly (0 differences), the
-    `web/books/src/lib/data` cover fields (`coverObject` 952 /
-    `coverCardObject` 1,112) are untouched, and all 2,064 bucket
-    objects (952 covers + 1,112 card derivatives) serve byte-exact over
-    HTTP (`--verify-only --verify 3176` → `pass=2064 fail=0`).
+  - content preservation, proven rather than asserted: all 8,886
+    chapter paths *and their blob SHAs* match the pre-rewrite
+    bundle exactly (0 differences over a full
+    `ls-tree -r <tip> | grep chapters/` diff, bundle clone vs live
+    repo), and a sampled chapter
+    (`shelf/jude-steel-1/chapters/01-the-tunnel.md`) is identical on
+    blob SHA, byte count and sha256 in both — blob
+    `002ac2ac…`, 27,370 bytes,
+    `44762b4b…`. The `web/books/src/lib/data` cover fields
+    (`coverObject` 952 / `coverCardObject` 1,112) are untouched, and
+    all 2,064 bucket objects (952 covers + 1,112 card derivatives)
+    serve byte-exact over HTTP (`--verify-only --verify 3176` →
+    `pass=2064 fail=0`).
+  - **a root-tree comparison is not a preservation proof across an
+    excision, and this Log initially claimed one.** An earlier draft
+    of this entry asserted that the rewritten tip's tree SHA was
+    identical to the pre-rewrite main's, citing `eeb2703a96e7…`. That
+    was wrong twice over, and both failures are worth recording
+    because the next run will be tempted the same way. The SHA cited
+    is the tree of `0f2c1c5a` — an intermediate main, not the old tip
+    named above (`ae5be546`, tree `597b7e83`) and not the pushed tip
+    (`7b3cb16c`, tree `2ba70a52`); those two trees differ. And even a
+    genuine match would prove nothing about the shipped text: the
+    covers had already been untracked before the rewrite, so the tip
+    trees moved for unrelated reasons, and equality between two
+    mid-flight trees is not evidence about 8,886 chapter blobs.
+    Preservation is established by comparing the *content that had to
+    survive* — the chapter paths and their blob SHAs — against the
+    pre-rewrite bundle, which is what the sentence above now does.
   - cutover: `git push --force-with-lease=refs/heads/main:<old>
     --no-verify <new>:refs/heads/main` to both `origin` (github) and
     `gitlab`, inside one `dracon-sync maintenance --` window, with
