@@ -151,6 +151,19 @@ unless the operator explicitly reclassifies them.
     main tip predates the rewrite base, so it could not have recovered
     the cutover point — a bundle must be taken at or after the rewrite
     base, not merely "recently".
+  - **this bundle does NOT contain the exact pre-push commit, and that
+    is worth knowing before you need it.** Its `refs/heads/main` is
+    `7d6a956b`; the cutover old tip `ae5be546` is 45 commits *later*,
+    and `git cat-file` for `ae5be546` in a clone of this bundle fails.
+    The bundle was taken before the daemon finished its cycle, and the
+    cutover happened later. Nothing was lost: the gap was replayed
+    into the pushed tip, and spot-checked —
+    `web/music/libs/data/cookbook-track-count.json` is blob
+    `5832a1d5` at both `ae5be546` and `7b3cb16c`. But recovery from
+    this bundle means restoring `7d6a956b` and replaying the 45-commit
+    delta, not `git reset --hard ae5be546`. **Take the bundle after
+    the tip you are going to push, not before**, or record the delta
+    explicitly alongside it.
   - content preservation, proven rather than asserted: all 8,886
     chapter paths *and their blob SHAs* match the pre-rewrite
     bundle exactly (0 differences over a full
