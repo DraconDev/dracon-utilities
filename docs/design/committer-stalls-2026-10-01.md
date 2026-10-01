@@ -93,3 +93,26 @@ Mailmap report validation: 1,150 unit tests and 10 integration tests passed
 (3 ignored), release build succeeded, sync clippy clean, cargo deny clean.
 The binary was atomically installed and the daemon restarted. The preceding
 binary is saved at `/tmp/dracon-sync-before-mailmap-20261001`.
+
+## Released — dracon-sync 0.113.92
+
+Published through `dracon-sync maintenance -- scripts/release.sh 0.113.92 --yes`:
+all workspace gates passed (1,920 tests, 9 ignored; release build, clippy,
+cargo deny). The packaged install passed the phantom-untracked fixture.
+The release also fixes standalone lockfile retention: the release script
+copies Cargo's verified package lock into the nested repository, rather
+than committing its stale 0.113.55 lock. Its shell regression passed.
+
+Release commit: `3798563`; tag: `dracon-sync-v0.113.92`. The tag and main were
+pushed to GitHub and GitLab, the GitHub release is published (not draft),
+and the crates.io sparse index confirms 0.113.92. The released packaged
+binary was installed at `~/.local/bin/dracon-sync`; its install fixture
+passed again, then the daemon was restarted. The preceding local binary
+is saved at `/tmp/dracon-sync-before-release-0.113.92`.
+
+GitHub release:
+https://github.com/DraconDev/dracon-sync-background-auto-commit-multi-remote/releases/tag/dracon-sync-v0.113.92
+
+AGENTS.md now records the canonical identity requirement so future loops do
+not restore per-repository aliases. GitLab emitted an account storage warning
+but accepted both main and the release tag; this did not block the release.
