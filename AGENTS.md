@@ -352,11 +352,18 @@ author, or foreign `origin` is therefore a **warning** for a path-owned repo,
 not an auto-commit/push gate. Pushes still go only to the configured operator
 namespaces; foreign remotes are fetch-only and warned about.
 
-Loops SHOULD still use a deliberate identity (`<repo>-dev` /
-`<repo>@dracon.local`) so commit attribution stays useful. Add new identities
-to `trusted_emails` and `trusted_authors` when appropriate, but the daemon
-must not expand those lists automatically and must not manufacture commits to
-restore activity totals. A repo outside a configured watch root retains the
+CHANGED 2026-10-01 (explicit operator request): all watched repositories
+and loops use the canonical Git identity `DraconDev <dracsharp@gmail.com>`
+for new commits (`user.name` / `user.email`). Do not reset loop repositories
+to `<repo>-dev` aliases. Historical loop aliases remain valid; TOUCHED resolves
+confirmed aliases through Git mailmaps without changing commit hashes or
+activity timestamps. The operator's shared mapping is configured through
+`mailmap.file = ~/.config/git/dracon-identities.mailmap`.
+
+Add explicitly confirmed historical identities to `trusted_emails` and
+`trusted_authors` when appropriate. A mailmap does not grant ownership or
+replace these trust lists. The daemon must not expand those lists
+automatically and must not manufacture commits to restore activity totals. A repo outside a configured watch root retains the
 legacy heuristic ownership check, and `owned = false` always blocks it.
 
 ## History-rewrite ENFORCEMENT stack (v0.113.0, 2026-07-25)
