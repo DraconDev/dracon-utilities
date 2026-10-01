@@ -35,3 +35,13 @@ Existing unrelated concerns include vanished monster-minecraft and the old
 nested folder-auto-banner path, and stale alternate remotes. These are not
 the cause of the recovered commit stalls; retiring or restoring them needs
 an operator decision about their intended locations/projects.
+
+## Final deployment
+
+The corrected release binary was atomically installed at
+`~/.local/bin/dracon-sync`, with the previous binary saved at
+`/tmp/dracon-sync-before-cooldown-fix-20261001`. The service was restarted
+and reported healthy, freeze off, policy valid. The new PID automatically
+committed and synced fresh platform edits, confirming scheduler recovery.
+Validation: dracon-sync 1,149 unit tests + 10 integration tests passed
+(3 ignored), release build and clippy passed, cargo deny clean.
