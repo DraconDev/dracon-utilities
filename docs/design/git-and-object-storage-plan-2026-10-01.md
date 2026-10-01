@@ -1,4 +1,4 @@
-# Git and object storage: implementation plan
+# Dracon Sync: general Git and object-storage implementation plan
 
 Status: proposed implementation plan. Writing this document does not enable
 uploads, change file placement, alter retention, or authorize history rewrites.
@@ -6,16 +6,21 @@ Date: 2026-10-01. Operator: DraconDev.
 
 ## Objective
 
-Keep platform and game development simple while preserving valuable work
-without repeatedly filling Git history with media, render intermediates, and
-large generated datasets. Keep the current project boundaries: games remain
-submodules; the utilities remain nested standalone repositories.
+Make external payload preservation a reusable, optional Dracon Sync feature
+for any watched repository: software, games, research, documents, media, or
+other workflows. Keep Git history useful without repeatedly adding large or
+frequently changing payloads. Repository layout is independent of storage:
+standalone repos, nested repos, and submodules remain supported.
+
+The Dracon fleet supplies incident evidence and rollout candidates, not
+hard-coded product rules. No platform directory, music namespace, personal
+identity, or particular bucket is required by the feature.
 
 Success means a repository version can be recovered with its exact assets,
 Warden protection remains effective, and a failed bucket operation cannot
 silently put external payloads back into Git or stall unrelated repositories.
 
-## Baseline and evidence
+## Local evidence motivating the general feature
 
 - dracon-sync 0.113.92 fixes classification cooldowns and resolves TOUCHED
   aliases. It does not implement a fleet-wide automatic storage policy.
@@ -52,7 +57,41 @@ guarantee reproduction of the exact original media. This plan supersedes
 those assumptions for new implementation; sanctioned maintenance remains a
 separate procedure.
 
-## Proposed policy
+## Product scope and configuration
+
+Ship the shared implementation and commands in the Dracon Sync repository.
+Document the public configuration and reference format there. Existing platform
+scripts are evidence or adapter candidates, not a runtime dependency; useful
+components must be extracted with their licensing, tests, and contracts checked.
+
+External storage is disabled unless configured. Existing commit-all behavior
+and file limits remain unchanged for users who do not opt in. Support global
+policy with explicit per-repository overrides, named backends, ordered path
+rules, and an explanation command that reports the effective rule and reason.
+A rule selects Git or external preservation, with optional size conditions,
+privacy requirements, and retention/recovery policy. Detect conflicting or
+invalid rules before processing files. Do not infer a workflow from repo names.
+
+Use a backend interface for immutable put, verified get, access checks, and
+capabilities. Start with a local test backend and an S3-compatible production
+adapter; add other providers behind the same contract later. Backends advertise
+which checks and durability guarantees they support. Credentials stay in the
+existing secret/configuration facilities, never in committed references.
+Separate configurable provider constraints from operator growth budgets.
+
+References and restoration must work on another machine and after a repo move.
+Commit portable backend identifiers and the versioned restore format, not local
+absolute paths or credentials. Provide documented hydration/verification through
+the packaged CLI without requiring a running daemon or platform scripts.
+
+Warden is the first security integration, not a mandatory dependency for every
+user. Plain public/non-sensitive assets can use the adapter directly under an
+explicit policy. A rule requiring encryption must fail closed when the security
+integration or keys are unavailable; never silently downgrade protection.
+Preserve compatibility with existing Git filters and reject unsupported filter
+compositions with an actionable diagnostic.
+
+## Proposed operator profile, not universal defaults
 
 Placement is deterministic per path and purpose. A repository crossing a
 size threshold does not silently change placement or migrate history.
@@ -66,7 +105,9 @@ size threshold does not silently change placement or migrate history.
 | Large generated catalogs | First assess canonical inputs and sharding; do not route arbitrary JSON by extension |
 | Logs, sessions, database snapshots | Separate archive policy; preserve current behavior until that policy is implemented |
 
-20 MiB is a proposed initial media threshold, not a provider limit. Repos can
+20 MiB is a proposed threshold for our pilot profile, not a provider limit or
+a universal Dracon Sync default. Other users choose their own declared paths
+and thresholds. Repos can
 set documented path-specific exceptions. Keep existing Git media as legacy
 content by default. Initial opt-in applies to declared new paths; converting
 an existing tracked path requires a reviewed migration that handles hooks,
@@ -84,7 +125,8 @@ it does not eliminate storage costs.
 
 ## Responsibilities and durability contract
 
-Warden owns classification, encryption, and sensitive metadata protection.
+The security integration owns classification, encryption, and sensitive
+metadata protection; Warden supplies that integration for the Dracon fleet.
 Sync owns scheduling, preservation status, and committing the exact version.
 A shared object-storage adapter owns bounded upload/download and verification.
 Git owns source history and immutable references. Object storage owns payloads.
@@ -99,7 +141,8 @@ storage namespace. Namespace prefixes are not access-control boundaries.
 
 A completed preservation operation means:
 1. Capture a stable source snapshot; detect edits during capture/upload.
-2. Warden prepares its approved representation, encrypting if required.
+2. The configured security integration prepares the approved representation,
+   encrypting if required (Warden in the Dracon fleet).
 3. Upload immutable bytes and verify length, digest, and intended access.
 4. Record recoverable references and manifests in the same Git index snapshot.
 5. Commit/push through existing hooks, then report the actual durability state.
@@ -126,7 +169,9 @@ Git commits and asset preservation each get truthful status.
 
 ### 1. Inventory and policy simulation
 
-Produce a read-only inventory for platform, music, one game, and video output:
+Define the general configuration and backend/reference contracts first.
+Produce read-only inventories across representative repository shapes and
+content classes; use platform, music, one game, and video output as local cases:
 current files, tracked/ignored state, history growth by path/class, existing
 manifests, filters, publishers, and consumers. Measure old raw blobs separately
 from actual stored history. Review existing producer services for stale writer
@@ -142,14 +187,16 @@ and restore requirement. No existing file silently changes storage.
 
 ### 2. Storage and security prototype
 
-Implement the shared reference schema and Warden integration against a local
+Implement the shared reference schema, security interface, and Warden adapter
+inside Dracon Sync against a local
 fake object backend. Reuse reviewed publisher/resolver components where their
 contracts fit. Keep public publishing distinct from private preservation.
 Specify and test filter ordering and behavior for both manual and daemon Git.
 Decide whether existing manifests are sufficient or a pointer format is needed;
 avoid building a second incompatible format without this comparison.
 
-Gate: same bytes/digest round-trip; encrypted restoration with authorized keys;
+Gate: identical behavior without project-specific paths or services;
+standalone, nested, and submodule repo coverage; same bytes/digest round-trip; encrypted restoration with authorized keys;
 no plaintext or metadata leak; Warden is never bypassed; no network in Git
 classification; retry never changes an existing immutable object.
 
@@ -169,7 +216,9 @@ source commits. A cold checkout restores both the latest and an older version.
 
 ### 4. Controlled live pilot
 
-Opt in a small declared set of music assets first. Check live bucket access
+Exercise the packaged CLI in a fresh generic repository with no platform
+checkout, both with and without Warden. Then opt in a small declared set of
+music assets as the first local live pilot. Check live bucket access
 and billing terms without exposing credentials. Require one verified
 independent recovery copy in addition to the primary object store before
 calling irreplaceable asset preservation complete. Existing Git mirrors alone
@@ -188,7 +237,9 @@ explicitly accepted storage/recovery cost. No automatic old-data deletion.
 
 Roll out declared paths per repo. Record exceptions and teach generators the
 same policy. Revisit catalog structure separately. Keep current repo/submodule
-boundaries and daemon coverage. Update AGENTS, examples, operator docs, release
+boundaries and daemon coverage. Publish generic setup, backend, security,
+rule-precedence, manual-Git, and recovery documentation with examples for
+multiple workflows. Update AGENTS, examples, operator docs, release
 notes, packaged-install fixtures, and all required workspace checks.
 
 For old history, prepare a separate measured slimming proposal with exact
@@ -214,7 +265,8 @@ review rather than automatically deleted.
 
 ## Decisions before implementation
 
-- Confirm the simulated media policy and exceptions; the proposed 20 MiB
+- Confirm the general opt-in configuration and initial production backend.
+- Confirm the simulated local media profile and exceptions; the proposed 20 MiB
   default is adjustable before any paths are enrolled.
 - Confirm the independent recovery destination and acceptable recurring costs.
 - Approve the first live pilot's exact paths and public/private classification.
