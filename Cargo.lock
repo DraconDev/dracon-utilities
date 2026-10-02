@@ -955,6 +955,7 @@ name = "dracon-sync"
 version = "0.113.92"
 dependencies = [
  "anyhow",
+ "chrono",
  "clap",
  "comfy-table",
  "dirs",
@@ -962,6 +963,7 @@ dependencies = [
  "futures",
  "git2",
  "globset",
+ "hmac",
  "libc",
  "notify-rust",
  "parking_lot",
@@ -977,6 +979,7 @@ dependencies = [
  "toml 0.8.23",
  "unicode-width",
  "urlencoding",
+ "zeroize",
 ]
 
 [[package]]
