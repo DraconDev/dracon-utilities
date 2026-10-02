@@ -1,7 +1,7 @@
 # Audit remediation — 2026-10-02
 
 All seven findings from [the audit](AUDIT_2026-10-02.md) are addressed in source.
-Final spec-contract verification is in progress; the other checks below passed.
+All verification checks below passed, including the complete spec contract.
 
 ## Changes and regression evidence
 
@@ -32,7 +32,7 @@ Canonical nested checkouts and published history were preserved.
 
 | Check | Result |
 |---|---|
-| Locked workspace tests | PASS: 2,127 tests, 25 existing ignored; two additional Warden preservation regressions also pass. Final spec reruns the complete latest suite. |
+| Locked workspace tests | PASS: 2,129 tests; 25 existing ignored. The final spec gate reran the complete latest suite. |
 | Warden pre-push regression group | PASS: 22 tests |
 | Complete system suite | PASS: 420 tests |
 | Parent audit and convergence regressions | PASS: 34 tests |
@@ -43,7 +43,7 @@ Canonical nested checkouts and published history were preserved.
 | `python3 scripts/check-nested-pins.py --check-local` | PASS |
 | Exact downloaded pinned sources, locked offline workspace check | PASS |
 | `./scripts/check-flake.sh` | PASS: flake evaluation and generated-service policy |
-| `./scripts/verify-spec.sh` | Final run in progress |
+| `./scripts/verify-spec.sh` | PASS: all six invariants |
 
 Audit-gate regressions are wired into the spec verifier and CI. The Nix CI job
 runs its source-isolation regression with Nix installed; the scripts job may
