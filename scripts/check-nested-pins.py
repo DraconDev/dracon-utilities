@@ -65,6 +65,19 @@ def local_head(crate_dir: Path) -> str:
         fail(f"cannot read {crate_dir} HEAD: {error.output.strip()}")
 
 
+def pinned_package(crate_dir: Path, revision: str, manifest: str) -> tuple[str, str]:
+    """Inspect the source CI builds, rather than the developer's live manifest."""
+    try:
+        content = subprocess.check_output(
+            ["git", "-C", str(crate_dir), "show", f"{revision}:{manifest}"],
+            text=True, stderr=subprocess.PIPE,
+        )
+        package = tomllib.loads(content)["package"]
+        return str(package["name"]), str(package["version"])
+    except (OSError, subprocess.CalledProcessError, KeyError, tomllib.TOMLDecodeError) as error:
+        fail(f"cannot inspect pinned manifest {revision}:{manifest} in {crate_dir}; fetch that revision first: {type(error).__name__}")
+
+
 def ci_checkout_pins(workflow: str, checkout_path: str) -> list[str]:
     """Return every `ref:` used by a CI checkout of `checkout_path`.
 
@@ -140,6 +153,7 @@ def main() -> int:
         if package.get("source") is None:
             lock_by_name[package["name"]] = str(package["version"])
 
+    source_pins = {}
     for checkout_path, flake_node in SOURCES.items():
         expected_url = (
             f'url = "github:DraconDev/{GITHUB_REPOS[checkout_path]}/main";'
@@ -153,6 +167,7 @@ def main() -> int:
         if len(set(matches)) != 1:
             fail(f"CI uses inconsistent pins for {checkout_path}: {sorted(set(matches))}")
         ci_rev = matches[0]
+        source_pins[checkout_path] = ci_rev
 
         try:
             flake_rev = flake_lock["nodes"][flake_node]["locked"]["rev"]
@@ -172,7 +187,11 @@ def main() -> int:
         print(f"PASS: {checkout_path} source pin {ci_rev}")
 
     for label, (package_name, crate_dir) in LOCK_PACKAGES.items():
-        manifest_name, manifest_version = read_package_version(crate_dir)
+        checkout = "dracon-warden" if label == "dracon-security" else label
+        relative = "src/security/Cargo.toml" if label == "dracon-security" else "Cargo.toml"
+        manifest_name, manifest_version = pinned_package(
+            ROOT / checkout, source_pins[checkout], relative
+        )
         if manifest_name != package_name:
             fail(f"{label}: manifest name is {manifest_name}, expected {package_name}")
         lock_version = lock_by_name.get(package_name)
