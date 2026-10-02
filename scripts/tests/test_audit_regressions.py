@@ -1,12 +1,15 @@
 """Hermetic regressions for the parent audit gates."""
 import importlib.util
 import json
+import contextlib
+import io
 import os
 from pathlib import Path
 import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -58,6 +61,55 @@ class PinnedMetadata(unittest.TestCase):
             revision = git("rev-parse", "HEAD")
             manifest.write_text('[package]\nname="fixture"\nversion="2.0.0"\n')
             self.assertEqual(pins.pinned_package(root, revision, "Cargo.toml"), ("fixture", "1.0.0"))
+
+
+    def test_checker_rejects_lock_metadata_matching_only_live_sources(self):
+        spec = importlib.util.spec_from_file_location("pins", ROOT / "scripts/check-nested-pins.py")
+        pins = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(pins)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            workflow = []
+            nodes = {}
+            urls = []
+            for utility, node in pins.SOURCES.items():
+                repo = root / utility
+                repo.mkdir()
+                def git(*args):
+                    return subprocess.check_output(
+                        ["git", "-c", "core.hooksPath=/dev/null", "-c", "user.name=Audit Fixture",
+                         "-c", "user.email=audit-fixture@invalid", *args], cwd=repo, text=True).strip()
+                git("init", "--quiet")
+                (repo / "Cargo.toml").write_text(f'[package]\nname="{utility}"\nversion="1.0.0"\n')
+                if utility == "dracon-warden":
+                    (repo / "src/security").mkdir(parents=True)
+                    (repo / "src/security/Cargo.toml").write_text(
+                        '[package]\nname="dracon-security"\nversion="1.0.0"\n')
+                git("add", "--", "Cargo.toml", *( ["src/security/Cargo.toml"] if utility == "dracon-warden" else []))
+                git("commit", "--quiet", "-m", "pinned metadata")
+                revision = git("rev-parse", "HEAD")
+                (repo / "Cargo.toml").write_text(f'[package]\nname="{utility}"\nversion="2.0.0"\n')
+                workflow.append(f"      repository: DraconDev/{pins.GITHUB_REPOS[utility]}\n"
+                                f"      ref: {revision}\n      path: {utility}\n")
+                nodes[node] = {"locked": {"rev": revision}, "original": {"ref": "main"}}
+                urls.append(f'url = "github:DraconDev/{pins.GITHUB_REPOS[utility]}/main";')
+            (root / ".github/workflows").mkdir(parents=True)
+            (root / ".github/workflows/ci.yml").write_text("\n".join(workflow))
+            (root / "flake.nix").write_text("\n".join(urls))
+            (root / "flake.lock").write_text(json.dumps({"nodes": nodes}))
+            def lock(version):
+                (root / "Cargo.lock").write_text("\n".join(
+                    f'[[package]]\nname="{name}"\nversion="{version if name != "dracon-security" else "1.0.0"}"\n'
+                    for name in pins.LOCK_PACKAGES))
+            with patch.object(pins, "ROOT", root), patch("sys.argv", ["check-nested-pins.py"]), \
+                    contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()) as errors:
+                lock("2.0.0")
+                with self.assertRaises(SystemExit) as failure:
+                    pins.main()
+                self.assertEqual(failure.exception.code, 1)
+                self.assertIn("Cargo.lock version 2.0.0", errors.getvalue())
+                lock("1.0.0")
+                self.assertEqual(pins.main(), 0)
 
 
 @unittest.skipUnless(shutil.which("nix"), "Nix is required for the source isolation regression")
