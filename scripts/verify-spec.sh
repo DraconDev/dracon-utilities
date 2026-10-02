@@ -78,6 +78,15 @@ else
   failures=$((failures + 1))
 fi
 
+# Invariant 6: audit gates reject failed tests and mismatched pinned metadata.
+echo "--- Invariant 6: Audit gate regressions ---"
+if python3 -m unittest -v scripts.tests.test_audit_regressions; then
+  echo "PASS: Audit gate regressions pass"
+else
+  echo "FAIL: Audit gate regressions failed"
+  failures=$((failures + 1))
+fi
+
 # --- Add more checks above this line ---
 
 if [ "$failures" -eq 0 ]; then

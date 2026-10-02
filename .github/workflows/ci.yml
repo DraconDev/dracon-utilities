@@ -229,6 +229,9 @@ jobs:
           bash -n doctor.sh
           ./doctor.sh
 
+      - name: Parent audit regression tests
+        run: python3 -m unittest -v scripts.tests.test_audit_regressions
+
       - name: Verify nested source pins
         # RESTORED 2026-09-27 (audit decision D1). This gate was removed
         # in the 2026-08-22 monorepo conversion along with the `*-src`
@@ -404,6 +407,9 @@ jobs:
 
       - name: Install Nix
         uses: cachix/install-nix-action@v30
+
+      - name: Verify ignored files stay outside the Nix source
+        run: python3 -m unittest -v scripts.tests.test_audit_regressions.NixSourceIsolation
 
       - name: Check flake evaluates
         run: ./scripts/check-flake.sh

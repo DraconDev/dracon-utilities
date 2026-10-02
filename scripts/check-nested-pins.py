@@ -44,16 +44,6 @@ def fail(message: str) -> None:
     raise SystemExit(1)
 
 
-def read_package_version(crate_dir: Path) -> tuple[str, str]:
-    manifest = crate_dir / "Cargo.toml"
-    try:
-        data = tomllib.loads(manifest.read_text())
-        package = data["package"]
-        return str(package["name"]), str(package["version"])
-    except (OSError, KeyError, TypeError, tomllib.TOMLDecodeError) as error:
-        fail(f"cannot read package metadata from {manifest}: {error}")
-
-
 def local_head(crate_dir: Path) -> str:
     try:
         return subprocess.check_output(
@@ -186,7 +176,7 @@ def main() -> int:
 
         print(f"PASS: {checkout_path} source pin {ci_rev}")
 
-    for label, (package_name, crate_dir) in LOCK_PACKAGES.items():
+    for label, (package_name, _) in LOCK_PACKAGES.items():
         checkout = "dracon-warden" if label == "dracon-security" else label
         relative = "src/security/Cargo.toml" if label == "dracon-security" else "Cargo.toml"
         manifest_name, manifest_version = pinned_package(
