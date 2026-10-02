@@ -12,7 +12,7 @@ failures=0
 
 # Invariant 1: Project compiles
 echo "--- Invariant 1: Project compiles ---"
-if ! cargo check --workspace --quiet 2>&1; then
+if ! cargo check --workspace --locked --quiet 2>&1; then
   echo "FAIL: cargo check --workspace failed"
   failures=$((failures + 1))
 else
@@ -60,12 +60,12 @@ fi
 # Invariant 4: Core unit tests pass
 # (--workspace because these crates are binaries, not libraries, so --lib would fail)
 echo "--- Invariant 4: Core unit tests pass ---"
-output=$(cargo test --workspace -- --test-threads=1 2>&1)
-if echo "$output" | grep -q "test result:.*FAILED"; then
-  echo "FAIL: Some unit tests failed"
-  failures=$((failures + 1))
-else
+if output=$(cargo test --workspace --locked -- --test-threads=1 2>&1); then
   echo "PASS: Core unit tests pass"
+else
+  printf '%s\n' "$output"
+  echo "FAIL: cargo test --workspace --locked failed"
+  failures=$((failures + 1))
 fi
 
 # Invariant 5: sync convergence evidence tools preserve the selected-repository

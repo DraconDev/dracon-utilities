@@ -5,6 +5,9 @@
 
 set -euo pipefail
 
+# Anchor both checks to this Git checkout, including when called elsewhere.
+cd "$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
+
 output="$(nix flake check --no-build 2>&1)" || {
     printf '%s\n' "$output"
     exit 1
@@ -35,7 +38,8 @@ echo "PASS: Nix flake checks passed (Home Manager output warning is intentional 
 # standalone unit shipped beside dracon-system.
 service_check="$(nix eval --impure --raw --expr '
 let
-  flake = builtins.getFlake (toString ./.);
+  # A plain path imports ignored build output and private local files.
+  flake = builtins.getFlake ("git+file://" + toString ./.);
   pkgs = import flake.inputs.nixpkgs { system = builtins.currentSystem; };
   lib = pkgs.lib;
   evaluated = lib.evalModules {
