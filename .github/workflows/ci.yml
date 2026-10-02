@@ -27,17 +27,17 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
-          ref: b6e75318b25a548c713ebd6aef9f6cb9d5742d75
+          ref: 27855c087b2182302194698da9e5da4117f51175
           path: dracon-sync
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-system-disk-process-guard-doctor
-          ref: 927832b28d1673fe2d900d8ea09b3a12bc5afc8a
+          ref: caaf339269ebf75bd3bc7e9e38b64abf65b3932b
           path: dracon-system
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-warden-secret-encrypt-age-git-filter
-          ref: 3aaa9029338877e561fd549b192dab1942f0c694
+          ref: 60394a4d6f2ff189045fcec718fa97cfd9d6f384
           path: dracon-warden
 
 
@@ -80,17 +80,17 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
-          ref: b6e75318b25a548c713ebd6aef9f6cb9d5742d75
+          ref: 27855c087b2182302194698da9e5da4117f51175
           path: dracon-sync
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-system-disk-process-guard-doctor
-          ref: 927832b28d1673fe2d900d8ea09b3a12bc5afc8a
+          ref: caaf339269ebf75bd3bc7e9e38b64abf65b3932b
           path: dracon-system
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-warden-secret-encrypt-age-git-filter
-          ref: 3aaa9029338877e561fd549b192dab1942f0c694
+          ref: 60394a4d6f2ff189045fcec718fa97cfd9d6f384
           path: dracon-warden
 
 
@@ -129,17 +129,17 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
-          ref: b6e75318b25a548c713ebd6aef9f6cb9d5742d75
+          ref: 27855c087b2182302194698da9e5da4117f51175
           path: dracon-sync
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-system-disk-process-guard-doctor
-          ref: 927832b28d1673fe2d900d8ea09b3a12bc5afc8a
+          ref: caaf339269ebf75bd3bc7e9e38b64abf65b3932b
           path: dracon-system
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-warden-secret-encrypt-age-git-filter
-          ref: 3aaa9029338877e561fd549b192dab1942f0c694
+          ref: 60394a4d6f2ff189045fcec718fa97cfd9d6f384
           path: dracon-warden
 
 
@@ -185,17 +185,17 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
-          ref: b6e75318b25a548c713ebd6aef9f6cb9d5742d75
+          ref: 27855c087b2182302194698da9e5da4117f51175
           path: dracon-sync
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-system-disk-process-guard-doctor
-          ref: 927832b28d1673fe2d900d8ea09b3a12bc5afc8a
+          ref: caaf339269ebf75bd3bc7e9e38b64abf65b3932b
           path: dracon-system
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-warden-secret-encrypt-age-git-filter
-          ref: 3aaa9029338877e561fd549b192dab1942f0c694
+          ref: 60394a4d6f2ff189045fcec718fa97cfd9d6f384
           path: dracon-warden
 
       - name: Install shellcheck
@@ -267,17 +267,17 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
-          ref: b6e75318b25a548c713ebd6aef9f6cb9d5742d75
+          ref: 27855c087b2182302194698da9e5da4117f51175
           path: dracon-sync
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-system-disk-process-guard-doctor
-          ref: 927832b28d1673fe2d900d8ea09b3a12bc5afc8a
+          ref: caaf339269ebf75bd3bc7e9e38b64abf65b3932b
           path: dracon-system
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-warden-secret-encrypt-age-git-filter
-          ref: 3aaa9029338877e561fd549b192dab1942f0c694
+          ref: 60394a4d6f2ff189045fcec718fa97cfd9d6f384
           path: dracon-warden
 
 
@@ -344,17 +344,17 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
-          ref: b6e75318b25a548c713ebd6aef9f6cb9d5742d75
+          ref: 27855c087b2182302194698da9e5da4117f51175
           path: dracon-sync
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-system-disk-process-guard-doctor
-          ref: 927832b28d1673fe2d900d8ea09b3a12bc5afc8a
+          ref: caaf339269ebf75bd3bc7e9e38b64abf65b3932b
           path: dracon-system
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-warden-secret-encrypt-age-git-filter
-          ref: 3aaa9029338877e561fd549b192dab1942f0c694
+          ref: 60394a4d6f2ff189045fcec718fa97cfd9d6f384
           path: dracon-warden
 
 
@@ -392,17 +392,17 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
-          ref: b6e75318b25a548c713ebd6aef9f6cb9d5742d75
+          ref: 27855c087b2182302194698da9e5da4117f51175
           path: dracon-sync
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-system-disk-process-guard-doctor
-          ref: 927832b28d1673fe2d900d8ea09b3a12bc5afc8a
+          ref: caaf339269ebf75bd3bc7e9e38b64abf65b3932b
           path: dracon-system
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-warden-secret-encrypt-age-git-filter
-          ref: 3aaa9029338877e561fd549b192dab1942f0c694
+          ref: 60394a4d6f2ff189045fcec718fa97cfd9d6f384
           path: dracon-warden
 
       - name: Install Nix
