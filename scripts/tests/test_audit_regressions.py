@@ -154,5 +154,20 @@ class LockedInstallerBuilds(unittest.TestCase):
                           f"floating installer build (add --locked): {line}")
 
 
+class InstallAtomicBinaryReplace(unittest.TestCase):
+    def test_install_sh_replaces_live_binary_atomically(self):
+        # ADDED 2026-10-03 (audit L12): the live binary must be
+        # replaced by same-dir rename (atomic) — never `rm -f` + `cp`,
+        # whose window exec-fails a concurrent git filter spawn and
+        # wedges add/checkout mid-install.
+        text = (ROOT / "install.sh").read_text()
+        self.assertNotIn('rm -f ~/.local/bin/"$binary"', text,
+                         "non-atomic live-binary remove is back (use temp+rename)")
+        self.assertIn('mv -f "$tmp_bin" ~/.local/bin/"$binary"', text,
+                      "atomic temp-then-rename of the live binary is missing")
+        self.assertIn('cp "$resolved" "$tmp_bin"', text,
+                      "staged copy into the same dir is missing")
+
+
 if __name__ == "__main__":
     unittest.main()

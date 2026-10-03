@@ -408,10 +408,15 @@ install_binary() {
             done
         fi
 
-        # Remove old binary and install new
-        rm -f ~/.local/bin/"$binary"
-        cp "$resolved" ~/.local/bin/"$binary"
-        chmod +x ~/.local/bin/"$binary"
+        # Install atomically (FIXED 2026-10-03, audit L12): the old
+        # `rm -f` + `cp` left a window where a concurrent git filter
+        # spawn exec-ing the live binary failed (missing/half-written
+        # file), wedging add/checkout mid-install. Same-dir rename is
+        # atomic; mirrors the warden hook installer's temp-then-rename.
+        tmp_bin=~/.local/bin/."$binary".$$
+        cp "$resolved" "$tmp_bin"
+        chmod +x "$tmp_bin"
+        mv -f "$tmp_bin" ~/.local/bin/"$binary"
 
         # Restart only what `--upgrade` found running. An operator-stopped
         # service is never resurrected here; the final `restart_service`
