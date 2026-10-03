@@ -13,6 +13,9 @@ set -euo pipefail
 #   --no-restart       Don't restart services after install
 #   --binaries-only    Only install binaries, skip configs and services
 #
+# Note: a full install also sets `git config --global init.defaultBranch main`
+# (skipped under --binaries-only; --dry-run only reports what would change).
+#
 # Examples:
 #   ./install.sh                    # First install
 #   ./install.sh --upgrade          # Update existing installation
@@ -60,7 +63,7 @@ service_was_running() {
 for arg in "$@"; do
     case "$arg" in
         --help|-h)
-            sed -n '3,17p' "$0" | sed 's/^# //; s/^#$//'
+            sed -n '3,23p' "$0" | sed 's/^# //; s/^#$//'
             exit 0
             ;;
         --dry-run)
@@ -129,14 +132,20 @@ for utility in dracon-sync dracon-system dracon-warden; do
     fi
 done
 
-# Set git default branch to main (consistent with GitHub convention)
-CURRENT_DEFAULT=$(git config --global init.defaultBranch 2>/dev/null || echo "")
-if [ "$CURRENT_DEFAULT" != "main" ]; then
-    if [ "$DRY_RUN" = true ]; then
-        echo "Would set git default branch to main (currently: ${CURRENT_DEFAULT:-master})"
-    else
-        git config --global init.defaultBranch main
-        echo "✅ Set git default branch to main (was: ${CURRENT_DEFAULT:-master})"
+# FIXED 2026-10-03 (audit R4-M-06): setting the global default branch is
+# config work, not binary installation — a --binaries-only run must not
+# rewrite the operator's global git config as a side effect. (Documented
+# in --help above.)
+if [ "$BINARIES_ONLY" != true ]; then
+    # Set git default branch to main (consistent with GitHub convention)
+    CURRENT_DEFAULT=$(git config --global init.defaultBranch 2>/dev/null || echo "")
+    if [ "$CURRENT_DEFAULT" != "main" ]; then
+        if [ "$DRY_RUN" = true ]; then
+            echo "Would set git default branch to main (currently: ${CURRENT_DEFAULT:-master})"
+        else
+            git config --global init.defaultBranch main
+            echo "✅ Set git default branch to main (was: ${CURRENT_DEFAULT:-master})"
+        fi
     fi
 fi
 
