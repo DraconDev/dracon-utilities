@@ -166,6 +166,11 @@
               git config --global user.email "nix-sandbox@example.test"
               git config --global user.name "nix-sandbox"
               git config --global init.defaultBranch main
+              # ssh -F on a MISSING file is fatal (unlike the default
+              # ~/.ssh/config); every ssh push passes -F
+              # $HOME/.dracon/secrets/ssh/config, so seed an empty one.
+              mkdir -p "$HOME/.dracon/secrets/ssh"
+              touch "$HOME/.dracon/secrets/ssh/config"
             '';
             checkFlags = [
               "--test-threads=1"
