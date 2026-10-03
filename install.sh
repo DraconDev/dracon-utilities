@@ -469,6 +469,7 @@ fi
 # DRY_RUN branch below, so a dry run created them anyway.
 if [ "$DRY_RUN" = true ]; then
     echo "Would install systemd services to ~/.config/systemd/user/"
+    echo "Would install watchdog timers + scripts and enable the timers"
     echo "Would create config directories under ~/.dracon/utilities/"
 else
     mkdir -p ~/.config/systemd/user
@@ -477,10 +478,29 @@ else
     mkdir -p ~/.dracon/utilities/warden
     cp dracon-sync/dracon-sync.service ~/.config/systemd/user/dracon-sync.service 2>/dev/null || true
     cp dracon-system/dracon-system-guard.service ~/.config/systemd/user/dracon-system-guard.service 2>/dev/null || true
+    # ADDED 2026-10-02 (audit M8): the watchdog timers + scripts were
+    # live-only, so fresh installs silently lacked restart-if-stopped
+    # and freeze auto-clear. Ship them like the services.
+    mkdir -p ~/.dracon/sync-notify ~/.dracon/system-notify
+    cp dracon-sync/dracon-sync-watchdog.service ~/.config/systemd/user/dracon-sync-watchdog.service 2>/dev/null || true
+    cp dracon-sync/dracon-sync-watchdog.timer ~/.config/systemd/user/dracon-sync-watchdog.timer 2>/dev/null || true
+    cp dracon-sync/dracon-freeze-watchdog.service ~/.config/systemd/user/dracon-freeze-watchdog.service 2>/dev/null || true
+    cp dracon-sync/dracon-freeze-watchdog.timer ~/.config/systemd/user/dracon-freeze-watchdog.timer 2>/dev/null || true
+    cp dracon-system/dracon-system-guard-watchdog.service ~/.config/systemd/user/dracon-system-guard-watchdog.service 2>/dev/null || true
+    cp dracon-system/dracon-system-guard-watchdog.timer ~/.config/systemd/user/dracon-system-guard-watchdog.timer 2>/dev/null || true
+    cp dracon-sync/scripts/dracon-sync-watchdog.sh ~/.dracon/sync-notify/dracon-sync-watchdog.sh 2>/dev/null || true
+    cp dracon-sync/scripts/dracon-freeze-watchdog.sh ~/.dracon/sync-notify/dracon-freeze-watchdog.sh 2>/dev/null || true
+    cp dracon-system/scripts/dracon-system-guard-watchdog.sh ~/.dracon/system-notify/dracon-system-guard-watchdog.sh 2>/dev/null || true
+    chmod +x ~/.dracon/sync-notify/dracon-sync-watchdog.sh ~/.dracon/sync-notify/dracon-freeze-watchdog.sh ~/.dracon/system-notify/dracon-system-guard-watchdog.sh 2>/dev/null || true
     systemctl --user daemon-reload 2>/dev/null || true
     # Wait for systemd to settle after daemon-reload
     sleep 1
     echo "✅ Systemd services installed"
+    if systemctl --user enable --now dracon-sync-watchdog.timer dracon-freeze-watchdog.timer dracon-system-guard-watchdog.timer 2>/dev/null; then
+        echo "✅ Watchdog timers enabled and started"
+    else
+        echo "  ⚠️ Could not enable watchdog timers (enable manually: systemctl --user enable --now dracon-sync-watchdog.timer dracon-freeze-watchdog.timer dracon-system-guard-watchdog.timer)"
+    fi
 fi
 
 # Copy example configs
