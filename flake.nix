@@ -406,6 +406,8 @@
             systemd.user.services.dracon-sync-watchdog = mkIf cfg.sync.enable {
               Unit = {
                 Description = "Dracon sync watchdog (restart daemon if stopped)";
+                Documentation = "https://github.com/DraconDev/dracon-utilities";
+                After = [ "timers.target" ];
               };
               Service = {
                 Type = "oneshot";
@@ -418,6 +420,7 @@
             systemd.user.timers.dracon-sync-watchdog = mkIf cfg.sync.enable {
               Unit = {
                 Description = "Run dracon-sync-watchdog.service every 2 minutes";
+                Documentation = "https://github.com/DraconDev/dracon-utilities";
               };
               Timer = {
                 OnBootSec = "2min";
@@ -430,6 +433,8 @@
             systemd.user.services.dracon-freeze-watchdog = mkIf cfg.sync.enable {
               Unit = {
                 Description = "Dracon freeze watchdog (warn/auto-clear forgotten pause)";
+                Documentation = "https://github.com/DraconDev/dracon-utilities";
+                After = [ "timers.target" ];
               };
               Service = {
                 Type = "oneshot";
@@ -442,6 +447,7 @@
             systemd.user.timers.dracon-freeze-watchdog = mkIf cfg.sync.enable {
               Unit = {
                 Description = "Run dracon-freeze-watchdog every 2 minutes";
+                Documentation = "https://github.com/DraconDev/dracon-utilities";
               };
               Timer = {
                 OnBootSec = "2min";
@@ -454,6 +460,8 @@
             systemd.user.services.dracon-system-guard-watchdog = mkIf cfg.system.enable {
               Unit = {
                 Description = "Dracon system guard watchdog (restart daemon if stopped)";
+                Documentation = "https://github.com/DraconDev/dracon-utilities";
+                After = [ "timers.target" ];
               };
               Service = {
                 Type = "oneshot";
@@ -466,6 +474,7 @@
             systemd.user.timers.dracon-system-guard-watchdog = mkIf cfg.system.enable {
               Unit = {
                 Description = "Run dracon-system-guard-watchdog.service every 2 minutes";
+                Documentation = "https://github.com/DraconDev/dracon-utilities";
               };
               Timer = {
                 OnBootSec = "2min";
