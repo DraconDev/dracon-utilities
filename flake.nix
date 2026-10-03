@@ -142,7 +142,7 @@
         packages = {
           dracon-sync = pkgs.rustPlatform.buildRustPackage (commonArgs // {
             pname = "dracon-sync";
-            version = crateVersion "0.113.88" draconSyncSrc;
+            version = crateVersion "0.113.93" draconSyncSrc;
             buildAndTestSubdir = "dracon-sync";
             cargoBuildFeatures = [ ];
             # Tests need git, serial execution, and network access (some tests hang
@@ -152,7 +152,7 @@
 
           dracon-system = pkgs.rustPlatform.buildRustPackage (commonArgs // {
             pname = "dracon-system";
-            version = crateVersion "0.112.41" draconSystemSrc;
+            version = crateVersion "0.112.44" draconSystemSrc;
             buildAndTestSubdir = "dracon-system";
             nativeCheckInputs = [ pkgs.git ];
             checkFlags = [
@@ -181,7 +181,7 @@
 
           dracon-warden = pkgs.rustPlatform.buildRustPackage (commonArgs // {
             pname = "dracon-warden";
-            version = crateVersion "0.113.14" draconWardenSrc;
+            version = crateVersion "0.113.15" draconWardenSrc;
             buildAndTestSubdir = "dracon-warden";
             # Warden doesn't need openssl/libgit2/libssh2, but they're
             # harmless to include via the shared commonArgs.
