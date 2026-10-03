@@ -616,22 +616,37 @@ restart_service() {
         unit_existed=true
     fi
 
-    if [ "$unit_existed" = true ] && ! service_was_running "$service"; then
+    # FIXED 2026-10-03 (audit R3-L30): a FRESH install (unit absent from
+    # the pre-snapshot) has no "deliberately stopped" state to preserve
+    # (D4), so enable + start. The old code fell through to a "not
+    # found" line and left the service disabled — it only came up ~2.5
+    # min later via the M8 watchdog backstop, contradicting the D4
+    # model (and "not found" misreported a unit this script just
+    # installed). Enable failure stays loud, never silent.
+    if [ "$unit_existed" = false ]; then
+        if systemctl --user enable --now "$service" 2>/dev/null; then
+            echo "  ✅ $service enabled and started (fresh install)"
+        else
+            echo "  ⚠️ Could not enable --now $service (enable manually: systemctl --user enable --now $service)"
+        fi
+        return 0
+    fi
+
+    if ! service_was_running "$service"; then
         echo "  ⏭️  $service was not running before this install — left as-is (start it with: systemctl --user start $service)"
         return 0
     fi
 
-    # FIXED 2026-09-27 (audit F97): the second disjunct piped
+    # FIXED 2026-09-27 (audit F97): this used to pipe a live
     # `systemctl --user list-unit-files` into `grep -q`, which is a
     # false-negative race under `set -o pipefail` (grep -q exits on the
     # first match → systemctl takes SIGPIPE → exit 141 → the pipeline
     # reports "not found" even when the unit exists). The unit list is
-    # captured once at the top of the script and grepped as a string.
-    if systemctl --user is-enabled "$service" &>/dev/null || [ "$unit_existed" = true ]; then
-        systemctl --user restart "$service" 2>/dev/null && echo "  ✅ $service restarted" || echo "  ⚠️ Could not restart $service"
-    else
-        echo "  ⚠️ $service not found"
-    fi
+    # captured once at the top of the script and grepped as a string
+    # (see `unit_existed` above, which also settled the fresh-install
+    # arm) — reaching here means the unit existed AND was running, so
+    # restart unconditionally.
+    systemctl --user restart "$service" 2>/dev/null && echo "  ✅ $service restarted" || echo "  ⚠️ Could not restart $service"
 }
 
 restart_service dracon-sync.service
