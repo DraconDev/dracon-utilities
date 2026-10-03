@@ -230,20 +230,26 @@ let
     # R3-L25: watchdog Unit metadata + output routing (the flake omitted
     # Documentation/After until this finding; harmless metadata, now pinned).
     (if services.dracon-sync-watchdog.Unit.Documentation != "https://github.com/DraconDev/dracon-utilities" then throw "sync watchdog Unit Documentation drift (shipped-unit parity)" else null)
+    (if services.dracon-sync-watchdog.Unit.Description != "Dracon sync watchdog (restart daemon if stopped)" then throw "sync watchdog Unit Description drift (shipped-unit parity)" else null)
     (if services.dracon-sync-watchdog.Unit.After != [ "timers.target" ] then throw "sync watchdog Unit After drift (shipped-unit parity)" else null)
     (if services.dracon-sync-watchdog.Service.StandardOutput != "journal" then throw "sync watchdog StandardOutput drift (shipped-unit parity)" else null)
     (if services.dracon-sync-watchdog.Service.StandardError != "journal" then throw "sync watchdog StandardError drift (shipped-unit parity)" else null)
     (if timers.dracon-sync-watchdog.Unit.Documentation != "https://github.com/DraconDev/dracon-utilities" then throw "sync watchdog timer Documentation drift (shipped-unit parity)" else null)
+    (if timers.dracon-sync-watchdog.Unit.Description != "Run dracon-sync-watchdog.service every 2 minutes" then throw "sync watchdog timer Description drift (shipped-unit parity)" else null)
     (if services.dracon-freeze-watchdog.Unit.Documentation != "https://github.com/DraconDev/dracon-utilities" then throw "freeze watchdog Unit Documentation drift (shipped-unit parity)" else null)
+    (if services.dracon-freeze-watchdog.Unit.Description != "Dracon freeze watchdog (warn/auto-clear forgotten pause)" then throw "freeze watchdog Unit Description drift (shipped-unit parity)" else null)
     (if services.dracon-freeze-watchdog.Unit.After != [ "timers.target" ] then throw "freeze watchdog Unit After drift (shipped-unit parity)" else null)
     (if services.dracon-freeze-watchdog.Service.StandardOutput != "journal" then throw "freeze watchdog StandardOutput drift (shipped-unit parity)" else null)
     (if services.dracon-freeze-watchdog.Service.StandardError != "journal" then throw "freeze watchdog StandardError drift (shipped-unit parity)" else null)
     (if timers.dracon-freeze-watchdog.Unit.Documentation != "https://github.com/DraconDev/dracon-utilities" then throw "freeze watchdog timer Documentation drift (shipped-unit parity)" else null)
+    (if timers.dracon-freeze-watchdog.Unit.Description != "Run dracon-freeze-watchdog every 2 minutes" then throw "freeze watchdog timer Description drift (shipped-unit parity)" else null)
     (if services.dracon-system-guard-watchdog.Unit.Documentation != "https://github.com/DraconDev/dracon-utilities" then throw "guard watchdog Unit Documentation drift (shipped-unit parity)" else null)
+    (if services.dracon-system-guard-watchdog.Unit.Description != "Dracon system guard watchdog (restart daemon if stopped)" then throw "guard watchdog Unit Description drift (shipped-unit parity)" else null)
     (if services.dracon-system-guard-watchdog.Unit.After != [ "timers.target" ] then throw "guard watchdog Unit After drift (shipped-unit parity)" else null)
     (if services.dracon-system-guard-watchdog.Service.StandardOutput != "journal" then throw "guard watchdog StandardOutput drift (shipped-unit parity)" else null)
     (if services.dracon-system-guard-watchdog.Service.StandardError != "journal" then throw "guard watchdog StandardError drift (shipped-unit parity)" else null)
     (if timers.dracon-system-guard-watchdog.Unit.Documentation != "https://github.com/DraconDev/dracon-utilities" then throw "guard watchdog timer Documentation drift (shipped-unit parity)" else null)
+    (if timers.dracon-system-guard-watchdog.Unit.Description != "Run dracon-system-guard-watchdog.service every 2 minutes" then throw "guard watchdog timer Description drift (shipped-unit parity)" else null)
   ];
 in
   builtins.deepSeq checks "PASS: generated services match shipped-unit parity (all properties + watchdogs + script sources)"
