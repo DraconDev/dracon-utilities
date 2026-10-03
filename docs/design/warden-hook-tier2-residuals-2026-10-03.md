@@ -43,16 +43,15 @@ run over fleet history before enabling. Do NOT transliterate the
 The hook iterates `git diff-tree -z` output via `tr '\0' '\n'` +
 `IFS= read -r` (main.rs PRE_PUSH_HOOK, "residual newline-in-filename
 edge is accepted as absurd"). A filename containing a literal newline
-splits into two fragments; neither fragment resolves to the real path,
-so the file's content is attributed to non-paths and its hatch check
-misses (fail direction: the fragments still enter the scan lists, so a
-secret in such a file is MORE likely to block, not less — the miss is
-coverage-shaped, not allow-shaped, except for the hatch lookup).
+splits into two fragments; neither fragment resolves to the real
+path, so the diff scan's pathspecs match nothing and the added-loop
+`git cat-file blob $sha:<fragment>` fails silent — a secret in such
+a file pushes clean (allow-shaped miss, both loops).
 
 Why accepted: POSIX allows newline in filenames but no tool in the
-fleet creates them; git itself quotes such paths in most outputs.
-Handling true NUL-delimited iteration in `/bin/sh` (no `read -d`)
-would require restructuring the loop around a helper.
+fleet creates them; git itself quotes such paths in most non-`-z`
+outputs. Handling true NUL-delimited iteration in `/bin/sh` (no
+`read -d`) would require restructuring the loop around a helper.
 
 Future work: if ever needed, replace the `tr` stage with an
 NUL-aware iteration (e.g. a `while` over `git diff-tree -z` piped
