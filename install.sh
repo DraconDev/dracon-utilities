@@ -353,6 +353,11 @@ install_binary() {
         local new_hash
         new_hash=$(md5sum "$resolved" | cut -d' ' -f1)
 
+        # FIXED 2026-10-03 (audit R3-L20): the success echo used to
+        # print HERE, before the cp/mv below — a copy failure left a
+        # stale `.<binary>.$$` dotfile AND a log line already claiming
+        # success. Record the kind now, echo only after `mv` lands.
+        local install_kind="new"
         if [ -f "$installed" ]; then
             local old_hash
             old_hash=$(md5sum "$installed" | cut -d' ' -f1)
@@ -360,10 +365,8 @@ install_binary() {
                 echo "  ⏭️  ~/.local/bin/$binary unchanged (same hash)"
                 return 0
             else
-                echo "  ✅ Installed ~/.local/bin/$binary (updated)"
+                install_kind="updated"
             fi
-        else
-            echo "  ✅ Installed ~/.local/bin/$binary (new)"
         fi
 
         # A running Unix process keeps its executable inode open, so an
@@ -414,9 +417,17 @@ install_binary() {
         # file), wedging add/checkout mid-install. Same-dir rename is
         # atomic; mirrors the warden hook installer's temp-then-rename.
         tmp_bin=~/.local/bin/."$binary".$$
-        cp "$resolved" "$tmp_bin"
-        chmod +x "$tmp_bin"
-        mv -f "$tmp_bin" ~/.local/bin/"$binary"
+        # R3-L20: any step failing removes the temp dotfile (no stale
+        # hidden file) and aborts loud — never a premature success line.
+        if cp "$resolved" "$tmp_bin" \
+            && chmod +x "$tmp_bin" \
+            && mv -f "$tmp_bin" ~/.local/bin/"$binary"; then
+            echo "  ✅ Installed ~/.local/bin/$binary ($install_kind)"
+        else
+            rm -f "$tmp_bin"
+            echo "  ❌ Failed to install ~/.local/bin/$binary" >&2
+            return 1
+        fi
 
         # Restart only what `--upgrade` found running. An operator-stopped
         # service is never resurrected here; the final `restart_service`
