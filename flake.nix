@@ -186,7 +186,7 @@
             # Warden doesn't need openssl/libgit2/libssh2, but they're
             # harmless to include via the shared commonArgs.
             nativeCheckInputs = [ pkgs.git ];
-            checkFlags = [ "--test-threads=1" "--skip" "filter_clean_encrypts_content_with_secret_marker" ];
+            checkFlags = [ "--test-threads=1" ];
           });
 
           # All three binaries in one derivation
