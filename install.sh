@@ -606,6 +606,9 @@ restart_service() {
     #   * unit existed and was NOT running     -> leave it stopped, and say
     #     so. A stopped daemon is a deliberate operator state; resurrecting
     #     it is the surprise this removes.
+    #   * unit is NEW (fresh install)          -> enable --now it (R3-L30,
+    #     2026-10-03). No prior state exists to preserve; leaving it
+    #     disabled contradicts D4 (it only came up via the M8 backstop).
     #
     # "Was running" comes from the pre-install snapshot, not a live query:
     # `--upgrade` stops the service itself before reaching here, and a
