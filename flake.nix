@@ -478,16 +478,21 @@
             # The oneshot services above exec these scripts; provision them
             # so a pure-Nix install does not ship timers pointing at
             # missing files.
+            # FIXED 2026-10-03 (audit R3-H1): these MUST come from the
+            # pinned `*-src` inputs, not `${self}` — the utility dirs are
+            # gitignored nested clones, so git-filtered `self` has no
+            # utility source and every Nix install failed at generation
+            # build. scripts/check-flake.sh asserts `.source` existence.
             home.file.".dracon/sync-notify/dracon-sync-watchdog.sh" = mkIf cfg.sync.enable {
-              source = "${self}/dracon-sync/scripts/dracon-sync-watchdog.sh";
+              source = "${draconSyncSrc}/scripts/dracon-sync-watchdog.sh";
               executable = true;
             };
             home.file.".dracon/sync-notify/dracon-freeze-watchdog.sh" = mkIf cfg.sync.enable {
-              source = "${self}/dracon-sync/scripts/dracon-freeze-watchdog.sh";
+              source = "${draconSyncSrc}/scripts/dracon-freeze-watchdog.sh";
               executable = true;
             };
             home.file.".dracon/system-notify/dracon-system-guard-watchdog.sh" = mkIf cfg.system.enable {
-              source = "${self}/dracon-system/scripts/dracon-system-guard-watchdog.sh";
+              source = "${draconSystemSrc}/scripts/dracon-system-guard-watchdog.sh";
               executable = true;
             };
           };
