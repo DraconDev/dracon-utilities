@@ -311,7 +311,9 @@
                 # NO MemoryDenyWriteExecute: mirrors the shipped unit —
                 # the daemon honors repo pre-push hooks, whose JIT
                 # runtimes (node/V8) need PROT_EXEC (2026-10-02
-                # fleet-wide push-stuck incident).
+                # fleet-wide push-stuck incident). Hook helpers inherit
+                # the whole sandbox below and cannot relax it (audit M7):
+                # helpers needing blocked calls fail with EPERM.
                 RestrictRealtime = true;
                 RestrictSUIDSGID = true;
                 RemoveIPC = true;
