@@ -118,7 +118,7 @@ echo "🌐 AI Configuration"
 # dracon-sync/ai.example.toml here, so this check can pass. Before that the
 # check was a permanent false WARN — install.sh shipped only the three
 # dracon-*.example.toml files and never installed an ai.toml.
-check "AI provider config (ai.toml)" "[ -f $HOME/.dracon/utilities/sync/ai.toml ]" false
+check "AI provider config (ai.toml)" "[ -f \"$HOME/.dracon/utilities/sync/ai.toml\" ]" false
 
 echo ""
 echo "📝 PATH Check"
