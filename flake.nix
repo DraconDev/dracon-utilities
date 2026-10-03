@@ -186,6 +186,14 @@
             # Warden doesn't need openssl/libgit2/libssh2, but they're
             # harmless to include via the shared commonArgs.
             nativeCheckInputs = [ pkgs.git ];
+            # REMOVED 2026-10-03 (audit R4-M-13): the
+            # `--skip filter_clean_encrypts_content_with_secret_marker`
+            # dated to the 0.1.1 public-release commit with no recorded
+            # reason; the test passes in the sandbox today (verified by
+            # building with the skip removed), so the skip was stale.
+            # The same build exposed the real sandbox breakage — two
+            # test git-wrappers exec'ing /usr/bin/env, which the
+            # sandbox lacks — fixed in tests.rs (`VAR=val exec`).
             checkFlags = [ "--test-threads=1" ];
           });
 
