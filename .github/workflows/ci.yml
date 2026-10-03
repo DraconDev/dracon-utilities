@@ -382,12 +382,11 @@ jobs:
         # Verified locally: "advisories ok, bans ok, licenses ok, sources ok".
         run: cargo deny check
 
-      # NOTE (2026-09-27): `scripts/verify-spec.sh` is NOT wired in yet.
-      # Its only failing invariant is "Nested source pins", which encodes
-      # the pre-2026-09-11 nested-standalone-in-flake model. Adding it now
-      # would turn CI red for a question that is still open, so it is
-      # raised as an operator decision instead. See the 2026-09-27 audit
-      # pass in .pi-glla/audit-loop/findings.md.
+      # NOTE (2026-09-27, audit decision D1): `scripts/verify-spec.sh`
+      # IS wired in — see "Verify the documented spec contract" above.
+      # (An earlier note said it was unwired pending the nested-source
+      # pins question; D1 resolved that and unblocked it. Corrected
+      # 2026-10-03, audit R4-M-15.)
 
   nix:
     name: Nix Flake
