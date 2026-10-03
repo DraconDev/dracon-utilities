@@ -169,5 +169,34 @@ class InstallAtomicBinaryReplace(unittest.TestCase):
                       "staged copy into the same dir is missing")
 
 
+class InstallGitConfigDisclosure(unittest.TestCase):
+    def test_install_sh_skips_global_git_config_under_binaries_only(self):
+        # ADDED 2026-10-03 (audit R4-M-06): setting the global default
+        # branch is config work, not binary installation. The write must
+        # stay for full installs (nested inside a --binaries-only guard),
+        # and --help must disclose it (inside the printed header range).
+        text = (ROOT / "install.sh").read_text()
+        lines = text.splitlines()
+        write = "git config --global init.defaultBranch main"
+        guard = 'if [ "$BINARIES_ONLY" != true ]; then'
+        self.assertIn(guard, text,
+                      "binaries-only guard for the git-config block is missing")
+        self.assertLess(text.index(guard), text.index(write),
+                        "the global git write escaped its --binaries-only guard")
+        self.assertIn("        " + write, text,
+                      "the global git write is no longer nested in the guard")
+        # The --help printer is a fixed `sed -n '3,NeNp'` window: the
+        # disclosure note must sit inside it, or --help silently drops it
+        # (as it already did for two example lines before this fix).
+        help_line = next(line for line in lines if 'sed -n' in line and "'3," in line)
+        help_end = int(help_line.split("'3,")[1].split("p'")[0])
+        noted = [number for number, line in enumerate(lines, 1)
+                 if line.startswith("#") and "init.defaultBranch" in line]
+        self.assertGreater(len(noted), 0, "--help never mentions the git-config write")
+        for number in noted:
+            self.assertLessEqual(number, help_end,
+                                 f"header note at line {number} falls outside the --help window (3,{help_end})")
+
+
 if __name__ == "__main__":
     unittest.main()
