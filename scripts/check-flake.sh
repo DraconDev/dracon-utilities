@@ -242,7 +242,7 @@ let
     (if services.dracon-freeze-watchdog.Service.StandardOutput != "journal" then throw "freeze watchdog StandardOutput drift (shipped-unit parity)" else null)
     (if services.dracon-freeze-watchdog.Service.StandardError != "journal" then throw "freeze watchdog StandardError drift (shipped-unit parity)" else null)
     (if timers.dracon-freeze-watchdog.Unit.Documentation != "https://github.com/DraconDev/dracon-utilities" then throw "freeze watchdog timer Documentation drift (shipped-unit parity)" else null)
-    (if timers.dracon-freeze-watchdog.Unit.Description != "Run dracon-freeze-watchdog every 2 minutes" then throw "freeze watchdog timer Description drift (shipped-unit parity)" else null)
+    (if timers.dracon-freeze-watchdog.Unit.Description != "Run dracon-freeze-watchdog every 3 minutes" then throw "freeze watchdog timer Description drift (shipped-unit parity)" else null)
     (if services.dracon-system-guard-watchdog.Unit.Documentation != "https://github.com/DraconDev/dracon-utilities" then throw "guard watchdog Unit Documentation drift (shipped-unit parity)" else null)
     (if services.dracon-system-guard-watchdog.Unit.Description != "Dracon system guard watchdog (restart daemon if stopped)" then throw "guard watchdog Unit Description drift (shipped-unit parity)" else null)
     (if services.dracon-system-guard-watchdog.Unit.After != [ "timers.target" ] then throw "guard watchdog Unit After drift (shipped-unit parity)" else null)
