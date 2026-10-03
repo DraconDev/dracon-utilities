@@ -44,6 +44,17 @@ TARGETS = {
     "dracon-warden": ("dracon-warden-src", "dracon-warden-secret-encrypt-age-git-filter"),
 }
 
+# checkout directory -> flake.nix `*-src` variable for the crateVersion
+# fallback. Explicit (not string-built): the old
+# `"dracon" + checkout.split("-")[1] + "Src"` produced `draconsyncSrc`,
+# which never matched `draconSyncSrc` — the rewrite silently rewrote
+# nothing and every fallback drifted (audit R4-M-12).
+FLAKE_SRC_VAR = {
+    "dracon-sync": "draconSyncSrc",
+    "dracon-system": "draconSystemSrc",
+    "dracon-warden": "draconWardenSrc",
+}
+
 
 def run(argv: list[str], cwd: Path | None = None) -> str:
     return subprocess.check_output(argv, cwd=cwd, text=True).strip()
@@ -58,6 +69,43 @@ def remote_main(checkout: str) -> str:
         run(["git", "fetch", name, "main"], cwd=repo)
         return run(["git", "rev-parse", "FETCH_HEAD"], cwd=repo)
     raise SystemExit(f"{checkout}: no usable remote")
+
+
+def package_version_from_manifest(manifest_text: str) -> str | None:
+    """The [package] version from a Cargo.toml text, or None when absent.
+
+    Section-scoped: a [workspace.package] version above [package] must
+    not win (same class as audit R4-M-11).
+    """
+    in_package = False
+    for line in manifest_text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("["):
+            in_package = stripped == "[package]"
+            continue
+        if in_package:
+            match = re.match(r'^version\s*=\s*"([^"]+)"', stripped)
+            if match:
+                return match.group(1)
+    return None
+
+
+def rewrite_crate_fallback(flake_text: str, src_var: str, version: str) -> str:
+    """Replace the crateVersion fallback for one src variable.
+
+    Raises SystemExit unless exactly one line is rewritten: the pre-fix
+    pattern silently matched nothing, so repin "kept fallbacks in step"
+    without ever rewriting them (audit R4-M-12).
+    """
+    pattern = re.compile(r'(version = crateVersion ")[^"]+(" ' + re.escape(src_var) + r")")
+    new_text, count = pattern.subn(
+        lambda m: m.group(1) + version + m.group(2), flake_text
+    )
+    if count != 1:
+        raise SystemExit(
+            f"expected exactly one crateVersion fallback for {src_var}, rewrote {count}"
+        )
+    return new_text
 
 
 def workflow_refs(text: str, repository_fragment: str, checkout: str) -> list[re.Match[str]]:
@@ -148,14 +196,39 @@ def main() -> int:
         if after == before:
             raise SystemExit(f"{checkout}: no workflow ref was rewritten")
         # Keep the crateVersion fallbacks in step with the new pins.
-        manifest = ROOT / checkout / "Cargo.toml"
-        version = re.search(r'^version = "([^"]+)"', manifest.read_text(), re.M)
-        if version:
-            flake_text = re.sub(
-                r'(version = crateVersion ")[^"]+(" dracon' + checkout.split("-")[1] + r'Src)',
-                lambda m: m.group(1) + version.group(1) + m.group(2),
-                flake_text,
+        # FIXED 2026-10-03 (audit R4-M-12, three defects): (1) the old
+        # pattern built `draconsyncSrc`, which never matched
+        # `draconSyncSrc` — the rewrite was a silent no-op; (2) the
+        # version came from the LIVE worktree manifest, contradicting
+        # this script's own "REMOTE main, never a local worktree" rule;
+        # (3) the version regex read the first `^version =` in the file
+        # (M-11 class). The version now comes from the pinned rev,
+        # [package]-scoped. A manifest that cannot be read degrades to
+        # warn-and-keep (aborting here would leave the already-rewritten
+        # lock split from the workflow; a stale fallback is the
+        # pre-existing state, a wrong one would be new).
+        try:
+            manifest_text = run(
+                ["git", "show", f"{new_rev}:Cargo.toml"], cwd=ROOT / checkout
             )
+        except subprocess.CalledProcessError as error:
+            print(
+                f"{checkout}: cannot read Cargo.toml at {new_rev[:9]} ({error}); "
+                "leaving the crateVersion fallback unchanged",
+                file=sys.stderr,
+            )
+        else:
+            version = package_version_from_manifest(manifest_text)
+            if version is None:
+                print(
+                    f"{checkout}: no [package] version at {new_rev[:9]}; "
+                    "leaving the crateVersion fallback unchanged",
+                    file=sys.stderr,
+                )
+            else:
+                flake_text = rewrite_crate_fallback(
+                    flake_text, FLAKE_SRC_VAR[checkout], version
+                )
         print(f"{checkout}: repinned to {new_rev[:9]} ({after} workflow refs)")
 
     WORKFLOW.write_text(workflow)
