@@ -147,7 +147,9 @@
             cargoBuildFeatures = [ ];
             # Tests need git, serial execution, and network access (some tests hang
             # in the Nix sandbox). Tests run via 'cargo test' in CI.
-            doCheck = false;
+            doCheck = true;
+            nativeCheckInputs = [ pkgs.git ];
+            checkFlags = [ "--test-threads=1" ];
           });
 
           dracon-system = pkgs.rustPlatform.buildRustPackage (commonArgs // {
