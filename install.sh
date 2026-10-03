@@ -325,12 +325,20 @@ install_binary() {
         return 0
     fi
 
+    # FIXED 2026-10-02 (audit M11): every build is --locked. A floating
+    # build bypasses the Cargo.lock/deny pin chain CI enforces, so the
+    # installed binary drifts from the tested one (the
+    # installed-binary-drops-patch incident class). A stale lock fails
+    # loudly: --locked errors instead of silently resolving, and the last
+    # attempt in each chain runs without 2>/dev/null so the error is
+    # visible. Regenerate the lock explicitly (cargo update -w) instead
+    # of installing past it.
     if [ -n "$features" ]; then
-        (cd "$subdir" && cargo build --release --package "$package" --features "$features" 2>/dev/null) || \
-        (cd "$subdir" && cargo build --release -p "$package" 2>/dev/null) || \
-        (cd "$subdir" && cargo build --release -p "$package")
+        (cd "$subdir" && cargo build --locked --release --package "$package" --features "$features" 2>/dev/null) || \
+        (cd "$subdir" && cargo build --locked --release -p "$package" 2>/dev/null) || \
+        (cd "$subdir" && cargo build --locked --release -p "$package")
     else
-        (cd "$subdir" && cargo build --release -p "$package")
+        (cd "$subdir" && cargo build --locked --release -p "$package")
     fi
 
     local resolved=""
