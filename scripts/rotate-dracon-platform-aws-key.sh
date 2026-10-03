@@ -176,15 +176,37 @@ if [[ "${1:-}" == "--check" || "${1:-}" == "-c" ]]; then
   exit $?
 fi
 
-if [[ $# -ne 2 ]]; then
-  echo "Usage: $0 <NEW_AWS_ACCESS_KEY_ID> <NEW_AWS_SECRET_ACCESS_KEY>" >&2
+if [[ $# -ne 0 ]]; then
+  echo "Usage: NEW_AWS_ACCESS_KEY_ID=<id> NEW_AWS_SECRET_ACCESS_KEY=<secret> $0" >&2
   echo "       $0 --check    # diagnostic mode, no key needed" >&2
-  echo "  Example: $0 <EXAMPLE-AWS-KEY-ID> <EXAMPLE-AWS-SECRET>" >&2
+  echo "  (credentials are never taken via argv; they would leak via ps)" >&2
   exit 1
 fi
 
-NEW_AKIA="$1"
-NEW_SECRET="$2"
+# FIXED 2026-10-03 (audit R4-M-01): the secret arrived as $2, visible
+# to ps on a shared host and persisted in shell history. It now
+# comes from the environment, or from a TTY prompt (read -s, no
+# echo) when the env vars are absent. Non-TTY without env fails
+# closed — there is nowhere safe to read a secret from.
+NEW_AKIA="${NEW_AWS_ACCESS_KEY_ID:-}"
+NEW_SECRET="${NEW_AWS_SECRET_ACCESS_KEY:-}"
+if [[ -z "$NEW_AKIA" || -z "$NEW_SECRET" ]]; then
+  if [[ -t 0 ]]; then
+    [[ -n "$NEW_AKIA" ]] || read -r -p "NEW_AWS_ACCESS_KEY_ID: " NEW_AKIA
+    if [[ -z "$NEW_SECRET" ]]; then
+      read -r -s -p "NEW_AWS_SECRET_ACCESS_KEY: " NEW_SECRET
+      echo
+    fi
+  else
+    echo "Missing credentials: set NEW_AWS_ACCESS_KEY_ID + NEW_AWS_SECRET_ACCESS_KEY," >&2
+    echo "or run on a TTY to be prompted (secret entry is not echoed)." >&2
+    exit 1
+  fi
+fi
+if [[ -z "$NEW_AKIA" || -z "$NEW_SECRET" ]]; then
+  echo "Empty credential after prompt; aborting." >&2
+  exit 1
+fi
 # A unique substring of the OLD leaked key. New keys are random, so this
 # substring is highly unlikely to appear in a freshly-issued key. This is
 # how we detect that the OLD key has been removed without embedding the
@@ -227,11 +249,36 @@ done
 echo "✓ env files: $ENV_DIR/.env.dev, $ENV_DIR/.env.prod"
 echo
 
+# FIXED 2026-10-03 (audit R4-M-07): the old sed interpolated the
+# secret into the replacement unescaped — a | in the value broke
+# the delimiter, &/backslash injected match text. Rewrite the file
+# line-by-line instead: byte-exact values, key order preserved,
+# inode/permissions kept (write back over the original, not mv).
+replace_env_value() {
+  local file="$1" key="$2" value="$3" tmp line replaced=0
+  tmp=$(mktemp) || { echo "FATAL: mktemp failed" >&2; exit 2; }
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ "$line" == "$key="* ]]; then
+      printf '%s=%s\n' "$key" "$value"
+      replaced=1
+    else
+      printf '%s\n' "$line"
+    fi
+  done <"$file" >"$tmp"
+  if [[ "$replaced" -eq 0 ]]; then
+    rm -f "$tmp"
+    echo "FATAL: $key not found in $file" >&2
+    exit 2
+  fi
+  cat "$tmp" >"$file"
+  rm -f "$tmp"
+}
+
 # Step 1: Replace values
 echo "--- Step 1: Replace values in env files ---"
 for env in .env.dev .env.prod; do
-  sed -i "s|^SES_ACCESS_KEY=.*|SES_ACCESS_KEY=$NEW_AKIA|" "$ENV_DIR/$env"
-  sed -i "s|^SES_SECRET_KEY=.*|SES_SECRET_KEY=$NEW_SECRET|" "$ENV_DIR/$env"
+  replace_env_value "$ENV_DIR/$env" "SES_ACCESS_KEY" "$NEW_AKIA"
+  replace_env_value "$ENV_DIR/$env" "SES_SECRET_KEY" "$NEW_SECRET"
   echo "  ✓ $env: replaced SES_ACCESS_KEY + SES_SECRET_KEY"
 done
 echo
@@ -264,12 +311,15 @@ done
 echo
 
 # Step 4: Re-encrypt with warden (criterion 9)
+# (R4-M-15: run `once` a single time and reuse its output — the old
+# code ran it twice, the second run only to capture one echo line.)
 echo "--- Step 4: Re-encrypt with dracon-warden (criterion 9) ---"
-if ! dracon-warden once "$PLATFORM_DIR" >/dev/null; then
+once_out=""
+if ! once_out=$(dracon-warden once "$PLATFORM_DIR" 2>&1); then
   echo "  ✗ dracon-warden once exited non-zero" >&2
   exit 5
 fi
-echo "  ✓ dracon-warden hardened: $(dracon-warden once "$PLATFORM_DIR" 2>&1 | grep -E "hardening|hardened" | head -1)"
+echo "  ✓ dracon-warden hardened: $(printf '%s\n' "$once_out" | grep -E "hardening|hardened" | head -1)"
 echo
 
 # Step 5: Read-back verify via smudge filter (criterion 10)
