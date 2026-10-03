@@ -325,8 +325,11 @@ echo
 # Step 5: Read-back verify via smudge filter (criterion 10)
 echo "--- Step 5: Read-back verify via smudge filter (criterion 10) ---"
 for env in .env.dev .env.prod; do
-  akia=$(grep "^SES_ACCESS_KEY=" "$ENV_DIR/$env" | cut -d= -f2)
-  secret=$(grep "^SES_SECRET_KEY=" "$ENV_DIR/$env" | cut -d= -f2)
+  # FIXED 2026-10-03 (audit R4-M-07): cut -d= -f2 truncated base64
+  # = padding, so a secret ending in = always failed read-back.
+  # Strip only the KEY= prefix; the whole remainder is the value.
+  akia=$(grep "^SES_ACCESS_KEY=" "$ENV_DIR/$env"); akia="${akia#*=}"
+  secret=$(grep "^SES_SECRET_KEY=" "$ENV_DIR/$env"); secret=${secret#*=}
   if [[ "$akia" != "$NEW_AKIA" ]]; then
     echo "  ✗ $env: read-back AKIA mismatch (got '$akia', want '$NEW_AKIA')" >&2
     exit 5
@@ -369,11 +372,17 @@ fi
 echo "  ✓ git commit: $(git rev-parse --short HEAD)"
 
 # Push to codeberg
-if ! git push codeberg main:master >/dev/null 2>&1; then
-  echo "  ✗ git push to codeberg failed" >&2
+# (R4-M-15: the remote + branch mapping were hardcoded. The local
+# dracon-platform checkout currently has no codeberg remote at all
+# (origin=github, gitlab=gitlab), so the mapping is overridable —
+# set ROTATE_PUSH_REMOTE/ROTATE_PUSH_REFSPEC when it exists.)
+ROTATE_PUSH_REMOTE="${ROTATE_PUSH_REMOTE:-codeberg}"
+ROTATE_PUSH_REFSPEC="${ROTATE_PUSH_REFSPEC:-main:master}"
+if ! git push "$ROTATE_PUSH_REMOTE" "$ROTATE_PUSH_REFSPEC" >/dev/null 2>&1; then
+  echo "  ✗ git push to $ROTATE_PUSH_REMOTE ($ROTATE_PUSH_REFSPEC) failed" >&2
   exit 7
 fi
-echo "  ✓ git push to codeberg: success"
+echo "  ✓ git push to $ROTATE_PUSH_REMOTE: success"
 echo
 
 # Final summary
