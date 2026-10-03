@@ -263,6 +263,13 @@
 
           config = {
             # --- dracon-sync ---
+            # Parity contract (audit H2, 2026-10-02): this Nix unit must
+            # match dracon-sync/dracon-sync.service property-for-property
+            # except ExecStart (store path vs ~/.local/bin). Drift here
+            # previously shipped CPUQuota=15% (measured classifier
+            # starvation) and Restart=on-failure to Nix installs.
+            # scripts/check-flake.sh asserts the security-relevant
+            # properties below; update it with any intentional change.
             systemd.user.services.dracon-sync = mkIf cfg.sync.enable {
               Unit = {
                 Description = "Dracon Sync (deterministic sync runtime)";
@@ -271,19 +278,21 @@
               };
               Service = {
                 Type = "simple";
+                StandardOutput = "journal";
+                StandardError = "journal";
                 Environment = [
-                  "PATH=%h/.local/bin:/run/wrappers/bin:%h/.nix-profile/bin:%h/.local/state/nix/profile/bin:/etc/profiles/per-user/%u/bin:/nix/var/nix/profiles/default/bin:/run/current-system/sw/bin"
+                  "PATH=%h/.local/bin:/run/wrappers/bin:%h/.local/share/flatpak/exports/bin:/var/lib/flatpak/exports/bin:%h/.nix-profile/bin:/nix/profile/bin:%h/.local/state/nix/profile/bin:/etc/profiles/per-user/%u/bin:/nix/var/nix/profiles/default/bin:/run/current-system/sw/bin"
                   "DRACON_SYNC_POLICY=${cfg.sync.policyPath}"
                   "GIT_TERMINAL_PROMPT=0"
                 ];
                 PassEnvironment = [ "SSH_AUTH_SOCK" ];
-                ExecStartPre = "-pkill -x -f 'dracon-git pulse'";
+                ExecStartPre = "-/run/current-system/sw/bin/pkill -x -f \"dracon-git pulse\"";
                 ExecStart = "${cfg.sync.package}/bin/dracon-sync daemon";
-                Restart = "on-failure";
+                Restart = "always";
                 RestartSec = "5";
                 RestartPreventExitStatus = "2 78";
                 Nice = "10";
-                CPUQuota = "15%";
+                CPUQuota = "100%";
                 MemoryHigh = "768M";
                 MemoryMax = "2G";
                 TasksMax = "96";
@@ -292,6 +301,24 @@
                 ProtectHome = "read-only";
                 ReadWritePaths = [ "%h/.dracon" "%h/Dev" "%h/.local/state/dracon" "%h/.ssh" ];
                 PrivateTmp = true;
+                PrivateDevices = true;
+                ProtectKernelTunables = true;
+                ProtectKernelLogs = true;
+                ProtectClock = true;
+                ProtectHostname = true;
+                ProtectControlGroups = true;
+                LockPersonality = true;
+                # NO MemoryDenyWriteExecute: mirrors the shipped unit —
+                # the daemon honors repo pre-push hooks, whose JIT
+                # runtimes (node/V8) need PROT_EXEC (2026-10-02
+                # fleet-wide push-stuck incident).
+                RestrictRealtime = true;
+                RestrictSUIDSGID = true;
+                RemoveIPC = true;
+                CapabilityBoundingSet = "";
+                RestrictNamespaces = true;
+                SystemCallFilter = "@system-service";
+                SystemCallErrorNumber = "EPERM";
               };
               Install = {
                 WantedBy = [ "default.target" ];
