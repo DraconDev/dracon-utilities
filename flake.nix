@@ -157,10 +157,16 @@
             # fails closed. They pass wherever the worktree is
             # smudged (notably the workspace `cargo test` CI job).
             nativeCheckInputs = [ pkgs.git ];
-            # EXPERIMENT 2026-10-03 (audit R4-M-13): the sandbox sets
-            # HOME=/homeless-shelter (unwritable); many sync tests keep
-            # caches/state under $HOME. Point HOME at TMPDIR for checks.
-            preCheck = "export HOME=$TMPDIR";
+            # Fixtures run with AMBIENT machine gitconfig by design
+            # (test_helpers.rs: identity, init.defaultBranch) — the
+            # sandbox has none, so seed a throwaway identity plus a
+            # writable HOME (caches/state live under $HOME).
+            preCheck = ''
+              export HOME=$TMPDIR
+              git config --global user.email "nix-sandbox@example.test"
+              git config --global user.name "nix-sandbox"
+              git config --global init.defaultBranch main
+            '';
             checkFlags = [
               "--test-threads=1"
               "--skip" "storage_core::s3::http::tests::actual_http_corruption_and_provider_errors_produce_no_receipt_or_secret"
