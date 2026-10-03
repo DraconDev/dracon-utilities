@@ -8,7 +8,9 @@
 #
 # Usage:
 #   ./cleanup-github-orphans.sh          # Dry run (list only)
-#   ./cleanup-github-orphans.sh --apply  # Actually delete repos
+#   ./cleanup-github-orphans.sh --apply  # Delete after typed confirmation
+#                                        # (type "DELETE N repos"; a non-tty
+#                                        # stdin aborts without deleting)
 #
 # Requires: gh CLI with delete_repo scope
 #   gh auth refresh -h github.com -s delete_repo
@@ -56,6 +58,39 @@ echo "   Suffix orphans:       $SUFFIXED_COUNT"
 echo "   Test repos:           $TEST_COUNT"
 echo "   Other remote-only:    $(echo "$REMOTE_ONLY_STALE" | grep -c . || echo 0)"
 echo ""
+
+# FIXED 2026-10-03 (audit R4-M-09): --apply used to delete N repos on a
+# bare flag — a stale gh listing or a wrong-org typo becomes irreversible
+# mass deletion with no backup. Print the count plus the full list and
+# require the operator to type it back exactly. A non-tty stdin (piped
+# run, CI) fails the read and aborts closed; zero targets exits quietly.
+if $APPLY; then
+    DELETE_COUNT=$((SUFFIXED_COUNT + TEST_COUNT))
+    if [[ "$DELETE_COUNT" -eq 0 ]]; then
+        echo "Nothing to delete."
+        exit 0
+    fi
+    echo "⚠️  About to PERMANENTLY delete $DELETE_COUNT GitHub repos (irreversible, no backup):"
+    if [[ -n "$SUFFIXED" ]]; then
+        echo "$SUFFIXED" | sed 's/^/   - DraconDev\//'
+    fi
+    if [[ -n "$TEST_REPOS" ]]; then
+        echo "$TEST_REPOS" | sed 's/^/   - DraconDev\//'
+    fi
+    echo ""
+    printf 'Type exactly "DELETE %s repos" to confirm: ' "$DELETE_COUNT"
+    CONFIRM=""
+    if ! IFS= read -r CONFIRM; then
+        echo "" >&2
+        echo "Aborted (no confirmation read)." >&2
+        exit 1
+    fi
+    if [[ "$CONFIRM" != "DELETE $DELETE_COUNT repos" ]]; then
+        echo "Aborted (confirmation did not match)." >&2
+        exit 1
+    fi
+    echo ""
+fi
 
 # Delete function
 delete_repo() {
