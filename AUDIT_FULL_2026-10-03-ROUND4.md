@@ -178,3 +178,100 @@ Evidence: dracon-warden/src/main.rs:3477-3482 (refusal), :3873-3884 (one-shot Er
 Impact: IF any caller (lead claims cargo/gix on dirty trees) invokes clean with an absolute path, every git add aborts → cargo publish/package breaks in warden-managed repos. Real git always sends repo-relative %f/process paths, so the guard is dead code on the git path — pure availability risk, no leak. gix-absolute behavior UNVERIFIED (no vendored gix sources, no network).
 Fix: relativize-then-guard — strip an absolute path to repo-relative when it resolves under the repo root (or accept basename + containment check), still refusing .. escapes and outside-root absolutes; add a regression test.
 
+## LOW (48)
+
+### R4-SC-07 — LOW — detached_discard stale-result marker never inserted (dead M1 path)
+Evidence: daemon.rs:6571 (declared) + :6560-6562 (comment: "force-cleared and possibly re-dispatched"); :8948-8949 (only .get/.remove at check site); :9055-9063 (wedge path requests cancellation but never inserts a marker). Repo-wide grep confirms no insert site.
+Impact: currently benign (ownership retained until join, so no force-clear race exists), but the M1 per-generation machinery is untestable-by-construction and would silently not fire if force-clearing ever returns.
+Fix: insert the marker on abort, or remove the dead path and its test-only helper.
+
+### R4-SC-08 — LOW — raw Command::new("git") bypasses DRACON_SYNC_GIT_BIN + prompt sealing
+Evidence: sync.rs:956 (repo_has_warden_filter), :3982 + :4026 (auto_resolve_unmerged), :4102 (check_untracked_threshold) vs policy.rs:411-435 (git_binary honors DRACON_SYNC_GIT_BIN/Nix paths; GitCommand::new seals SSH prompt env). (Sibling pattern: R4-SR-13 covers the same class in ownership.rs.)
+Impact: inconsistent git binary (breaks the DRACON_SYNC_GIT_BIN test seam and Nix layout), unprompt-sealed subprocess env.
+Fix: use policy::std_git_command() at all four sites.
+
+### R4-SC-09 — LOW — fetch-first auto-pull refspec skips the branch safety check
+Evidence: git/push.rs:350-353 (pull_refspec from current_branch with no is_safe_branch_name gate) vs :290-301 (push refspec bails on unsafe names) and :194-206 (same in transport fallback).
+Impact: exotic local branch name reaches `git pull origin <ref>` unvalidated (arg confusion); also pulls the explicit branch while pushing HEAD — a mid-detach race can merge an unexpected ref.
+Fix: validate with is_safe_branch_name and bail like the push paths.
+
+### R4-SC-10 — LOW — staging pathspecs are not :(literal)-quoted (glob filenames)
+Evidence: sync.rs:1429-1432 (git add -A -- <raw paths>) vs git/staging.rs:154 (:(literal) prefix used for ls-files pathspecs for the same reason).
+Impact: operator/expansion filenames containing glob magic ([, *) interpreted as pathspec patterns — mis-staged or silently skipped files.
+Fix: prefix :(literal) (or --literal-pathspecs) on the git add argv.
+
+### R4-SC-11 — LOW — conflict guard misses in-progress revert (and bisect)
+Evidence: sync.rs:483-506 checks rebase-merge/rebase-apply/MERGE_HEAD/CHERRY_PICK_HEAD only; sync.rs:3628-3633 (compute_blast_radius detects .git/MERGE_HEAD + REVERT_HEAD for the message) proves mid-revert commits are reachable.
+Impact: daemon stages/commits/pushes through an operator's in-progress git revert.
+Fix: add is_revert_in_progress (.git/REVERT_HEAD, via state_path_exists) and bisect guards to check_conflict_state.
+
+### R4-SC-12 — LOW — has_origin_remote config string-parse can false-negative with no fallback
+Evidence: git/status.rs:84-99 (when <repo>/.git/config is readable, returns the line.trim() == "[remote \"origin\"]" verdict directly; trailing comments, casing, or include-based remotes read as absent; git-CLI fallback only runs when the file is unreadable).
+Impact: origin exists but reads absent → skipped pulls, spurious "created remote" attempts (sync.rs:5091 ensure_origin_remote), wrong has_local_or_pending_work.
+Fix: fall back to `git remote get-url origin` on a parse negative, or parse robustly.
+
+### R4-SC-13 — LOW — origin retry budget exceeds the mirror budget (~5 pushes vs 3)
+Evidence: git/push.rs:277-281 (attempts loop) + :427-437 (extra push_with_transport_fallbacks attempt after the loop exhausts; R3-L02 comment acknowledges retries=0 → up to 5 pushes) vs git/multi_remote.rs:697 (mirror budget counts TOTAL attempts, min 1).
+Impact: sick origin hammered harder per cycle than a sick mirror; asymmetric load and inconsistent operator expectations.
+Fix: count the fallback sweep inside the same total budget as the mirror path.
+
+### R4-SC-14 — LOW — detect_large_blobs_ahead fails open (empty) when rev-list fails
+Evidence: git/staging.rs:298-305 (@{u}..HEAD rev-list non-success → Ok(vec![])).
+Impact: repos without upstream (mirror-only) or with transient rev-list errors silently disable the >100 MiB rewrite guard — exactly the repos that most need it.
+Fix: propagate the error (caller decides) or fall back to a merge-base/whole-branch measure.
+
+### R4-SC-15 — LOW — index.lock contention on git add fails the whole sync (no backoff)
+Evidence: sync.rs:1433-1441 (normal-path git add error propagates as Err → sync Failure); only the filter-only reset path treats lock contention as non-fatal (:4347-4356, comment names sync-now/warden contention explicitly).
+Impact: transient contention with the CLI or warden burns failure budget and can trip MAX_FAILURES backoff for a healthy repo.
+Fix: retry index.lock failures with a short backoff and/or map them to a non-failure retain outcome.
+
+### R4-SC-16 — LOW — operator-concurrent staging is swept into the auto-commit
+Evidence: sync.rs:4336-4340 (commit set = full diff --cached, not the filtered to_stage list); Blocked arm deliberately leaves the index intact (:4403-4408) but the success path commits whatever is staged, including manual git adds landing between clean_staged_paths and commit.
+Impact: operator-staged work committed under a mechanical message without consent window.
+Fix: verify the staged set ⊆ intended paths before commit (or commit an explicit pathspec).
+
+### R4-SC-17 — LOW — trailing-drain "still running" count includes previous-cycle pending repos
+Evidence: daemon.rs:8920 (dispatched_this_cycle seeded from in_flight.clone(), which still holds previous cycles' detached-registry repos); :9030-9032 (message reports dispatched_this_cycle.len() as this cycle's still-running tasks).
+Impact: misleading per-cycle drain message (over-counts); detached_since re-insert is guarded by or_insert so no timestamp harm.
+Fix: seed dispatched_this_cycle from this cycle's to_sync repos only.
+
+### R4-SR-06 — LOW — glob * branch is case-sensitive (raw pattern vs lowercased name)
+Evidence: exclude.rs:991 (normalized.starts_with(&pattern[..len-1]) uses RAW pattern while normalized is lowercased; exact-match branch :974-977 normalizes both sides). Repro: is_excluded_dir_name("target-x", {"Target*"}) == false; docs/tests (:66-70) promise case-insensitive matching.
+Impact: documented case-insensitive patterns silently fail to exclude.
+Fix: slice normalized_pattern instead of pattern; add Target* regression test.
+
+### R4-SR-07 — LOW — patterns with 2+ * never match
+Evidence: matches_file_pattern generic arm requires parts.len() == 2; *-test-* → 3 parts → falls through to false. Repro: matches_file_pattern("my-test-file", "*-test-*") == false. Also affects per-segment matching in rel_* helpers (:1056-1130).
+Impact: user multi-wildcard patterns silently never match.
+Fix: implement multi-* ordered subsequence matching or reject/validate such patterns at config load with a warning.
+
+### R4-SR-08 — LOW — repair-warns uses GLOBAL-ONLY auto-commit patterns
+Evidence: report.rs:8882-8888 (has_sync_relevant_dirty_entries(..., &policy.auto_commit_exclude_patterns) — per-repo override ignored entirely, no load_repo_override in this path), unlike the UNION contract (policy.rs:1100-1116).
+Impact: repos excluded only per-repo get spurious warn-repair plans + incident-ledger planned records for dirt the worker would never touch (real_is_dirty at :8912 still drives selection, so noise, not data loss).
+Fix: load the per-repo override and pass effective_auto_commit_excludes.
+
+### R4-SR-09 — LOW — repos --json emits null, contradicting the "never null" contract
+Evidence: RepoReportRow (report.rs:1487-1645, plain Serialize derive, no skip_serializing_if) has codeberg_skip_reason :1548, git_size_bytes :1563, git_modules_bytes :1574, frozen_secs :1644 → serialize as null. Contract (:1661-1662) says "Absent values use the - sentinel … — never null."
+Impact: contract/consumer confusion.
+Fix: document the four nullable fields in the contract (preferred — changing to sentinels breaks consumers) or add skip_serializing_if.
+
+### R4-SR-10 — LOW — codeberg skip reason: undocumented values + misleading multi-remote annotation
+Evidence: field doc (report.rs:1537-1548) allows private/unknown/None, but construction (:4651-4675) can emit "quota" (:4670) and "public" (:4665, "shouldn't happen" TOCTOU between two cached_repo_visibility reads). Renderer (:737-744) folds the codeberg-specific reason onto the WHOLE excl list: github,codeberg excl + private renders [… [github,codeberg:private]], misattributing the reason to github.
+Impact: undocumented values break consumers; misattributed reason misleads operators.
+Fix: document quota (+ handle public explicitly, e.g. fall back to unknown); render the reason against codeberg only.
+
+### R4-SR-11 — LOW — report embeds stuck-push last_error verbatim; no report-side redaction
+Evidence: report.rs:4385-4394 (HINT) and :4428 (push_error) clone info.last_error with no redact_url_credentials call; report.rs contains zero redaction calls (verified by search). Mitigation (read, not assumed): daemon redacts at ledger-write time (daemon.rs:5271,:5291-5296). Residual: pre-2026-08-11 ledger entries and any future writer bypass flow unredacted into table + JSON.
+Impact: residual credential-echo risk in report output.
+Fix: one redact_url_credentials at report construction (defense in depth, cheap).
+
+### R4-SR-12 — LOW — stale doc references non-existent global policy.exclude_remotes (doc-only)
+Evidence: report.rs:1532-1533 "(or by the global policy.exclude_remotes)"; no such SyncPolicy field exists (verified by search — only RepoPolicyOverride.exclude_remotes, policy.rs:1018; daemon report paths all start from the per-repo list: daemon.rs:1045, sync.rs:2375). No behavior drift.
+Fix: correct the comment to per-repo-only.
+
+### R4-SR-13 — LOW — ownership.rs raw git, unbounded, blocking async workers
+Evidence: git_config_user_email / git_head_author_email / git_head_author_name / git_origin_url (ownership.rs:572-638) use Command::new("git") (not policy::std_git_command), no timeout, synchronous; report calls detect_* fresh per repo inside async row futures (report.rs:4298-4314, 4 subprocesses × N repos). (Sibling pattern: R4-SC-08 covers the same class in sync.rs.)
+Impact: DRACON_SYNC_GIT_BIN override ignored; a wedged git blocks a tokio worker (fast local reads, so hang risk is low — availability, not safety).
+Fix: route through std_git_command() + bounded wait (or spawn_blocking).
+
+
