@@ -274,4 +274,120 @@ Evidence: git_config_user_email / git_head_author_email / git_head_author_name /
 Impact: DRACON_SYNC_GIT_BIN override ignored; a wedged git blocks a tokio worker (fast local reads, so hang risk is low — availability, not safety).
 Fix: route through std_git_command() + bounded wait (or spawn_blocking).
 
+### R4-SR-14 — LOW — report reads per-repo override twice per row (perf + TOCTOU skew)
+Evidence: load_repo_override(&repo) at report.rs:3938 (drives excludes/remotes) and again at :4289 (ownership). Two file reads + parses per repo per run; a concurrent edit (or one transient parse failure) makes classification and ownership disagree.
+Impact: perf waste + classification/ownership skew under concurrent edit.
+Fix: load once, reuse the binding.
+
+### R4-SR-15 — LOW — secrets.rs minimal .env dialect; misleading readability warning
+Evidence: parser (:84-119) splits on first =, trims, keeps the rest verbatim: quoted values (GH_TOKEN="abc" → token includes quotes), export KEY=val lines (key mismatch → skipped), inline comments (GH_TOKEN=abc # x → value includes comment) all fail closed into auth errors. Separately, warn_if_world_readable (:180-191) triggers on 0o044 (group OR other) but always reports "world-readable". No leak (control-char refusal :94-113 verified + tested).
+Impact: fail-closed confusion only.
+Fix: strip matching quotes / export prefix / unquoted trailing comments (document the dialect); fix the warning to name group vs other.
+
+### R4-SR-16 — LOW — --warn filter retains concern rows but the warn bucket excludes them
+Evidence: counts (report.rs:3815-3818) define warn as warn && !active && !concern, but RepoFilter::Warn retains r.warn && !r.active (:4747) — concern rows with warn=true are listed under a header whose warn=N excludes them.
+Impact: header/row count inconsistency.
+Fix: retain r.warn && !r.active && !r.concern for consistency.
+
+### R4-SR-17 — LOW — stale REPLACE/inherit docs post-UNION; "all consumers" claim is false (doc-only)
+Evidence: RepoPolicyOverride.auto_commit_exclude_patterns doc "None means inherit the global value" (policy.rs:953-959); SyncPolicy doc "Defaults to empty: this is an opt-in per-repo mechanism" (policy.rs:541-543); classify_dirty_entries doc "effective per-repo (fallback global)" (report.rs:1296-1297) — all describe REPLACE, but the contract since R3-M2 is EXTEND (policy.rs:1100-1116), whose own "All consumers go through this helper now" is falsified by R4-SR-02 (report.rs:3958) and R4-SR-08 (report.rs:8882).
+Impact: doc-only; implementers misled.
+Fix: update the three docs to EXTEND semantics; soften the helper claim until report sites migrate.
+
+### R4-SYS-07 — LOW — doctor legacy-config hint names the wrong path (merges regression R4-02)
+Evidence: check tests ~/.config/dracon (src/doctor.rs:30-32) but the hint says "Move or remove the legacy ~/dracon configuration" (:156-164; regression cites :163). Mismatch present since introduction (commit 06a2021, verified via git show).
+Impact: operator told to remove a path that was never checked; cosmetic.
+Fix: align the hint with the checked path (or vice versa if ~/dracon was intended).
+
+### R4-SYS-08 — LOW — sentinel comment teaches the opposite of tmp 0-behaviour (doc-only)
+Evidence: src/policy.rs:977-978 says tmp_min_age_hours "0 = sweep /tmp regardless of age", but 0 disables cleanup (src/main.rs:5589-5591 early return) and the example agrees ("0 disables tmp hygiene", dracon-system.example.toml:280). Behaviour is safe.
+Impact: footgun for the next editor.
+Fix: correct the comment to "0 disables tmp hygiene".
+
+### R4-SYS-09 — LOW — relocate crash window between staging rename and symlink
+Evidence: src/relocate.rs:354-368 — after rename(source, staging) a crash leaves the source path MISSING with data only in <name>.dracon-relocate-staging, no marker and no documented recovery (the restore path covers symlink-error only).
+Impact: confusing post-crash state; data present but path missing.
+Fix: document recovery; optionally have setup detect stale staging dirs.
+
+### R4-SYS-10 — LOW — loaded-unit check is an ExecReload-presence-only proxy
+Evidence: scripts/check-unit-deployment.sh:146-156 — a copied-but-not-reloaded unit is caught only via missing ExecReload; any other directive drift (e.g. ReadWritePaths, PrivateTmp) with files agreeing passes steps 3-5, and step 6 covers only storage roots and only while running.
+Impact: directive drift passes the checker.
+Fix: also fail when systemctl --user show -p NeedDaemonReload is yes.
+
+### R4-SYS-11 — LOW — fd-iteration error drops the REST of that process's fd list
+Evidence: src/main.rs:5471 — while let Ok(Some(fd_entry)) exits the loop on Err, discarding all remaining fds of that process, broader than the documented "per-process/per-fd read failures stay skips" (:5445-5451), which reads as one fd skipped.
+Impact: under-counted open files for that process.
+Fix: restructure to continue-on-error per fd entry.
+
+### R4-SYS-12 — LOW — open-file scan misses running executables / mmap'd files
+Evidence: collect_open_paths_under_from (src/main.rs:5441-5495) collects fd targets and cwd only; /proc/<pid>/exe and maps are not consulted, so a stale binary executing from /tmp is deleted while running (process survives on the unlinked inode; the path is gone).
+Impact: running binary's path unlinked from under it.
+Fix: also record the exe link (one readlink per pid, same cost class as cwd).
+
+### R4-SYS-13 — LOW — unreadable tmp root silently skipped, no diagnostic
+Evidence: src/main.rs:5614-5617 — read_dir(root) failure is continue with no log line, unlike the loud proc-scan refusal (:5602-5605). Deletion-safe direction, but dry-run silently under-reports.
+Impact: silent under-report.
+Fix: one eprintln naming the skipped root.
+
+### R4-SYS-14 — LOW — daemon/checker canonicalization parity (symlinked roots)
+Evidence: checker matches on the canonical path (check-unit-deployment.sh:242-246, R3-L23) but unit_grants_write compares uncanonicalized paths (src/safety.rs:353-357, roots from uncanonicalized expand_tilde per src/quarantine.rs:110-117), so a symlinked storage root can warn in one and pass in the other.
+Impact: checker/daemon verdict split on symlinked roots.
+Fix: canonicalize (with literal fallback, as the checker does) in uncovered_storage_roots.
+
+### R4-SYS-15 — LOW — parse_df_details * 1024 can overflow
+Evidence: src/main.rs:798-800 — parse::<u64>() * 1024 panics in debug / wraps in release on absurd input, while the file's own convention is saturating_mul (:6704-6707). df output is local, so reachability is low, but a panic kills the daemon pass.
+Impact: daemon-pass panic on absurd input.
+Fix: saturating_mul(1024).
+
+### R4-SYS-16 — LOW — watchdog .service has no hardening directives
+Evidence: dracon-system-guard-watchdog.service:1-15 (no NoNewPrivileges / ProtectSystem / syscall filter) vs the guard unit's full sandbox (dracon-system-guard.service:48-119). It only shells systemctl, but it runs every 2 min as a second privileged-ish entry point.
+Impact: wider-than-needed privileges on a periodic entry point.
+Fix: add baseline NoNewPrivileges=true, ProtectSystem=strict, ProtectHome=read-only (it needs no writes).
+
+### R4-SYS-17 — LOW — watchdog script-path parity unpinned by any test
+Evidence: .service:10 ExecStart %h/.dracon/system-notify/dracon-system-guard-watchdog.sh must equal the install destination (install.sh:527, chmod :528), but no test references system-notify (only doctor timer names), unlike the pinned ExecReload contract (tests/guard_service.rs:220-253). Drift = 203/EXEC every 2 min with the guard un-backstopped.
+Impact: silent watchdog death on path drift.
+Fix: add a parity test asserting the ExecStart suffix matches the install path.
+
+### R4-SYS-18 — LOW — doctor --json omits the strict verdict
+Evidence: JSON mode prints the raw report (src/doctor.rs:220-226) whose schema (src/main.rs:439-465) carries no required/strict outcome, so machine consumers must hardcode the required set from doctor_checks.
+Impact: machine consumers cannot read the strict verdict.
+Fix: add strict_ok (and/or failed-required labels) to the JSON report.
+
+### R4-W-05 — LOW — bare .dracon/ dir marks a repo warden-MANAGED; sync-only repos blocked as drift
+Evidence: src/main.rs:5092 ([ -d "$REPO/.dracon" ] && MANAGED=1), then :5178-5197 demand warden filter config; dracon-sync/src/policy.rs:746 (<repo>/.dracon/dracon-sync.toml is a sync non-warden path; sync also uses .dracon/convos/, .dracon/assets.manifest).
+Impact: sync-managed repo outside warden harden coverage has commits blocked until warden is set up — the H-10 false-positive class (comment :5075-5080) reintroduced via a shared dir name.
+Fix: key MANAGED on a warden-specific marker (filter keys / attributes) instead of the shared .dracon/ dir.
+
+### R4-W-06 — LOW — merge internal errors share exit 1 with conflicts, with different %A state
+Evidence: src/main.rs:2367 (run_merge(...)? Err propagates to process exit 1); :4594-4601 (conflict writes plaintext markers to %A and returns Ok(1); on Err %A is untouched, still current-side ciphertext); :4543-4547 (contract comment covers only clean vs conflict, not internal error).
+Impact: decrypt failure / merge-file crash presents as a routine conflict but leaves ciphertext in the worktree.
+Fix: document, or use exit 2 for internal errors (git treats any nonzero as conflict, but the operator message can differ).
+
+### R4-W-07 — LOW — merge tempdir holds all three decrypted sides in TMPDIR
+Evidence: src/main.rs:4613-4622 (plaintext ancestor/current/other written to tempfile::tempdir(); removed only on clean drop, persists on SIGKILL, no zeroization). 0700 dir already limits exposure.
+Impact: decrypted secrets at rest in /tmp on crash.
+Fix: best-effort zeroize before drop; note in threat model.
+
+### R4-W-08 — LOW — .plaintext hatch checks are CWD-relative with no containment; helper is pub fail-open
+Evidence: dracon-warden/src/security/src/modules/filter.rs:25-31 (is_hatched does Path::new(&format!("{}.plaintext", path)).exists() with no absolute/.. rejection and no repo-root anchoring; any existence returns plaintext passthrough :161-163); src/main.rs:5404,:5450,:5476 (pre-push [ -f "$f.plaintext" ] likewise CWD-relative; hooks assume repo-root cwd).
+Impact: filter path is pre-validated on the real clean path (main.rs:3475-3492 rejects absolute/..), so this is an API/hook footgun + TOCTOU (hatch added/removed between check and commit), not a live bypass. Hook cwd assumption (repo root) not verified against git source.
+Fix: contain hatch resolution to the repo root and reject absolute/.. inside is_hatched.
+
+### R4-W-09 — LOW — pkt_encode silently truncates oversize payloads
+Evidence: src/main.rs:4025-4047 (payloads over PKT_MAX_TOTAL_LEN-4 truncated with only debug_assert!(false)). Unreachable today (all callers chunk at PKT_MAX_PAYLOAD).
+Impact: a future caller gets silent stream corruption instead of Err.
+Fix: return Result / assert in all builds.
+
+### R4-W-10 — LOW — pre-push scan residuals (documented tradeoffs, still gaps)
+Evidence: src/main.rs:5247-5251,:5287 (SECRET_RE covers Tier-1 shapes + assignments only; unquoted secret=/api_key=, AWS secret keys, generic high-entropy Tier-2 shapes push clean when the filter is bypassed); :5224-5226 (newline-in-filename edge explicitly accepted: tr '\0' '\n' + read -r); :5481-5491 (modified-binary check allows any new match string already present in a parent blob).
+Impact: defense-in-depth residual; each is a conscious tradeoff in comments.
+Fix: none required; track Tier-2 hook coverage as future work.
+
+### R4-W-11 — LOW — hook entry does not check rev-parse --show-toplevel; harden warn-only on global-hook refresh failure
+Evidence: src/main.rs:5012,:5314 (REPO=$(git rev-parse --show-toplevel) without || exit 1, unlike GIT_COMMON_DIR at :5020/:5315; failure yields empty REPO → MANAGED=0 → pre-commit exits 0 fail-open); :2092-2096 (global hook refresh failure only eprintln!s, then repos are reported hardened).
+Impact: negligible in practice (hooks always run in a repo; refresh is bounded staleness).
+Fix: add || exit 1; consider failing harden on refresh error.
+
+
 
