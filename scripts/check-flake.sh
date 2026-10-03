@@ -84,7 +84,7 @@ let
     (need "-%h/.local/state/nix")
     (need "-/mnt/data/quarantine")
     (need "-/mnt/data/cold")
-    (needGuard "ExecReload" "/bin/sh -c ''kill -HUP $MAINPID''")
+    (if builtins.match ".*/bin/sh -c .*kill -HUP.*" guard.ExecReload == null then throw "dracon-system-guard ExecReload must be the SIGHUP reload (shipped-unit parity)" else null)
     (needGuard "MemoryDenyWriteExecute" true)
     (needGuard "AmbientCapabilities" "CAP_SYS_NICE")
     (needGuard "CapabilityBoundingSet" "CAP_SYS_NICE")
