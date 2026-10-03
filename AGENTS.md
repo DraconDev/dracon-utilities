@@ -470,6 +470,13 @@ pause (14 repos PENDING) — see `dracon-sync` 0.113.54.
   and auto-clears a stale freeze marker at 30m (daemon hard-clears
   at 1h). It logs to the journal and sends `notify-send` if
   available. See `docs/design/daemon-quiesce-policy-2026-08-07.md`.
+- All three watchdog timers (+ their notify scripts) SHIP in-repo
+  since audit M8 (2026-10-02): `dracon-sync/dracon-*-watchdog.{service,timer}`
+  + `dracon-sync/scripts/dracon-*-watchdog.sh`,
+  `dracon-system/dracon-system-guard-watchdog.{service,timer}` +
+  script. `install.sh` installs + enables them; the flake module
+  declares them for Nix installs. Previously live-only, so fresh
+  installs silently lacked every backstop above.
 
 ## Guard service resilience & memory limiting (2026-08-10, v0.112.36)
 
