@@ -177,14 +177,16 @@ class InstallGitConfigDisclosure(unittest.TestCase):
         # and --help must disclose it (inside the printed header range).
         text = (ROOT / "install.sh").read_text()
         lines = text.splitlines()
-        write = "git config --global init.defaultBranch main"
+        # The 8-space form is the code-block write; the header note
+        # quotes the same command, so the bare literal is ambiguous.
+        write = '        git config --global init.defaultBranch main'
         guard = 'if [ "$BINARIES_ONLY" != true ]; then'
         self.assertIn(guard, text,
                       "binaries-only guard for the git-config block is missing")
+        self.assertIn(write, text,
+                      "the global git write for full installs is missing")
         self.assertLess(text.index(guard), text.index(write),
                         "the global git write escaped its --binaries-only guard")
-        self.assertIn("        " + write, text,
-                      "the global git write is no longer nested in the guard")
         # The --help printer is a fixed `sed -n '3,NeNp'` window: the
         # disclosure note must sit inside it, or --help silently drops it
         # (as it already did for two example lines before this fix).
