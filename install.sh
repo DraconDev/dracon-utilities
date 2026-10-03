@@ -500,22 +500,38 @@ else
     mkdir -p ~/.dracon/utilities/sync
     mkdir -p ~/.dracon/utilities/system
     mkdir -p ~/.dracon/utilities/warden
-    cp dracon-sync/dracon-sync.service ~/.config/systemd/user/dracon-sync.service 2>/dev/null || true
-    cp dracon-system/dracon-system-guard.service ~/.config/systemd/user/dracon-system-guard.service 2>/dev/null || true
+    # FIXED 2026-10-03 (audit R3-L32): every copy below used to swallow
+    # its failure (`2>/dev/null || true`) while the block printed
+    # success regardless — a full disk or bad perms surfaced only
+    # obliquely via the timer-enable warning, or never (main
+    # services). Track each failure and abort loud, naming them.
+    copy_failures=""
+    copy_unit() {
+        cp "$1" "$2" 2>/dev/null || copy_failures="$copy_failures
+  ❌ $1 -> $2"
+    }
+    copy_unit dracon-sync/dracon-sync.service ~/.config/systemd/user/dracon-sync.service
+    copy_unit dracon-system/dracon-system-guard.service ~/.config/systemd/user/dracon-system-guard.service
     # ADDED 2026-10-02 (audit M8): the watchdog timers + scripts were
     # live-only, so fresh installs silently lacked restart-if-stopped
     # and freeze auto-clear. Ship them like the services.
     mkdir -p ~/.dracon/sync-notify ~/.dracon/system-notify
-    cp dracon-sync/dracon-sync-watchdog.service ~/.config/systemd/user/dracon-sync-watchdog.service 2>/dev/null || true
-    cp dracon-sync/dracon-sync-watchdog.timer ~/.config/systemd/user/dracon-sync-watchdog.timer 2>/dev/null || true
-    cp dracon-sync/dracon-freeze-watchdog.service ~/.config/systemd/user/dracon-freeze-watchdog.service 2>/dev/null || true
-    cp dracon-sync/dracon-freeze-watchdog.timer ~/.config/systemd/user/dracon-freeze-watchdog.timer 2>/dev/null || true
-    cp dracon-system/dracon-system-guard-watchdog.service ~/.config/systemd/user/dracon-system-guard-watchdog.service 2>/dev/null || true
-    cp dracon-system/dracon-system-guard-watchdog.timer ~/.config/systemd/user/dracon-system-guard-watchdog.timer 2>/dev/null || true
-    cp dracon-sync/scripts/dracon-sync-watchdog.sh ~/.dracon/sync-notify/dracon-sync-watchdog.sh 2>/dev/null || true
-    cp dracon-sync/scripts/dracon-freeze-watchdog.sh ~/.dracon/sync-notify/dracon-freeze-watchdog.sh 2>/dev/null || true
-    cp dracon-system/scripts/dracon-system-guard-watchdog.sh ~/.dracon/system-notify/dracon-system-guard-watchdog.sh 2>/dev/null || true
-    chmod +x ~/.dracon/sync-notify/dracon-sync-watchdog.sh ~/.dracon/sync-notify/dracon-freeze-watchdog.sh ~/.dracon/system-notify/dracon-system-guard-watchdog.sh 2>/dev/null || true
+    copy_unit dracon-sync/dracon-sync-watchdog.service ~/.config/systemd/user/dracon-sync-watchdog.service
+    copy_unit dracon-sync/dracon-sync-watchdog.timer ~/.config/systemd/user/dracon-sync-watchdog.timer
+    copy_unit dracon-sync/dracon-freeze-watchdog.service ~/.config/systemd/user/dracon-freeze-watchdog.service
+    copy_unit dracon-sync/dracon-freeze-watchdog.timer ~/.config/systemd/user/dracon-freeze-watchdog.timer
+    copy_unit dracon-system/dracon-system-guard-watchdog.service ~/.config/systemd/user/dracon-system-guard-watchdog.service
+    copy_unit dracon-system/dracon-system-guard-watchdog.timer ~/.config/systemd/user/dracon-system-guard-watchdog.timer
+    copy_unit dracon-sync/scripts/dracon-sync-watchdog.sh ~/.dracon/sync-notify/dracon-sync-watchdog.sh
+    copy_unit dracon-sync/scripts/dracon-freeze-watchdog.sh ~/.dracon/sync-notify/dracon-freeze-watchdog.sh
+    copy_unit dracon-system/scripts/dracon-system-guard-watchdog.sh ~/.dracon/system-notify/dracon-system-guard-watchdog.sh
+    chmod +x ~/.dracon/sync-notify/dracon-sync-watchdog.sh ~/.dracon/sync-notify/dracon-freeze-watchdog.sh ~/.dracon/system-notify/dracon-system-guard-watchdog.sh 2>/dev/null || copy_failures="$copy_failures
+  ❌ chmod +x watchdog scripts"
+    if [ -n "$copy_failures" ]; then
+        echo "  ❌ unit/script install failed:$copy_failures" >&2
+        echo "  fix the cause above (disk full? permissions?) and re-run install.sh" >&2
+        exit 1
+    fi
     systemctl --user daemon-reload 2>/dev/null || true
     # Wait for systemd to settle after daemon-reload
     sleep 1
