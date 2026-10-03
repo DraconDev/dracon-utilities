@@ -779,7 +779,18 @@ worktree layout was eliminated for all 10 game/hegemon submodules of
   exists because v0.113.29 added the SyncPolicy half of
   `build_artifact_cleanup` without the override half — the
   per-repo opt-out silently did nothing in production until
-  v0.113.33.
+  v0.113.33. **Strengthened 2026-10-02 (audit L3)**:
+  `test_repo_override_consumed_in_production_tripwire` additionally
+  asserts every paired override field is CONSUMED in production
+  through an override binding — the name-pairing check alone passed
+  both-halves-present-yet-never-merged knobs, and the new test
+  immediately found two: `settling_max_delay_secs` +
+  `dirty_max_age_action` (specified, parsed, documented as live,
+  consumed nowhere; quarantined in `OVERRIDE_COVERAGE_UNWIRED`
+  until the settling feature is implemented or both halves are
+  removed). The consumption check is a reference check, not a
+  merge-correctness proof — override-wins semantics still need
+  per-field behavioral tests.
 
 ## Recent audit-driven changes
 
