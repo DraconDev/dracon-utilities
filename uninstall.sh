@@ -64,7 +64,12 @@ fi
 BINARIES="dracon-sync dracon-system dracon-warden"
 
 # Service files to remove
-SERVICES="dracon-sync.service dracon-system-guard.service"
+# FIXED 2026-10-03 (audit R3-L27): the M8 watchdog units were missing
+# here, so after uninstall the 3 timers kept firing every 2 min (start
+# attempts on removed units = journal errors forever, and the freeze
+# watchdog kept clearing markers). Timers stop/disable/remove through
+# the same loop as services.
+SERVICES="dracon-sync.service dracon-system-guard.service dracon-sync-watchdog.service dracon-sync-watchdog.timer dracon-freeze-watchdog.service dracon-freeze-watchdog.timer dracon-system-guard-watchdog.service dracon-system-guard-watchdog.timer"
 
 # Remove binaries
 echo ""
@@ -109,6 +114,21 @@ for service in $SERVICES; do
 done
 
 systemctl --user daemon-reload 2>/dev/null || true
+
+# FIXED 2026-10-03 (audit R3-L27): remove the watchdog notify scripts
+# install.sh provisions (a bare script with no timer is harmless, but
+# leaving them behind is not an uninstall). Empty notify dirs go too.
+echo ""
+echo "Removing watchdog notify scripts..."
+for script in "$HOME/.dracon/sync-notify/dracon-sync-watchdog.sh" \
+              "$HOME/.dracon/sync-notify/dracon-freeze-watchdog.sh" \
+              "$HOME/.dracon/system-notify/dracon-system-guard-watchdog.sh"; do
+    if [ -f "$script" ]; then
+        rm -f "$script"
+        echo "  ✅ Removed $script"
+    fi
+done
+rmdir "$HOME/.dracon/sync-notify" "$HOME/.dracon/system-notify" 2>/dev/null || true
 
 # FIXED 2026-09-27 (audit F82): install.sh runs
 # `dracon-warden setup-hooks --global`, which writes ~/.config/git/hooks
