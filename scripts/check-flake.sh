@@ -227,6 +227,23 @@ let
     (if timers.dracon-system-guard-watchdog.Timer.OnBootSec != "2min" then throw "guard watchdog OnBootSec must be 2min (shipped-unit parity)" else null)
     (if timers.dracon-system-guard-watchdog.Timer.RandomizedDelaySec != "30" then throw "guard watchdog RandomizedDelaySec must be 30 (shipped-unit parity)" else null)
     (if timers.dracon-system-guard-watchdog.Timer.AccuracySec != "1s" then throw "guard watchdog AccuracySec must be 1s (shipped-unit parity)" else null)
+    # R3-L25: watchdog Unit metadata + output routing (the flake omitted
+    # Documentation/After until this finding; harmless metadata, now pinned).
+    (if services.dracon-sync-watchdog.Unit.Documentation != "https://github.com/DraconDev/dracon-utilities" then throw "sync watchdog Unit Documentation drift (shipped-unit parity)" else null)
+    (if services.dracon-sync-watchdog.Unit.After != [ "timers.target" ] then throw "sync watchdog Unit After drift (shipped-unit parity)" else null)
+    (if services.dracon-sync-watchdog.Service.StandardOutput != "journal" then throw "sync watchdog StandardOutput drift (shipped-unit parity)" else null)
+    (if services.dracon-sync-watchdog.Service.StandardError != "journal" then throw "sync watchdog StandardError drift (shipped-unit parity)" else null)
+    (if timers.dracon-sync-watchdog.Unit.Documentation != "https://github.com/DraconDev/dracon-utilities" then throw "sync watchdog timer Documentation drift (shipped-unit parity)" else null)
+    (if services.dracon-freeze-watchdog.Unit.Documentation != "https://github.com/DraconDev/dracon-utilities" then throw "freeze watchdog Unit Documentation drift (shipped-unit parity)" else null)
+    (if services.dracon-freeze-watchdog.Unit.After != [ "timers.target" ] then throw "freeze watchdog Unit After drift (shipped-unit parity)" else null)
+    (if services.dracon-freeze-watchdog.Service.StandardOutput != "journal" then throw "freeze watchdog StandardOutput drift (shipped-unit parity)" else null)
+    (if services.dracon-freeze-watchdog.Service.StandardError != "journal" then throw "freeze watchdog StandardError drift (shipped-unit parity)" else null)
+    (if timers.dracon-freeze-watchdog.Unit.Documentation != "https://github.com/DraconDev/dracon-utilities" then throw "freeze watchdog timer Documentation drift (shipped-unit parity)" else null)
+    (if services.dracon-system-guard-watchdog.Unit.Documentation != "https://github.com/DraconDev/dracon-utilities" then throw "guard watchdog Unit Documentation drift (shipped-unit parity)" else null)
+    (if services.dracon-system-guard-watchdog.Unit.After != [ "timers.target" ] then throw "guard watchdog Unit After drift (shipped-unit parity)" else null)
+    (if services.dracon-system-guard-watchdog.Service.StandardOutput != "journal" then throw "guard watchdog StandardOutput drift (shipped-unit parity)" else null)
+    (if services.dracon-system-guard-watchdog.Service.StandardError != "journal" then throw "guard watchdog StandardError drift (shipped-unit parity)" else null)
+    (if timers.dracon-system-guard-watchdog.Unit.Documentation != "https://github.com/DraconDev/dracon-utilities" then throw "guard watchdog timer Documentation drift (shipped-unit parity)" else null)
   ];
 in
   builtins.deepSeq checks "PASS: generated services match shipped-unit parity (guard cleanup/restart + H1/H2 sandbox/quota/restart)"
