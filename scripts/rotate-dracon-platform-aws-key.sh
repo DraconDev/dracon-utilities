@@ -164,8 +164,8 @@ run_check_mode() {
     echo "✓ ALL CRITERIA MET — goal can be marked complete"
   else
     echo "✗ 6 of 14 hard criteria still pending (criteria 6, 7, 8, 9, 10, 14)"
-    echo "  Required: paste NEW_AWS_ACCESS_KEY_ID + NEW_AWS_SECRET_ACCESS_KEY to rotate"
-    echo "  Or run:   $0 <NEW_AKIA> <NEW_SECRET>"
+    echo "  Required: provide NEW_AWS_ACCESS_KEY_ID + NEW_AWS_SECRET_ACCESS_KEY to rotate"
+    echo "  Or run:   NEW_AWS_ACCESS_KEY_ID=<id> NEW_AWS_SECRET_ACCESS_KEY=<secret> $0"
   fi
   return 0
 }
