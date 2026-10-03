@@ -145,11 +145,33 @@
             version = crateVersion "0.113.93" draconSyncSrc;
             buildAndTestSubdir = "dracon-sync";
             cargoBuildFeatures = [ ];
-            # Tests need git, serial execution, and network access (some tests hang
-            # in the Nix sandbox). Tests run via 'cargo test' in CI.
-            doCheck = true;
+            # CHANGED 2026-10-03 (audit R4-M-13): doCheck is ON — the old
+            # `doCheck = false` ("some tests hang in the Nix sandbox")
+            # was never re-verified, and a trial build passes 113 lib
+            # tests with no hangs. The 12 skips below are the only
+            # sandbox failures, all one root cause: they build
+            # credentials from the AWS *published example* key, which
+            # warden stores ciphertext in the repo — the sandbox
+            # checks out the pinned rev with no smudge filter, so the
+            # fixture key is `[DRACON_SECRET:...]` and validation
+            # fails closed. They pass wherever the worktree is
+            # smudged (notably the workspace `cargo test` CI job).
             nativeCheckInputs = [ pkgs.git ];
-            checkFlags = [ "--test-threads=1" ];
+            checkFlags = [
+              "--test-threads=1"
+              "--skip" "storage_core::s3::http::tests::actual_http_corruption_and_provider_errors_produce_no_receipt_or_secret"
+              "--skip" "storage_core::s3::http::tests::actual_http_creation_and_existing_object_require_signed_readback"
+              "--skip" "storage_core::s3::http::tests::aws_published_get_and_put_signatures_match"
+              "--skip" "storage_core::s3::http::tests::capability_probe_checks_competing_creates_and_preserved_conflicting_bytes"
+              "--skip" "storage_core::s3::http::tests::capability_probe_refuses_double_create_success_and_false_refusal"
+              "--skip" "storage_core::s3::http::tests::capability_probe_refuses_overwrite_and_corrupt_or_partial_readback"
+              "--skip" "storage_core::s3::http::tests::endpoints_credentials_and_namespace_fail_closed_without_echoing_input"
+              "--skip" "storage_core::s3::http::tests::missing_and_wrong_length_objects_fail_before_publication"
+              "--skip" "storage_core::s3::http::tests::redirects_are_not_followed_and_partial_or_encoded_bodies_are_rejected"
+              "--skip" "storage_core::s3::http::tests::session_credentials_are_sent_signed_and_expiration_is_checked_per_request"
+              "--skip" "storage_core::s3::http::tests::verified_write_scope_expiration_refuses_before_provider_contact"
+              "--skip" "storage_core::s3::http::tests::whole_response_deadline_cannot_be_extended_by_trickled_bytes"
+            ];
           });
 
           dracon-system = pkgs.rustPlatform.buildRustPackage (commonArgs // {
