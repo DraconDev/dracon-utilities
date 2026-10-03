@@ -36,8 +36,11 @@ echo "PASS: Nix flake checks passed (Home Manager output warning is intentional 
 # Evaluate the Home Manager module with systemd service options supplied by a
 # minimal test harness.  This checks the generated services, not just the
 # standalone units shipped beside the crates. Both services must stay in
-# parity with their shipped units (audit H1/H2, 2026-10-02) — every
-# security-relevant property below is asserted so Nix/HM drift fails CI.
+# parity with their shipped units (audit H1/H2, 2026-10-02; extended to
+# EVERY shipped-unit property by R3-L25, 2026-10-03 — the earlier subset
+# let unasserted properties re-drift invisibly) so Nix/HM drift fails CI.
+# The only deliberate exception is ExecStart (store path vs ~/.local/bin),
+# which is asserted by suffix instead of equality.
 service_check="$(nix eval --impure --raw --expr '
 let
   # A plain path imports ignored build output and private local files.
@@ -68,6 +71,11 @@ let
   };
   guard = evaluated.config.systemd.user.services.dracon-system-guard.Service;
   sync = evaluated.config.systemd.user.services.dracon-sync.Service;
+  guardUnit = evaluated.config.systemd.user.services.dracon-system-guard.Unit;
+  syncUnit = evaluated.config.systemd.user.services.dracon-sync.Unit;
+  guardInstall = evaluated.config.systemd.user.services.dracon-system-guard.Install;
+  syncInstall = evaluated.config.systemd.user.services.dracon-sync.Install;
+  services = evaluated.config.systemd.user.services;
   timers = evaluated.config.systemd.user.timers;
   files = evaluated.config.home.file;
   guardPaths = guard.ReadWritePaths;
@@ -133,6 +141,92 @@ let
     (if !(builtins.pathExists files.".dracon/sync-notify/dracon-sync-watchdog.sh".source) then throw "sync watchdog script source must exist in the pinned input (R3-H1)" else null)
     (if !(builtins.pathExists files.".dracon/sync-notify/dracon-freeze-watchdog.sh".source) then throw "freeze watchdog script source must exist in the pinned input (R3-H1)" else null)
     (if !(builtins.pathExists files.".dracon/system-notify/dracon-system-guard-watchdog.sh".source) then throw "guard watchdog script source must exist in the pinned input (R3-H1)" else null)
+    # R3-L25: every REMAINING shipped-unit property (the H1/H2 subset
+    # above stays; this closes the gap so no property can re-drift
+    # invisibly). ExecStart is store-path by design — suffix only.
+    (needGuard "Type" "simple")
+    (needGuard "StandardOutput" "journal")
+    (needGuard "StandardError" "journal")
+    (if builtins.length guard.Environment != 1 then throw "dracon-system-guard Environment must carry exactly PATH (shipped-unit parity)" else null)
+    (if !(builtins.elem "PATH=%h/.local/bin:/run/wrappers/bin:%h/.local/share/flatpak/exports/bin:/var/lib/flatpak/exports/bin:%h/.nix-profile/bin:/nix/profile/bin:%h/.local/state/nix/profile/bin:/etc/profiles/per-user/%u/bin:/nix/var/nix/profiles/default/bin:/run/current-system/sw/bin" guard.Environment) then throw "dracon-system-guard PATH must match the shipped unit" else null)
+    (if builtins.match ".*/bin/dracon-system guard daemon" guard.ExecStart == null then throw "dracon-system-guard ExecStart must end in /bin/dracon-system guard daemon" else null)
+    (needGuard "RestartSec" "10")
+    (needGuard "MemoryMax" "250M")
+    (needGuard "CPUQuota" "20%")
+    (needGuard "TasksMax" "64")
+    (needGuard "NoNewPrivileges" true)
+    (needGuard "ProtectSystem" "strict")
+    (needGuard "ProtectHome" "read-only")
+    (needGuard "ProtectKernelTunables" true)
+    (needGuard "ProtectKernelLogs" true)
+    (needGuard "ProtectClock" true)
+    (needGuard "ProtectHostname" true)
+    (needGuard "ProtectControlGroups" true)
+    (needGuard "LockPersonality" true)
+    (needGuard "RestrictRealtime" true)
+    (needGuard "RestrictSUIDSGID" true)
+    (needGuard "RemoveIPC" true)
+    (if guardUnit.Description != "Dracon System Guard - Proactive disk space monitoring and cleanup" then throw "guard Unit Description drift (shipped-unit parity)" else null)
+    (if guardUnit.Documentation != "https://github.com/DraconDev/dracon-utilities" then throw "guard Unit Documentation drift (shipped-unit parity)" else null)
+    (if guardUnit.After != [ "network.target" ] then throw "guard Unit After must be [ network.target ] (shipped-unit parity)" else null)
+    (if guardInstall.WantedBy != [ "default.target" ] then throw "guard Install WantedBy must be [ default.target ] (shipped-unit parity)" else null)
+    (needSync "Type" "simple")
+    (needSync "StandardOutput" "journal")
+    (needSync "StandardError" "journal")
+    (if builtins.length sync.Environment != 3 then throw "dracon-sync Environment must carry exactly PATH+POLICY+PROMPT (shipped-unit parity)" else null)
+    (if !(builtins.elem "PATH=%h/.local/bin:/run/wrappers/bin:%h/.local/share/flatpak/exports/bin:/var/lib/flatpak/exports/bin:%h/.nix-profile/bin:/nix/profile/bin:%h/.local/state/nix/profile/bin:/etc/profiles/per-user/%u/bin:/nix/var/nix/profiles/default/bin:/run/current-system/sw/bin" sync.Environment) then throw "dracon-sync PATH must match the shipped unit" else null)
+    (if !(builtins.elem "DRACON_SYNC_POLICY=%h/.dracon/utilities/sync/dracon-sync.toml" sync.Environment) then throw "dracon-sync DRACON_SYNC_POLICY default must match the shipped unit" else null)
+    (if !(builtins.elem "GIT_TERMINAL_PROMPT=0" sync.Environment) then throw "dracon-sync GIT_TERMINAL_PROMPT must match the shipped unit" else null)
+    (if sync.PassEnvironment != [ "SSH_AUTH_SOCK" ] then throw "dracon-sync PassEnvironment must be [ SSH_AUTH_SOCK ] (shipped-unit parity)" else null)
+    (needSync "ExecStartPre" "-/run/current-system/sw/bin/pkill -x -f \"dracon-git pulse\"")
+    (if builtins.match ".*/bin/dracon-sync daemon" sync.ExecStart == null then throw "dracon-sync ExecStart must end in /bin/dracon-sync daemon" else null)
+    (needSync "RestartSec" "5")
+    (needSync "RestartPreventExitStatus" "2 78")
+    (needSync "Nice" "10")
+    (needSync "MemoryHigh" "768M")
+    (needSync "TasksMax" "96")
+    (needSync "ProtectSystem" "strict")
+    (needSync "ProtectHome" "read-only")
+    (if builtins.length sync.ReadWritePaths != 4 then throw "dracon-sync ReadWritePaths must list exactly 4 roots (shipped-unit parity)" else null)
+    (if !(builtins.elem "%h/.dracon" sync.ReadWritePaths) then throw "dracon-sync ReadWritePaths must contain %h/.dracon (shipped-unit parity)" else null)
+    (if !(builtins.elem "%h/Dev" sync.ReadWritePaths) then throw "dracon-sync ReadWritePaths must contain %h/Dev (shipped-unit parity)" else null)
+    (if !(builtins.elem "%h/.local/state/dracon" sync.ReadWritePaths) then throw "dracon-sync ReadWritePaths must contain %h/.local/state/dracon (shipped-unit parity)" else null)
+    (if !(builtins.elem "%h/.ssh" sync.ReadWritePaths) then throw "dracon-sync ReadWritePaths must contain %h/.ssh (shipped-unit parity)" else null)
+    (needSync "PrivateTmp" true)
+    (needSync "ProtectKernelTunables" true)
+    (needSync "ProtectKernelLogs" true)
+    (needSync "ProtectClock" true)
+    (needSync "ProtectHostname" true)
+    (needSync "ProtectControlGroups" true)
+    (needSync "LockPersonality" true)
+    (needSync "RestrictRealtime" true)
+    (needSync "RestrictSUIDSGID" true)
+    (needSync "RemoveIPC" true)
+    (needSync "CapabilityBoundingSet" "")
+    (if syncUnit.Description != "Dracon Sync (deterministic sync runtime)" then throw "sync Unit Description drift (shipped-unit parity)" else null)
+    (if syncUnit.Documentation != "https://github.com/DraconDev/dracon-utilities" then throw "sync Unit Documentation drift (shipped-unit parity)" else null)
+    (if syncUnit.After != [ "default.target" ] then throw "sync Unit After must be [ default.target ] (shipped-unit parity)" else null)
+    (if syncInstall.WantedBy != [ "default.target" ] then throw "sync Install WantedBy must be [ default.target ] (shipped-unit parity)" else null)
+    # R3-L25: watchdog oneshot services + timer details (previously only
+    # existence, OnUnitActiveSec, and timer WantedBy were asserted).
+    (if services.dracon-sync-watchdog.Service.Type != "oneshot" then throw "sync watchdog must be Type=oneshot (shipped-unit parity)" else null)
+    (if services.dracon-sync-watchdog.Service.ExecStart != "%h/.dracon/sync-notify/dracon-sync-watchdog.sh" then throw "sync watchdog ExecStart drift (shipped-unit parity)" else null)
+    (if services.dracon-sync-watchdog.Service.TimeoutStartSec != "15" then throw "sync watchdog TimeoutStartSec must be 15 (shipped-unit parity)" else null)
+    (if services.dracon-freeze-watchdog.Service.Type != "oneshot" then throw "freeze watchdog must be Type=oneshot (shipped-unit parity)" else null)
+    (if services.dracon-freeze-watchdog.Service.ExecStart != "%h/.dracon/sync-notify/dracon-freeze-watchdog.sh" then throw "freeze watchdog ExecStart drift (shipped-unit parity)" else null)
+    (if services.dracon-freeze-watchdog.Service.TimeoutStartSec != "10" then throw "freeze watchdog TimeoutStartSec must be 10 (shipped-unit parity)" else null)
+    (if services.dracon-system-guard-watchdog.Service.Type != "oneshot" then throw "guard watchdog must be Type=oneshot (shipped-unit parity)" else null)
+    (if services.dracon-system-guard-watchdog.Service.ExecStart != "%h/.dracon/system-notify/dracon-system-guard-watchdog.sh" then throw "guard watchdog ExecStart drift (shipped-unit parity)" else null)
+    (if services.dracon-system-guard-watchdog.Service.TimeoutStartSec != "15" then throw "guard watchdog TimeoutStartSec must be 15 (shipped-unit parity)" else null)
+    (if timers.dracon-sync-watchdog.Timer.OnBootSec != "2min" then throw "sync watchdog OnBootSec must be 2min (shipped-unit parity)" else null)
+    (if timers.dracon-sync-watchdog.Timer.RandomizedDelaySec != "30" then throw "sync watchdog RandomizedDelaySec must be 30 (shipped-unit parity)" else null)
+    (if timers.dracon-sync-watchdog.Timer.AccuracySec != "1s" then throw "sync watchdog AccuracySec must be 1s (shipped-unit parity)" else null)
+    (if timers.dracon-freeze-watchdog.Timer.OnBootSec != "2min" then throw "freeze watchdog OnBootSec must be 2min (shipped-unit parity)" else null)
+    (if timers.dracon-freeze-watchdog.Timer.RandomizedDelaySec != "15" then throw "freeze watchdog RandomizedDelaySec must be 15 (shipped-unit parity)" else null)
+    (if timers.dracon-freeze-watchdog.Timer.AccuracySec != "1s" then throw "freeze watchdog AccuracySec must be 1s (shipped-unit parity)" else null)
+    (if timers.dracon-system-guard-watchdog.Timer.OnBootSec != "2min" then throw "guard watchdog OnBootSec must be 2min (shipped-unit parity)" else null)
+    (if timers.dracon-system-guard-watchdog.Timer.RandomizedDelaySec != "30" then throw "guard watchdog RandomizedDelaySec must be 30 (shipped-unit parity)" else null)
+    (if timers.dracon-system-guard-watchdog.Timer.AccuracySec != "1s" then throw "guard watchdog AccuracySec must be 1s (shipped-unit parity)" else null)
   ];
 in
   builtins.deepSeq checks "PASS: generated services match shipped-unit parity (guard cleanup/restart + H1/H2 sandbox/quota/restart)"
