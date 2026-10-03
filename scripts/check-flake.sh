@@ -127,6 +127,12 @@ let
     (if files.".dracon/sync-notify/dracon-sync-watchdog.sh".executable != true then throw "sync watchdog script must be provisioned executable" else null)
     (if files.".dracon/sync-notify/dracon-freeze-watchdog.sh".executable != true then throw "freeze watchdog script must be provisioned executable" else null)
     (if files.".dracon/system-notify/dracon-system-guard-watchdog.sh".executable != true then throw "guard watchdog script must be provisioned executable" else null)
+    # R3-H1: `.executable` alone passed while `.source` pointed into
+    # git-filtered `${self}` (no utility source) — assert the pinned
+    # inputs actually carry the scripts.
+    (if !(builtins.pathExists files.".dracon/sync-notify/dracon-sync-watchdog.sh".source) then throw "sync watchdog script source must exist in the pinned input (R3-H1)" else null)
+    (if !(builtins.pathExists files.".dracon/sync-notify/dracon-freeze-watchdog.sh".source) then throw "freeze watchdog script source must exist in the pinned input (R3-H1)" else null)
+    (if !(builtins.pathExists files.".dracon/system-notify/dracon-system-guard-watchdog.sh".source) then throw "guard watchdog script source must exist in the pinned input (R3-H1)" else null)
   ];
 in
   builtins.deepSeq checks "PASS: generated services match shipped-unit parity (guard cleanup/restart + H1/H2 sandbox/quota/restart)"
