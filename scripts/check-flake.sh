@@ -246,7 +246,7 @@ let
     (if timers.dracon-system-guard-watchdog.Unit.Documentation != "https://github.com/DraconDev/dracon-utilities" then throw "guard watchdog timer Documentation drift (shipped-unit parity)" else null)
   ];
 in
-  builtins.deepSeq checks "PASS: generated services match shipped-unit parity (guard cleanup/restart + H1/H2 sandbox/quota/restart)"
+  builtins.deepSeq checks "PASS: generated services match shipped-unit parity (all properties + watchdogs + script sources)"
 ' 2>&1)" || {
     printf '%s\n' "$service_check"
     exit 1
