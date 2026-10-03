@@ -52,6 +52,14 @@ let
           type = lib.types.attrsOf lib.types.anything;
           default = {};
         };
+        options.systemd.user.timers = lib.mkOption {
+          type = lib.types.attrsOf lib.types.anything;
+          default = {};
+        };
+        options.home.file = lib.mkOption {
+          type = lib.types.attrsOf lib.types.anything;
+          default = {};
+        };
         config._module.args.pkgs = pkgs;
         config.services.dracon.system.enable = true;
         config.services.dracon.sync.enable = true;
@@ -60,6 +68,8 @@ let
   };
   guard = evaluated.config.systemd.user.services.dracon-system-guard.Service;
   sync = evaluated.config.systemd.user.services.dracon-sync.Service;
+  timers = evaluated.config.systemd.user.timers;
+  files = evaluated.config.home.file;
   guardPaths = guard.ReadWritePaths;
   need = path: if !(builtins.elem path guardPaths) then throw "dracon-system-guard ReadWritePaths must contain ${path} (shipped-unit parity)" else null;
   needSync = name: value: if sync.${name} != value then throw "dracon-sync ${name} must be ${builtins.toString value} (shipped-unit parity)" else null;
@@ -104,6 +114,19 @@ let
     (needSync "NoNewPrivileges" true)
     (needSync "PrivateDevices" true)
     (if (sync ? MemoryDenyWriteExecute) then throw "dracon-sync must not set MemoryDenyWriteExecute (breaks JIT hook helpers)" else null)
+    # M8: watchdog timers + their scripts must ship for Nix installs.
+    (if !(timers ? dracon-sync-watchdog) then throw "Nix module must ship dracon-sync-watchdog.timer" else null)
+    (if !(timers ? dracon-freeze-watchdog) then throw "Nix module must ship dracon-freeze-watchdog.timer" else null)
+    (if !(timers ? dracon-system-guard-watchdog) then throw "Nix module must ship dracon-system-guard-watchdog.timer" else null)
+    (if timers.dracon-sync-watchdog.Timer.OnUnitActiveSec != "2min" then throw "sync watchdog must fire every 2min" else null)
+    (if timers.dracon-freeze-watchdog.Timer.OnUnitActiveSec != "2min" then throw "freeze watchdog must fire every 2min" else null)
+    (if timers.dracon-system-guard-watchdog.Timer.OnUnitActiveSec != "2min" then throw "guard watchdog must fire every 2min" else null)
+    (if timers.dracon-sync-watchdog.Install.WantedBy != [ "timers.target" ] then throw "sync watchdog must be wanted by timers.target" else null)
+    (if timers.dracon-freeze-watchdog.Install.WantedBy != [ "timers.target" ] then throw "freeze watchdog must be wanted by timers.target" else null)
+    (if timers.dracon-system-guard-watchdog.Install.WantedBy != [ "timers.target" ] then throw "guard watchdog must be wanted by timers.target" else null)
+    (if files.".dracon/sync-notify/dracon-sync-watchdog.sh".executable != true then throw "sync watchdog script must be provisioned executable" else null)
+    (if files.".dracon/sync-notify/dracon-freeze-watchdog.sh".executable != true then throw "freeze watchdog script must be provisioned executable" else null)
+    (if files.".dracon/system-notify/dracon-system-guard-watchdog.sh".executable != true then throw "guard watchdog script must be provisioned executable" else null)
   ];
 in
   builtins.deepSeq checks "PASS: generated services match shipped-unit parity (guard cleanup/restart + H1/H2 sandbox/quota/restart)"

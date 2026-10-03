@@ -397,6 +397,99 @@
 
             # No dracon-warden service: warden has no daemon subcommand —
             # enforcement is via git hooks (dracon-warden setup-hooks --global).
+
+            # --- watchdog timers (audit M8, 2026-10-02) ---
+            # The timers were live-only, so Nix installs silently lacked
+            # restart-if-stopped and freeze auto-clear. Mirror of the
+            # shipped units in dracon-sync/ + dracon-system/ (services,
+            # timers, and the notify scripts they exec).
+            systemd.user.services.dracon-sync-watchdog = mkIf cfg.sync.enable {
+              Unit = {
+                Description = "Dracon sync watchdog (restart daemon if stopped)";
+              };
+              Service = {
+                Type = "oneshot";
+                ExecStart = "%h/.dracon/sync-notify/dracon-sync-watchdog.sh";
+                TimeoutStartSec = "15";
+                StandardOutput = "journal";
+                StandardError = "journal";
+              };
+            };
+            systemd.user.timers.dracon-sync-watchdog = mkIf cfg.sync.enable {
+              Unit = {
+                Description = "Run dracon-sync-watchdog.service every 2 minutes";
+              };
+              Timer = {
+                OnBootSec = "2min";
+                OnUnitActiveSec = "2min";
+                RandomizedDelaySec = "30";
+                AccuracySec = "1s";
+              };
+              Install = { WantedBy = [ "timers.target" ]; };
+            };
+            systemd.user.services.dracon-freeze-watchdog = mkIf cfg.sync.enable {
+              Unit = {
+                Description = "Dracon freeze watchdog (warn/auto-clear forgotten pause)";
+              };
+              Service = {
+                Type = "oneshot";
+                ExecStart = "%h/.dracon/sync-notify/dracon-freeze-watchdog.sh";
+                TimeoutStartSec = "10";
+                StandardOutput = "journal";
+                StandardError = "journal";
+              };
+            };
+            systemd.user.timers.dracon-freeze-watchdog = mkIf cfg.sync.enable {
+              Unit = {
+                Description = "Run dracon-freeze-watchdog every 2 minutes";
+              };
+              Timer = {
+                OnBootSec = "2min";
+                OnUnitActiveSec = "2min";
+                RandomizedDelaySec = "15";
+                AccuracySec = "1s";
+              };
+              Install = { WantedBy = [ "timers.target" ]; };
+            };
+            systemd.user.services.dracon-system-guard-watchdog = mkIf cfg.system.enable {
+              Unit = {
+                Description = "Dracon system guard watchdog (restart daemon if stopped)";
+              };
+              Service = {
+                Type = "oneshot";
+                ExecStart = "%h/.dracon/system-notify/dracon-system-guard-watchdog.sh";
+                TimeoutStartSec = "15";
+                StandardOutput = "journal";
+                StandardError = "journal";
+              };
+            };
+            systemd.user.timers.dracon-system-guard-watchdog = mkIf cfg.system.enable {
+              Unit = {
+                Description = "Run dracon-system-guard-watchdog.service every 2 minutes";
+              };
+              Timer = {
+                OnBootSec = "2min";
+                OnUnitActiveSec = "2min";
+                RandomizedDelaySec = "30";
+                AccuracySec = "1s";
+              };
+              Install = { WantedBy = [ "timers.target" ]; };
+            };
+            # The oneshot services above exec these scripts; provision them
+            # so a pure-Nix install does not ship timers pointing at
+            # missing files.
+            home.file.".dracon/sync-notify/dracon-sync-watchdog.sh" = mkIf cfg.sync.enable {
+              source = "${self}/dracon-sync/scripts/dracon-sync-watchdog.sh";
+              executable = true;
+            };
+            home.file.".dracon/sync-notify/dracon-freeze-watchdog.sh" = mkIf cfg.sync.enable {
+              source = "${self}/dracon-sync/scripts/dracon-freeze-watchdog.sh";
+              executable = true;
+            };
+            home.file.".dracon/system-notify/dracon-system-guard-watchdog.sh" = mkIf cfg.system.enable {
+              source = "${self}/dracon-system/scripts/dracon-system-guard-watchdog.sh";
+              executable = true;
+            };
           };
         };
     };
