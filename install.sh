@@ -119,15 +119,15 @@ if [ "$BINARIES_ONLY" != true ] && ! command -v systemctl &> /dev/null; then
     exit 1
 fi
 
-# This repo is a monorepo; utility source lives in the tracked
-# dracon-sync/, dracon-system/, dracon-warden/ directories. Check their
-# manifests before starting a build so a partial checkout gets an actionable
-# error instead of Cargo's path error.
+# The utilities are nested standalone repos (AGENTS.md), not tracked
+# parent dirs — but their checkouts must still be present to build.
+# Check their manifests before starting so a partial checkout gets an
+# actionable error instead of Cargo's path error.
 for utility in dracon-sync dracon-system dracon-warden; do
     if [ ! -f "$utility/Cargo.toml" ]; then
         echo "ERROR: utility directory '$utility' is missing its Cargo.toml"
-        echo "You may have a partial checkout — re-clone https://github.com/DraconDev/dracon-utilities.git;"
-        echo "see AGENTS.md for the monorepo layout."
+        echo "You may have a partial checkout — each utility is a nested standalone"
+        echo "repo; clone the missing one(s) next to the parent (see AGENTS.md)."
         exit 1
     fi
 done
