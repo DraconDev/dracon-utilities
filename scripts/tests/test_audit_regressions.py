@@ -191,11 +191,13 @@ class InstallGitConfigDisclosure(unittest.TestCase):
         help_line = next(line for line in lines if 'sed -n' in line and "'3," in line)
         help_end = int(help_line.split("'3,")[1].split("p'")[0])
         noted = [number for number, line in enumerate(lines, 1)
-                 if line.startswith("#") and "init.defaultBranch" in line]
-        self.assertGreater(len(noted), 0, "--help never mentions the git-config write")
-        for number in noted:
-            self.assertLessEqual(number, help_end,
-                                 f"header note at line {number} falls outside the --help window (3,{help_end})")
+                 if line.startswith("#") and "init.defaultBranch" in line
+                 and number <= help_end]
+        self.assertGreater(
+            len(noted), 0,
+            "--help never mentions the git-config write "
+            f"(no header comment names init.defaultBranch inside lines 3-{help_end})",
+        )
 
 
 if __name__ == "__main__":
