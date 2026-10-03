@@ -82,3 +82,99 @@ Fix: thread exclusion + effective revert_excluded_to_head into the restore arm (
 Evidence: policy.rs:1072-1081 (load_repo_override: any toml::from_str error → eprintln + RepoPolicyOverride::default()). One typo in <repo>/.dracon/dracon-sync.toml discards owned=false, exclude_remotes, auto_skip_unowned; daemon proceeds as if no override exists.
 Impact: operator-intended opt-outs silently void → daemon auto-commits/pushes repos it was told to leave alone (wrong-push direction). The eprintln is the only signal.
 Fix: fail closed per-repo on parse error (concern / skip with alert), or salvage-parse safety keys; at minimum record an incident-ledger entry, not just stderr.
+
+### R4-SR-05 — MEDIUM — flip_repo_visibility mixes owner/repo identity sources
+Evidence: visibility.rs:723 (GitHub owner parsed from origin_url) but repo name remapped through possibly different remote's repo_name_map :726-728; GitLab/Codeberg use local basename :746-747,:775-776 (doc :708), not URL-derived name.
+Impact: with stale origin (live cases visibility.rs:292-295, report.rs:1430) or renamed local dir, explicit make-public/make-private can address the wrong owner/repo pair — including flipping an unrelated same-account repo. gh/API 404s make the common case noisy-but-safe; the collision case is not.
+Fix: derive ONE (owner, repo) identity per target remote from that remote's own resolve_account+resolve_repo_name; refuse when origin-derived and config-derived identities disagree (same fail-closed posture as same_host_project_divergence :404-432).
+
+### R4-SYS-01 — MEDIUM — checker step 6 ignores DRACON_SYSTEM_POLICY, checks wrong file
+Evidence: dracon-system/scripts/check-unit-deployment.sh:305 (policy_file falls back to HOME default, no DRACON_SYSTEM_POLICY) while the daemon resolves the override (src/main.rs:7125-7130, honoured by doctor src/doctor.rs:34-41). Observed: with DRACON_SYSTEM_POLICY pointing at a policy naming an RO quarantine root and no default policy present, the script exits 0 "OK" (fixture probe /tmp/r4fix).
+Impact: runtime contract checked against roots the daemon never uses — false pass, or false fail on unused roots.
+Fix: policy_file="${POLICY_FILE:-${DRACON_SYSTEM_POLICY:-${HOME:-}/.dracon/utilities/system/dracon-system.toml}}".
+
+### R4-SYS-02 — MEDIUM — checker silently skips single-quoted storage roots (plus bare-~ gap)
+Evidence: dracon-system/scripts/check-unit-deployment.sh:195-199 (sed matches only key = "value"; TOML accepts single quotes, so quarantine_dir = '/mnt/data/q' reads as empty → check_storage_root_writable :232 returns 0). Observed: identical RO-mountinfo fixture fails double-quoted, passes single-quoted (/tmp/r4fix). Related: :233-237 handles ~/* but bare ~ falls into *) → skipped, while the daemon expands bare ~ (src/policy.rs:1378-1382).
+Impact: live config the checker reads as empty → false OK on unwritable roots.
+Fix: match both quote styles in storage_root_for_key; map bare ~ to $HOME. (Fix direction depends on whether ops wants these styles supported or rejected daemon-side.)
+
+### R4-SYS-03 — MEDIUM — doctor service probes blind on non-NixOS (NixOS-only bin paths)
+Evidence: src/main.rs:3949-3978 (resolve_bin_opt searches only /run/current-system/sw/bin, /etc/profiles/per-user/dracon/bin, /nix/var/nix/profiles/default/bin); src/doctor.rs:46 (strict resolver for probe); src/main.rs:7132-7136 (returns false on miss). On a plain distro (systemctl at /usr/bin) every service/timer check reports n/a. Shipped unit explicitly serves plain distros (dracon-system-guard.service:23-27).
+Impact: answerable checks report n/a on non-NixOS.
+Fix: fall back to PATH lookup (command -v) when the store dirs miss. (Priority depends on confirming non-NixOS is a supported doctor target vs NixOS-only.)
+
+### R4-SYS-04 — MEDIUM — is_git_tracked fail-OPEN when git is missing
+Evidence: src/relocate.rs:196-204 (parent probe `_ => return Ok(false)` covers git spawn failure as well as "not a repo"), contradicting the fn contract "inspection failures bail (fail closed)" (:163-164). On a gitless host every tracked dir reads untracked, voiding refuse-to-relocate-tracked (:238-243) incl. the no-override auto path (src/main.rs:6736, allow_tracked=false); unwrap_or(true) in find_cold_candidates (:592) cannot help because this returns Ok(false).
+Impact: tracked guard void on gitless hosts.
+Fix: bail on spawn error; return false only on a clean non-zero rev-parse.
+
+### R4-SYS-05 — MEDIUM — apply_relocate never re-checks free space (stale-plan strand)
+Evidence: space checked at plan time only (src/relocate.rs:268-287); apply_relocate (:302-337) re-validates dest-absence and source shape but never fits. ENOSPC mid-copy bails with source intact but leaves a partial dest blocking every retry via "already exists" (:261-263,:312-317) — the strand the R3-L28 comment describes for unknown space, reachable here via a stale plan.
+Impact: one stale plan strands all retries behind a partial dest.
+Fix: re-run the avail check at apply start; and/or remove the partial dest on copy/verify failure.
+
+### R4-SYS-06 — MEDIUM — uncovered_storage_roots omits log/guard-log/freeze-marker roots
+Evidence: src/safety.rs:365-380 (checks only quarantine_dir and relocate_cold_root). Operator-repointed log_dirs (auto_truncate_logs), guard_log_file, or sync_freeze_marker outside ReadWritePaths= fails EROFS per candidate with no startup warning — the silent-reclaim-death class the unit comment documents (dracon-system-guard.service:61-67) and this machinery was built to catch.
+Impact: silent reclaim death on repointed roots.
+Fix: include the three roots (via effective_log_dirs for log_dirs).
+
+### R4-W-02 — MEDIUM — "primary enforcement layer" is client-side hooks, bypassable end-to-end
+Evidence: dracon-warden/README.md:3,:187-188 (hooks are "the primary enforcement layer"); src/main.rs:5211 (pre-push "catches --no-verify bypass of pre-commit", but nothing catches git push --no-verify); -c core.hooksPath=<empty> / GIT_CONFIG_* / fresh clone without setup-hooks skip all three hooks (git built-ins, no server-side control in scope).
+Impact: commit --no-verify + push --no-verify pushes Tier-2/plaintext secrets with zero client checks.
+Fix: document hooks as advisory defense-in-depth (not enforcement), and/or add a server-side scan; at minimum reword the README claim.
+
+### R4-W-03 — MEDIUM — pre-commit verifies 2 of 5 managed keys; merge/diff driver drift undetected
+Evidence: src/main.rs:1719-1737 (ensure sets process, required, diff.dracon.textconv, merge.dracon.driver, merge.dracon.name); :5178,:5193 (hook checks only .gitattributes filter line + filter process/clean keys); :1707-1711,:4535-4536 (code comment: without these keys "git would fall back to the text driver" and "a conflict yields undecryptable garbage").
+Impact: drifted merge driver merges ciphertext (undecryptable conflict output); drifted textconv diffs ciphertext. (Whether git aborts vs falls back to text merge when the driver is undefined is unresolved — man page inconclusive; affects impact wording.)
+Fix: verify merge.dracon.driver + diff.dracon.textconv in PRE_COMMIT_HOOK.
+
+### R4-W-04 — MEDIUM — filter-process smudge ceiling diverges from one-shot: oversize blobs fail checkout under the installed driver
+Evidence: src/main.rs:4427-4444 (past passthrough_ceiling_bytes=4x limit the driver emits status=error in EVERY direction incl. smudge); :3885-3895 (one-shot filter-smudge streams oversize blobs via std::io::copy, no ceiling); :1720 (installed driver IS filter-process, so the failing path is the common one).
+Impact: blob over the ceiling (limit later lowered, pushed from higher-limit machine, exemption removed) makes checkout/diff of that file fail under filter-process while filter-smudge handles it. Narrow but real in a fleet.
+Fix: document, or relay smudge-direction blobs to the git-side limit instead of erroring.
+
+### R4-M-02 — MEDIUM — warden release runs zero AGENTS.md test gates
+Evidence: dracon-warden/scripts/release.sh:111 (TOTAL_STEPS=7), :279-291 (step 1 is the version bump; no cargo test/build/clippy, no cargo deny, no run_gate anywhere in the file). AGENTS.md:758-762 mandates four gates (test, build --release, deny, clippy -D warnings). Sync (:296-338) and system (:316-348) run all four pre-mutation; warden bumps first and can publish an untested tree — the class sync's header calls out as fixed 2026-08-10.
+Impact: untested/broken crate published to crates.io (wrong-push class).
+Fix: port the sync/system step-1 gate block (incl. run_deny_gate) ahead of the warden bump.
+
+### R4-M-03 — MEDIUM — sync/warden release notes ship broken GitHub links + 404 unit URL
+Evidence: dracon-sync/scripts/release.sh:399 (compare ...v${VERSION} on hardcoded DraconDev/dracon-utilities); dracon-warden/scripts/release.sh:350 (same); dracon-sync/scripts/release.sh:393 (curl unit from .../dracon-utilities/main/dracon-sync/dracon-sync.service). Tags are <crate>-v<version> (all three TAG= lines), so v${VERSION} never exists; post-D1 the utility repos are standalone (.gitignore:151-153 ignores dracon-sync/ etc., so the parent has no dracon-sync/dracon-sync.service to curl → 404). dracon-system/scripts/release.sh:440,:434 already do this right (GH_PATH + ${TAG}).
+Impact: every sync/warden GitHub release publishes dead links.
+Fix: port system's GH_PATH resolution + ${TAG} compare link; point the systemd curl at the utility repo (${GH_PATH}/main/dracon-sync.service).
+
+### R4-M-04 — MEDIUM — check-flake asserts Documentation the guard watchdog lacks both sides
+Evidence: scripts/check-flake.sh:242,:246 assert services/timers.dracon-system-guard-watchdog.Unit.Documentation == "https://github.com/DraconDev/dracon-utilities", but flake.nix:460-465 (service) and :474-478 (timer) define only Description/After, and the shipped dracon-system/dracon-system-guard-watchdog.service/timer likewise carry no Documentation (sync/freeze pairs have it in both places). Harness types services as attrsOf anything with no defaults (:58-61), so a missing attribute is a Nix eval error, not a mismatch; author knew the ? guard (:124) but didn't use it here. CI wires this script (.github/workflows/ci.yml:425).
+Impact: either a red gate or newly added and unexercised (nix eval not run to confirm; static mismatch is conclusive).
+Fix: add Documentation to the flake guard-watchdog Units AND the shipped units (keeping the assertions), then run scripts/check-flake.sh.
+
+### R4-M-05 — MEDIUM — repin recreates the whole flake lock inside a per-utility loop
+Evidence: scripts/repin-nested-sources.py:125 (nix flake lock --recreate-lock-file inside for checkout, node, ...). Each drifted utility triggers a full lock recreation (up to 3x), moving UNRELATED inputs (nixpkgs) as a side effect of a utility repin. Comment admits --update-input wasn't available on some nix.
+Impact: non-hermetic, unreviewable lock churn.
+Fix: hoist to one recreation, or prefer nix flake lock --update-input <*-src> per drifted input.
+
+### R4-M-06 — MEDIUM — install.sh rewrites global git config, undisclosed
+Evidence: install.sh:132-141 (git config --global init.defaultBranch main). Runs on every mode incl. --binaries-only (only --dry-run guarded), yet --help (:4-20) never mentions it.
+Impact: binary installer mutates global VCS config as a side effect.
+Fix: restrict to interactive full installs (skip under --binaries-only), document in --help, or drop (git ≥2.28 default hint suffices).
+
+### R4-M-07 — MEDIUM — rotate script corrupts/mishandles real-world secrets
+Evidence: scripts/rotate-dracon-platform-aws-key.sh:231-232 (sed -i "s|^SES_SECRET_KEY=.*|SES_SECRET_KEY=$NEW_SECRET|" — $NEW_SECRET unescaped: | breaks the delimiter, &/backslash inject match text); :276-277 (cut -d= -f2 truncates base64 = padding, so a secret ending in = always fails the read-back check at :282 with exit 5). AWS secret keys are 40-char base64 — = padding and +/ chars are realistic.
+Impact: corrupted .env writes; false read-back failures.
+Fix: replace via python3/env (no sed interpolation); parse with ${line#*=} or cut -d= -f2-.
+
+### R4-M-08 — MEDIUM — sync/warden releases accept downgrades; system refuses
+Evidence: dracon-sync/scripts/release.sh:340-355, dracon-warden/scripts/release.sh:279-291 (no monotonicity check) vs dracon-system/scripts/release.sh:295-301 (sort -V refusal before any mutation, added 2026-10-01). Same-version re-run is intentional idempotency, but a LOWER version rewrites the manifest, closes the CHANGELOG under a misleading header, and only fails late at the registry — local release surfaces left mutated with manual recovery.
+Impact: misleading release surfaces + manual recovery on downgrade typos.
+Fix: port system's pre-mutation guard (allow == for re-runs if desired, refuse <).
+
+### R4-M-09 — MEDIUM — orphan cleanup deletes GitHub repos on a bare flag, no confirm
+Evidence: scripts/cleanup-github-orphans.sh:19-21 (--apply), :61-73 (gh repo delete --yes per repo, irreversible). Dry-run is the default (good), but one --apply deletes N repos with no count confirmation or backup; a stale gh listing or wrong-org typo (org hardcoded :26) becomes mass deletion.
+Impact: irreversible mass deletion on one flag.
+Fix: print the count + require typed confirmation (type DELETE N repos).
+
+### R4-01 — MEDIUM (trigger unresolved) — clean filter hard-refuses absolute paths
+Evidence: dracon-warden/src/main.rs:3477-3482 (refusal), :3873-3884 (one-shot Err), :3946-3957 (process driver Err); live probe: filter-clean /tmp/abs-probe.txt → exit 1 "refusing to clean absolute filter path", relative path → exit 0 passthrough.
+Impact: IF any caller (lead claims cargo/gix on dirty trees) invokes clean with an absolute path, every git add aborts → cargo publish/package breaks in warden-managed repos. Real git always sends repo-relative %f/process paths, so the guard is dead code on the git path — pure availability risk, no leak. gix-absolute behavior UNVERIFIED (no vendored gix sources, no network).
+Fix: relativize-then-guard — strip an absolute path to repo-relative when it resolves under the repo root (or accept basename + containment check), still refusing .. escapes and outside-root absolutes; add a regression test.
+
