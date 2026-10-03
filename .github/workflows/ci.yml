@@ -208,6 +208,16 @@ jobs:
         # dracon-sync/scripts/release.sh step 7) were never linted.
         run: shellcheck install.sh uninstall.sh doctor.sh scripts/*.sh dracon-*/scripts/*.sh
 
+      - name: Unit-deployment checker regression suites
+        # ADDED 2026-10-02 (audit M9): the drift checkers are worthless if
+        # their suites never run. Both suites are hermetic (isolated HOME,
+        # stubbed systemctl/systemd-analyze; the no-bus cases take the
+        # documented exit-0 skip path on a runner with no user manager).
+        shell: bash
+        run: |
+          ./dracon-sync/scripts/test_check_unit_deployment.sh
+          ./dracon-system/scripts/test_check_unit_deployment.sh
+
       - name: Script dry-run (install.sh)
         # FIXED 2026-09-27 (audit F86, rework round 2): removing the
         # `|| true` was NOT enough. Under GitHub's default shell
