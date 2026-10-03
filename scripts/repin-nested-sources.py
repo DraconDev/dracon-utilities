@@ -119,10 +119,15 @@ def main() -> int:
         return 1
 
     for checkout, node, fragment, remote in drift:
-        # `nix flake update-input <input>` is not available on every nix
-        # version; recreating the lock file is equivalent here because the
-        # inputs are branch URLs and the lock is the only thing that moves.
-        run(["nix", "flake", "lock", "--recreate-lock-file"], cwd=ROOT)
+        # FIXED 2026-10-03 (audit R4-M-05): update ONLY the drifted input.
+        # `nix flake lock --update-input` has existed since Nix 2.4 (this
+        # fleet runs 2.31) — the "not available on every nix" comment was
+        # stale. The old `--recreate-lock-file` sat INSIDE this per-utility
+        # loop and re-resolved every input (nixpkgs included) up to 3x per
+        # run: non-hermetic, unreviewable lock churn as a side effect of a
+        # utility repin. The `*-src` inputs are `flake = false` plain
+        # sources, so `--update-input` moves exactly one node.
+        run(["nix", "flake", "lock", "--update-input", node], cwd=ROOT)
         new_lock = json.loads(LOCK.read_text())
         new_rev = new_lock["nodes"][node]["locked"]["rev"]
         if new_rev != remote:
