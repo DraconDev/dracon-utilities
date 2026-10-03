@@ -120,14 +120,16 @@ def main() -> int:
 
     for checkout, node, fragment, remote in drift:
         # FIXED 2026-10-03 (audit R4-M-05): update ONLY the drifted input.
-        # `nix flake lock --update-input` has existed since Nix 2.4 (this
-        # fleet runs 2.31) — the "not available on every nix" comment was
-        # stale. The old `--recreate-lock-file` sat INSIDE this per-utility
-        # loop and re-resolved every input (nixpkgs included) up to 3x per
-        # run: non-hermetic, unreviewable lock churn as a side effect of a
+        # `nix flake update <input>` (nee `lock --update-input`, deprecated
+        # alias on modern nix) has existed since Nix 2.4 — the "not
+        # available on every nix" comment was stale. The old
+        # `--recreate-lock-file` sat INSIDE this per-utility loop and
+        # re-resolved every input (nixpkgs included) up to 3x per run:
+        # non-hermetic, unreviewable lock churn as a side effect of a
         # utility repin. The `*-src` inputs are `flake = false` plain
-        # sources, so `--update-input` moves exactly one node.
-        run(["nix", "flake", "lock", "--update-input", node], cwd=ROOT)
+        # sources, so updating one input moves exactly one node
+        # (verified: nixpkgs/flake-utils/systems byte-identical).
+        run(["nix", "flake", "update", node], cwd=ROOT)
         new_lock = json.loads(LOCK.read_text())
         new_rev = new_lock["nodes"][node]["locked"]["rev"]
         if new_rev != remote:
