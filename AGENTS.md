@@ -791,9 +791,10 @@ worktree layout was eliminated for all 10 game/hegemon submodules of
   both-halves-present-yet-never-merged knobs, and the new test
   immediately found two: `settling_max_delay_secs` +
   `dirty_max_age_action` (specified, parsed, documented as live,
-  consumed nowhere; quarantined in `OVERRIDE_COVERAGE_UNWIRED`
-  until the settling feature is implemented or both halves are
-  removed). The consumption check is a reference check, not a
+  consumed nowhere; quarantined in `OVERRIDE_COVERAGE_UNWIRED`,
+  then REMOVED 2026-10-03, audit R3-L15 — both halves + docs
+  gone, legacy keys ignored by the parser). The consumption
+  check is a reference check, not a
   merge-correctness proof — override-wins semantics still need
   per-field behavioral tests.
 
