@@ -139,5 +139,20 @@ class NixSourceIsolation(unittest.TestCase):
             self.assertEqual(json.loads(result.stdout), {"artifact": False, "private": False})
 
 
+class LockedInstallerBuilds(unittest.TestCase):
+    def test_install_sh_builds_are_locked(self):
+        # ADDED 2026-10-02 (audit M11): install.sh is the deployment
+        # path — every cargo build it runs must carry --locked, or the
+        # installed binary drifts from the Cargo.lock/deny pin chain CI
+        # tested. A stale lock must fail loudly, never resolve silently.
+        lines = (ROOT / "install.sh").read_text().splitlines()
+        builds = [line.strip() for line in lines
+                  if "cargo build" in line and not line.strip().startswith("#")]
+        self.assertGreater(len(builds), 0, "no cargo build lines found in install.sh")
+        for line in builds:
+            self.assertIn("--locked", line,
+                          f"floating installer build (add --locked): {line}")
+
+
 if __name__ == "__main__":
     unittest.main()
