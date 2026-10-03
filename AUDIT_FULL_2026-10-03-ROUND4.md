@@ -389,5 +389,75 @@ Evidence: src/main.rs:5012,:5314 (REPO=$(git rev-parse --show-toplevel) without 
 Impact: negligible in practice (hooks always run in a repo; refresh is bounded staleness).
 Fix: add || exit 1; consider failing harden on refresh error.
 
+### R4-M-10 — LOW — system release hardcodes REMOTE=origin; sync/warden auto-detect
+Evidence: dracon-system/scripts/release.sh:88 (REMOTE=origin), help "(default: origin)"; system ships no resolve-github-remote.sh (sync:24, warden:27 have per-repo CANON auto-detect). Repeats the hardcoded-remote failure class sync documents at release.sh:277-280 (v0.113.9/10 push failures). Works today only because this repo happens to name its remote origin.
+Impact: release push fails on any non-origin remote naming.
+Fix: port resolve-github-remote.sh with the system CANON + auto-detect.
+
+### R4-M-11 — LOW — sync/warden version bump not [package]-scoped
+Evidence: dracon-sync/scripts/release.sh:342,:352; dracon-warden/scripts/release.sh:281,:288 (first ^version = in file) vs system :283-293 (crate_manifest_version, [package]-scoped, audit 2026-10-01). Safe today ([package] is line 1 in sync's manifest) but one [workspace.package] block above it silently bumps the wrong line.
+Impact: latent wrong-line bump.
+Fix: port crate_manifest_version + scoped sed.
+
+### R4-M-12 — LOW — flake crateVersion fallbacks drifted; repin reads local manifest
+Evidence: flake.nix:145 ("0.113.88" vs 0.113.93), :155 ("0.112.41" vs 0.112.44), :184 ("0.113.14" vs 0.113.15); scripts/repin-nested-sources.py:144-151 reads ROOT/checkout/Cargo.toml (live worktree) for the fallback, contradicting its own "REMOTE main, never a local worktree" rule (docstring + line 19). Fallback only fires on malformed input, but drift proves the "keep in step" path isn't running; local reads can inject mid-release versions.
+Impact: stale fallbacks; mid-release version injection risk.
+Fix: read the version from the pinned rev (git show <rev>:Cargo.toml).
+
+### R4-M-13 — LOW — sync Nix build runs no tests; warden skip unexplained
+Evidence: flake.nix:150 (doCheck = false for dracon-sync) vs system/warden which run test suites in-Nix; flake.nix:189 skips filter_clean_encrypts_content_with_secret_marker with no rationale comment (system documents every skip, :160-170).
+Impact: untested Nix path for sync; unexplained warden skip.
+Fix: document why sync can't run any tests in the sandbox (or run a subset); add the one-line reason for the warden skip.
+
+### R4-M-14 — LOW — "monorepo" drift + dead parent resolve helper (docs/hygiene)
+Evidence: install.sh:119-128 (calls the tree a monorepo; post-D1 they are nested standalone repos); dracon-warden/scripts/test_release_dry_run.sh:2 ("warden monorepo release preview"); dracon-system/scripts/test_release_pipeline.sh:2 ("monorepo release pipeline"); scripts/resolve-github-remote.sh (zero callers — parent release.sh is now a dispatcher and never invokes it).
+Impact: doc drift; dead code.
+Fix: reword to "nested standalone repositories"; delete the dead helper or wire a test.
+
+### R4-M-15 — LOW — small shell/script nits (each one line)
+Evidence: doctor.sh:121 ([ -f $HOME/... ] unquoted inside eval; breaks on spaced $HOME); rotate script :266,:270 (runs dracon-warden once twice — second run only to capture one echo line); rotate script :320 (git push codeberg main:master hardcodes a branch mapping); scripts/check-flake.sh (asserts watchdog Documentation/After/Type/ExecStart/Timeout/outputs but never Unit Description; descriptions match today but can re-drift invisibly); ci.yml:264 wires verify-spec.sh in one job while :385 says "NOT wired in yet" (stale note or job gap).
+Impact: minor robustness/doc gaps.
+Fix: quote $HOME; capture once; verify/parametrize the branch mapping; add six Description assertions; reconcile the ci.yml note.
+
+## ROUND3 verification (regression re-check, 2026-10-03)
+
+Method: read-only source inspection (every cited body opened) + live /tmp probes (filter-clean binary) + locked cargo test subsets. Tree clean at parent root. All ROUND2 items VERIFIED, none REOPENED.
+- H1 VERIFIED — flake.nix:341-396 (- prefixes, ExecReload, CAP_SYS_NICE, EPERM sandbox); check-flake.sh:86-112 asserts. H2 VERIFIED — flake.nix:291-323 (Restart=always, CPUQuota=100%, MDWE absent + comment :311-316); asserted :116-124.
+- M1 VERIFIED — multi_remote.rs:677-679 fail-fast (inspected). M2 VERIFIED — push.rs:52-55 per-forge retention (inspected). M3 VERIFIED — push.rs:238-250 and multi_remote.rs:707-718 SSH-cause chaining (inspected). Tests: push_ 102/102 PASS.
+- M4 VERIFIED — staging.rs:124+ staged_blob_sizes_for (ls-files -s + cat-file --batch-check, fail-closed); staging tests 7/7 PASS.
+- M5 VERIFIED — main.rs(system):6287-6289 auto_cleanup_apply gate (inspected). M6 VERIFIED — both shipped units contain SystemCallErrorNumber=EPERM (grep 1+1). M7 VERIFIED (documented) — dracon-sync.service:53 + flake.nix:315 comments intact. M8 VERIFIED — install.sh:519-526 ships 6 watchdog units + scripts; flake timers :406-486; check-flake :126-134 asserts.
+- M9 VERIFIED — 3b companion loop check-unit-deployment.sh:115-119; CI wiring per ROUND3 (not re-read; advisory — see G2 below).
+- M10 VERIFIED — SECRET_RE from hook_token_shapes_ere (warden main.rs:4680-4689). M11 VERIFIED — install.sh:337 cargo build --locked. M12 VERIFIED — report.rs:4487 full hash/msg rows (marker inspected).
+- L1 VERIFIED — sync.rs:5075-5086 Err propagates (inspected); bootstrap tests 12/12 PASS incl. test_sync_repo_bootstrap_failure_is_error_not_nothing_to_do. L2 VERIFIED — sync.rs:5108-5114 fail-closed count (inspected). L3 VERIFIED — policy.rs:2214 tripwire + :2403 UNWIRED const (grep). L4 VERIFIED — ops.rs:661 loud unlink + :918-919 test (grep).
+- L5 VERIFIED-as-residual — mirror path unchanged; origin budget doc-corrected per R3-L02 (push.rs:257-264 inspected). L6 VERIFIED — main.rs(system):3654 fail-closed scan (grep). L7 VERIFIED — :6717 df-failure pause (grep). L8 VERIFIED — :4310 writes-first truncate (grep).
+- L9 VERIFIED — smudge tests 8/8 PASS (code moved filter.rs -> main.rs filter_transform_bytes/smudge; behavior pinned by tests; no body-level diff of the moved smudge — see G3 below).
+- L10 VERIFIED — warden main.rs:5419-5452 (-M100%, diff-filter=a, blob-novelty). L11 VERIFIED (documented caveat) — warden main.rs:5547-5551 stale-ref warn. L12 VERIFIED — install.sh:414-425 atomic tmp+rename (+R3-L20 trap/echo fix).
+- L13 VERIFIED — report.rs:2985 grapheme truncator (+R3-L33 per-grapheme width :2999-3005); truncate tests 14/14 PASS. L14-L19 VERIFIED — markers at report.rs:3083 (VS16), :6656 (L15 link-out), :2871 (L16 doc), :2927/:5676/:5801 (L17), :6408 (L18 budgets), :6642-6648 (L19 compact count).
+- Same-day FIXED markers observed (not re-audited): R3-H1 (flake.nix:490-500, check-flake :141-143 .source asserts); R3-M1 (sync.rs:4782-4819 staged-blob sweep; M2 union helper policy.rs:1100 + 4 worker sites + daemon gates :8244/:8312 + test_auto_commit_excludes_union_global_and_per_repo PASS); R3-M3 (warden main.rs:5089-5091,:5175-5178 comment-aware probes + pre_commit_hook_blocks_when_only_commented_filters_remain PASS); R3-L01 (sync.rs:5687-5694); L02/L03 (push.rs:257-264,:422-429); L04 (multi_remote.rs:681-690); L05 (push.rs:110-116); L06 (push.rs:8-19,:384-392); L20 (install.sh:414-425); L21 (warden:5334); L26 (doctor.rs:14-17,:174-190); L33 (report.rs:2999).
+- Lead verdicts: (a) warden absolute-%f refusal CONFIRMED (code + live exit-1 probe); cargo/gix-absolute trigger UNRESOLVED offline → R4-01. (b) Doctor "fails when absent" REFUTED (absent → Ok, doctor.rs:157-161); "fails --strict when present" CONFIRMED BY DESIGN (required:true :162, exit 1 :276-278) but advisory-only (no install/CI/script gate consumes doctor --strict; grep over install.sh, uninstall.sh, .github/, doctor.sh, scripts/ = zero hits); spin-off R4-SYS-07/R4-02. (c) U1-U4 all still carried/open: U1 dispatch cooldown/starvation machinery present (daemon.rs:100-317) but unaudited beyond apply_outcome; U2 bundle/lease path present (staging.rs:467-555) unaudited; U3 fleet state single-host only; U4 no fault-injection runs.
+
+## Unresolved / omitted scope (12)
+
+1. Whether an ambient git credential helper exists that would rescue the github HTTPS leg (no repo evidence found). Affects R4-SC-06 impact wording.
+2. R4-SR-03 user-visible magnitude depends on daemon dispatch damping (fingerprints/quiet windows, out of scope): mechanism verified in exclude.rs + gate call sites, blast radius approximate.
+3. Whether ops wants bare-~ and single-quote policy styles supported or rejected daemon-side (checker fix direction depends on it). Affects R4-SYS-02.
+4. Confirm non-NixOS is a supported doctor target vs NixOS-only (decides R4-SYS-03 priority).
+5. Whether git aborts vs falls back to text merge when merge.dracon.driver is undefined (man page inconclusive; affects R4-W-03 impact wording).
+6. Hook cwd assumption (repo root) for CWD-relative .plaintext checks not verified against git source; treated as LOW. Affects R4-W-08.
+7. Could not run shellcheck (binary absent) — CI gate at ci.yml:209 presumably covers it.
+8. Could not run nix eval to confirm R4-M-04 gate-red vs unexercised; static mismatch is conclusive.
+9. scripts/sync_convergence.py (77KB) + verify-ownership-mirrors.py not line-audited (budget); no HIGH indicators in scope scan.
+10. G1: cargo/gix-absolute-path trigger for R4-01 unverifiable offline (no gix sources/network).
+11. G2: M9 CI wiring not re-read (advisory; ROUND3 evidence stands).
+12. G3: L9 via 8/8 smudge tests only (impl moved since ROUND3 refs).
+
+## Explicit non-findings / verified healthy (condensed)
+
+- Sync-report: visibility cache freshness boundaries match (visibility.rs:121-126 vs :201-203); GitLab/Codeberg tokens via curl stdin -H @-, never argv (:367-397,:532-647), errors carry no token material; .env control-char refusal blocks header injection (secrets.rs:94-113 + tests); Owned-verdict revalidation exists (R3-L14 two-strike, daemon.rs:1401-1416,:7271-7274), negatives redetect on TTL (:1384-1399); redact_url_credentials has no char-boundary panic (ownership.rs:515-546); emit_repo_failure routes failures to stderr in JSON mode (report.rs:3336-3343); no global exclude_remotes anywhere (report :804-828; daemon :1045; sync.rs:2375).
+- System: tmp symlink handling (main.rs:5628-5632 + check_safe_to_delete_tmp_entry), fail-closed tree_has_fresh_content (+ tests.rs:2511), blind-proc refusal (+ tests.rs:2181), containment test (:2558) sound; relocate verify-on-plan-counts fails closed on source change; strict walk/copy (+ tests) sound; fits_in_avail(None)=false pinned; checker 3b companions, discovery, dangling-symlink, mount-shadow, root-mount cases have regression tests (cases 1-28); install/uninstall watchdog unit+script coverage present and symmetric.
+- Warden: clean encrypt failure fails closed (lib.rs:1060-1064); inline smudge decrypt/base64/UTF-8 failures preserve the tag verbatim (filter.rs:446-464); whole-file smudge unlock failure warns + passes ciphertext through (lib.rs:1424-1427), stable with the double-encrypt guard (b64+age-magic, lib.rs:395-418); merge re-encrypt path-independent via ancestor format (main.rs:4548-4563, lib.rs:1086-1097); merge-file exit >1 is Err not conflict (:4631-4639, tests.rs:4774); clean path validation rejects absolute/.. fail-closed, smudge passes through safe (:3419-3494,:3896-3910); oversize clean refuses except exempt binaries (:3461-3474); status=error per-file fail-closed (:4519-4526); unsupported commands drain-then-error (:4447-4452); handshake violations abort (:4146+); no secret bytes in errors (unlock reports only age-magic+len, lib.rs:1361-1365; SecretScanner::scan snippet has no production callers); .gitattributes ordering (catch-all → -filter carve-outs → protected filter+diff+merge → plaintext -filter, :992-1045) matches last-match-wins intent.
+- Meta: parent dispatcher scripts/release.sh:8,:38-43 (exec-only, no coordinated release) + scripts/test_release.sh covers help/dispatch/exit-2 sound; sync release tag-after-publish, idempotent re-runs, deny-fallback guard (:324-333), fixture-on-packaged-artifact (:443-461) sound; close-changelog.py triplicated but behavior-identical; install.sh service gating (:45-53,:615-657), atomic binary swap (:414-430), shadowing guards (:254-308), copy-failure tracking (:508-534) sound; uninstall.sh removes M8 watchdog units+scripts (:67-72,:118-131) and reverts global hooksPath (:133-158) sound; check-unit-deployment.sh sync(332)/system(318) share discovery/exit contract, step-4 sentinels correctly differ, both have regression suites; watchdog timers/services match flake values except R4-M-04's Documentation gap; python3 -m unittest scripts.tests.* works via namespace packages (import probe OK); CI shellchecks all scripts (ci.yml:201-209); hermetic release builds use --locked throughout (install.sh:337-341).
+
+
 
 
