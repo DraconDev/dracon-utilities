@@ -326,6 +326,16 @@
             };
 
             # --- dracon-system ---
+            # Parity contract (audit H1, 2026-10-02): this Nix unit must
+            # match dracon-system/dracon-system-guard.service
+            # property-for-property except ExecStart (store path vs
+            # ~/.local/bin). Drift here previously shipped
+            # ReadWritePaths without '-' prefixes (systemd refuses to
+            # start when an entry is absent) and without the
+            # nix-profile/quarantine/cold roots, no ExecReload,
+            # no CAP_SYS_NICE, and no sandbox.
+            # scripts/check-flake.sh asserts the security-relevant
+            # properties below; update it with any intentional change.
             systemd.user.services.dracon-system-guard = mkIf cfg.system.enable {
               Unit = {
                 Description = "Dracon System Guard - Proactive disk space monitoring and cleanup";
@@ -334,10 +344,13 @@
               };
               Service = {
                 Type = "simple";
+                StandardOutput = "journal";
+                StandardError = "journal";
                 Environment = [
-                  "PATH=%h/.local/bin:/run/wrappers/bin:%h/.nix-profile/bin:%h/.local/state/nix/profile/bin:/etc/profiles/per-user/%u/bin:/nix/var/nix/profiles/default/bin:/run/current-system/sw/bin"
+                  "PATH=%h/.local/bin:/run/wrappers/bin:%h/.local/share/flatpak/exports/bin:/var/lib/flatpak/exports/bin:%h/.nix-profile/bin:/nix/profile/bin:%h/.local/state/nix/profile/bin:/etc/profiles/per-user/%u/bin:/nix/var/nix/profiles/default/bin:/run/current-system/sw/bin"
                 ];
                 ExecStart = "${cfg.system.package}/bin/dracon-system guard daemon";
+                ExecReload = "/bin/sh -c 'kill -HUP $MAINPID'";
                 # Keep intentionally relative policy paths stable for the user service.
                 WorkingDirectory = "%h";
                 # A disabled policy exits cleanly; only failures/crashes restart.
@@ -353,8 +366,27 @@
                 ProtectHome = "read-only";
                 # clean_tmp targets the host /tmp; keep the service sandboxed
                 # elsewhere while granting only this required write path.
-                ReadWritePaths = [ "%h/.dracon" "%h/Dev" "%h/.local/state/dracon" "%h/.local/share/Trash" "%h/.cargo" "%h/.cache" "%h/.npm" "/tmp" ];
+                # '-' prefixes mirror the shipped unit: systemd refuses to
+                # start when a non-prefixed entry is absent, so optional
+                # roots must not block startup (verified live, 2026-10-01).
+                ReadWritePaths = [ "%h/.dracon" "%h/.local/state/dracon" "%h/.local/share" "-%h/Dev" "-%h/.local/share/Trash" "-%h/.cargo" "-%h/.cache" "-%h/.npm" "-%h/.local/state/nix" "/tmp" "-/mnt/data/quarantine" "-/mnt/data/cold" ];
                 PrivateTmp = false;
+                PrivateDevices = true;
+                ProtectKernelTunables = true;
+                ProtectKernelLogs = true;
+                ProtectClock = true;
+                ProtectHostname = true;
+                ProtectControlGroups = true;
+                LockPersonality = true;
+                MemoryDenyWriteExecute = true;
+                RestrictRealtime = true;
+                RestrictSUIDSGID = true;
+                RemoveIPC = true;
+                AmbientCapabilities = "CAP_SYS_NICE";
+                CapabilityBoundingSet = "CAP_SYS_NICE";
+                RestrictNamespaces = true;
+                SystemCallFilter = "@system-service";
+                SystemCallErrorNumber = "EPERM";
               };
               Install = {
                 WantedBy = [ "default.target" ];
