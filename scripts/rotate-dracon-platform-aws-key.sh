@@ -12,10 +12,12 @@
 #   re-encrypt with dracon-warden, verify, and commit + push to codeberg.
 #
 # USAGE
-#   ./scripts/rotate-dracon-platform-aws-key.sh <NEW_AWS_ACCESS_KEY_ID> <NEW_AWS_SECRET_ACCESS_KEY>
+#   NEW_AWS_ACCESS_KEY_ID=<id> NEW_AWS_SECRET_ACCESS_KEY=<secret> ./scripts/rotate-dracon-platform-aws-key.sh
+#   (omit the env vars on a TTY and the script prompts instead; the secret
+#   is never taken via argv, so it never appears in the process table)
 #
 # EXAMPLE
-#   ./scripts/rotate-dracon-platform-aws-key.sh <EXAMPLE-AWS-KEY-ID> <EXAMPLE-AWS-SECRET>
+#   NEW_AWS_ACCESS_KEY_ID=<EXAMPLE-AWS-KEY-ID> NEW_AWS_SECRET_ACCESS_KEY=<EXAMPLE-AWS-SECRET> ./scripts/rotate-dracon-platform-aws-key.sh
 #
 # WHAT THIS SCRIPT DOES (corresponds to criteria 6, 7, 8, 9, 10, 14 of goal 007296af)
 #   1. Replaces SES_ACCESS_KEY and SES_SECRET_KEY in both .env.dev and .env.prod
@@ -53,7 +55,7 @@
 #   Code  Step                     When raised
 #   ----  -----------------------  ------------------------------------------------
 #     0   success                  All criteria met; rotation committed and pushed
-#     1   bad arguments            Wrong arg count or malformed NEW_AKIA
+#     1   bad arguments            Unexpected args or missing credentials (env/TTY)
 #     2   warden binary not found  dracon-warden missing from PATH
 #     3   OLD key still present    Substring check after rotation finds old key
 #     4   NEW key not present      Substring check finds new key missing in file
@@ -68,7 +70,7 @@
 # must take a separate action (history-rewrite, file edit, or rely on
 # AWS IAM disable to close the leak window).
 #
-# Usage:  $0 <NEW_AWS_ACCESS_KEY_ID> <NEW_AWS_SECRET_ACCESS_KEY>
+# Usage:  NEW_AWS_ACCESS_KEY_ID=<id> NEW_AWS_SECRET_ACCESS_KEY=<secret> $0
 #         $0 --check    # diagnostic, no key required
 
 set -euo pipefail
