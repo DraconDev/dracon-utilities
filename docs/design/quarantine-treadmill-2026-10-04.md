@@ -43,14 +43,18 @@ asymmetries:
 ## Residual: 21 unmanifested hand-copies (~78G)
 
 Oct 3, 13:30–19:34, twenty-one `target.<nanos>` dirs appeared with no
-manifest and no guard log line (the guard logs every move it makes, and
-its copy path removes the entry dir on any verification failure — a
-guard move cannot produce a manifest-less entry silently). Dep-info
-fingerprints tie 14 of them to treadmill origins (terhub ×6, eve ×5,
+manifest and no guard log line. First hypothesis (agent hand-copies) was
+WRONG: on Oct 4 a guard restart mid-copy reproduced the class exactly —
+a 4.7G partial entry with no manifest and no log line, owner PID dead.
+The guard's copy path only cleans up on failures it survives; a restart
+(OOM kill, deploy, watchdog) mid-copy abandons the partial entry, which
+is then pinned forever (no origin record, never expires, never
+replaced). The Oct 3 window matches the guard-OOM-kill era. Dep-info
+fingerprints tied 14 of the 21 to treadmill origins (terhub ×6, eve ×5,
 ai-auto-writer ×2, folder-auto-banner ×1), several with identical build
-hashes — duplicate copies of duplicates. No shell history identifies the
-actor; most likely an agent cleanup session copying (not moving) target
-dirs into quarantine as "safe" staging.
+hashes — duplicate copies of duplicates. All 21 were purged after
+operator approval; deploys now wait for no in-flight move before
+restarting the guard.
 
 They are pinned forever by the fail-safe (no origin record, never
 expire, never replaced). Purge is an operator call after inspecting the
