@@ -38,11 +38,29 @@ verdict at or above new knob `mem_swapin_warn_pages_per_sec` (default
 Swap-out stays a non-signal (reclaim working, not pressure);
 unmeasured fails closed. The existing 120s sustain still smooths spikes.
 
+## Follow-up: pressure-gated orphan reap (same date)
+
+The 24h auto-reap floor cannot catch a runaway whose owner just died,
+so a new opt-in (`reap_orphans_on_pressure`, default OFF) reaps under
+warn/critical pressure with NO age/CPU/state gates when ALL of these
+hold: allowlisted signature, parent reparented to init/systemd (owner
+provably dead), no controlling terminal (disowned shell jobs keep
+theirs), not exempt, not reserved/self. Kill-time re-verification
+(starttime + still-orphaned + still-detached + still-allowlisted)
+replaces the idle proof. Proven live in-test against a real setsid
+orphan (scan → verify → SIGTERM → recorded, 0.15s).
+
 ## Residuals
 
 - Concurrency itself is unmanaged: the guard can now SEE thrash and
   bias OOM, but nothing caps how many loops run heavy jobs at once.
-  CPUQuota offender caps (`cap_offenders_cpu_percent`, default OFF)
-  exist but only engage on critical verdicts.
+  CPUQuota offender caps are ARMED at 50% (2026-10-04) and engage on
+  critical verdicts; first engagement still to be observed.
 - dracon-sync burned ~40% CPU through the incident in a commit storm
-  fed by loop file writes — secondary, settles with the loops.
+  fed by loop file writes — secondary, settles with the loops. (The
+  7.5h wedged tasks were a separate filter-hang issue; see
+  `sync-wedge-filter-hang-2026-10-04.md`.)
+- CAP_SYS_NICE: already granted by the unit AND effective in the live
+  daemon (verified CapEff + renice lines in journal). The "renice
+  mitigation disabled" message seen during diagnosis came from a
+  shell-context `guard once` smoke test, not the daemon. No action.
