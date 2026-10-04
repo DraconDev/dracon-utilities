@@ -994,6 +994,7 @@ dependencies = [
  "dirs",
  "dracon-system-lib",
  "fs2",
+ "libc",
  "serde",
  "serde_json",
  "tempfile",
