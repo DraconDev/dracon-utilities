@@ -25,6 +25,23 @@ stuck budget on rejections that retrying can never fix.
 > rebuilt and reinstalled. Nothing here was deployed, and the service was not
 > stopped (per the quiesce policy in `AGENTS.md`).
 
+> **History note**: the first version of the new test used a binding literally
+> named for a credential, holding the warden's secret-scan warning text. That
+> matched the hook's quoted-assignment shape and the daemon auto-committed it,
+> wedging `dracon-sync`'s own push — the same false-positive class this work
+> began with. A rename fixed the source, but warden scans **each commit's own
+> diff** (`NEW_COMMITS`), so the two earlier commits matched permanently and no
+> forward commit could clear them. With operator approval, the three unpushed
+> commits were squashed into one (`git reset --soft origin/main` + commit,
+> both under `dracon-sync maintenance --`). Verified afterwards: `push.rs`
+> byte-identical (sha256 `f1272be6…`), the published
+> `dracon-sync-v0.113.95` tag still on `11d8e03`, and the push a plain
+> fast-forward `11d8e03..f8a543a` — no force-push, no tag moved, no published
+> history touched. The lesson generalises: **never write a credential-named
+> binding holding a string literal in a daemon-watched repo**, and keep
+> explanatory comments free of the shape being described (the warden's own hook
+> carries the same warning about its comment).
+
 ## §1 — Why this misdiagnosis kept happening
 
 `classify_push_failure` was introduced in v0.113.50 precisely to stop the
