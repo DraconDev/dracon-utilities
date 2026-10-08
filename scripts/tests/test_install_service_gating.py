@@ -42,6 +42,28 @@ INSTALL_SH = ROOT / "install.sh"
 
 SERVICES = ("dracon-sync.service", "dracon-system-guard.service")
 
+
+def copy_unit_sources() -> list[str]:
+    """Every source path the installer's `copy_unit` calls copy, in file order.
+
+    Parsed from the real install.sh so the sandbox fixture can never drift from
+    the installer's copy list again: when audit M8 added the watchdog units +
+    scripts (2026-10-03), the hardcoded fixture still created only
+    `<crate>/<crate>.service`, and this suite went 11/14 red while nothing ran
+    it. The parser is deliberately dumb — one source per `copy_unit <src> <dst>`
+    line, first word after the call name — and the definition line
+    (`copy_unit() {`) does not match because the next character is `(`.
+    """
+    sources: list[str] = []
+    for line in INSTALL_SH.read_text().splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("copy_unit "):
+            continue
+        parts = stripped.split()
+        if len(parts) >= 2:
+            sources.append(parts[1])
+    return sources
+
 # The stub `systemctl` reports these services as ACTIVE and as already
 # EXISTING on disk (i.e. an established installation).
 STUB_SYSTEMCTL = r"""#!/usr/bin/env bash
@@ -167,9 +189,15 @@ class InstallRun:
             (crate_dir / "Cargo.toml").write_text(
                 f'[package]\nname = "{crate}"\nversion = "0.0.0"\nedition = "2021"\n'
             )
-            (crate_dir / f"{crate}.service").write_text(
-                f"# sandbox stub for {crate}.service\n"
-            )
+        # Materialize every unit/script the installer copies, parsed from the
+        # real install.sh (copy_unit_sources above) so the fixture follows the
+        # installer instead of a hardcoded list that rots. The real files carry
+        # the warden encryption filter, so the sandbox uses inert stubs — the
+        # installer only cp's them and chmod's the notify scripts.
+        for src in copy_unit_sources():
+            target = self.repo / src
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(f"# sandbox stub for {src}\n")
 
         self._write_stub("systemctl", STUB_SYSTEMCTL)
         self._write_stub("pgrep", STUB_PGREP)
@@ -337,6 +365,41 @@ class FirstInstallBehaviourIsUnchanged(unittest.TestCase):
                 0,
                 f"a unit that did not exist before the install is not started ({svc})",
             )
+
+
+class InstallerCopyListParity(unittest.TestCase):
+    """The sandbox must materialize everything the installer copies.
+
+    Structural guard: the fixture parses install.sh's copy list, so the two
+    failure modes that survive a future installer change are a source missing
+    from the REAL tree and a source the parser missed. This class pins both.
+    """
+
+    def test_every_copy_source_exists_in_the_real_repo(self) -> None:
+        missing = [s for s in copy_unit_sources() if not (ROOT / s).is_file()]
+        self.assertEqual(
+            missing, [], f"install.sh copies sources missing from the repo: {missing}"
+        )
+
+    def test_the_sandbox_materializes_every_copy_source(self) -> None:
+        tmp, run_obj = sandbox(active="", existing="")
+        self.addCleanup(tmp.cleanup)
+        missing = [s for s in copy_unit_sources() if not (run_obj.repo / s).is_file()]
+        self.assertEqual(
+            missing, [], f"sandbox fixture lacks installer copy sources: {missing}"
+        )
+
+    def test_the_parser_finds_the_m8_watchdog_sources(self) -> None:
+        # Pin that the parser sees the M8 additions — a silent parse regression
+        # would recreate the 11/14 red suite.
+        sources = copy_unit_sources()
+        self.assertIn("dracon-system/dracon-system-guard.service", sources)
+        self.assertIn("dracon-sync/dracon-sync-watchdog.timer", sources)
+        self.assertGreaterEqual(
+            len([s for s in sources if "watchdog" in s]),
+            8,
+            "the M8 watchdog units + scripts must be part of the parsed copy list",
+        )
 
 
 class SandboxIsHermetic(unittest.TestCase):
