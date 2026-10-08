@@ -402,6 +402,52 @@ class InstallerCopyListParity(unittest.TestCase):
         )
 
 
+class PreFlightGuards(unittest.TestCase):
+    """install.sh must fail before ANY mutation when a copy source is missing.
+
+    Added 2026-10-08 (audit F105): the pre-M8 prerequisite loop checked only
+    Cargo.toml, so a partial checkout installed new binaries first and died on
+    the fatal `copy_unit` afterwards — a half-installed machine.
+    """
+
+    def _drop_one_copy_source(self, run_obj: InstallRun) -> str:
+        src = copy_unit_sources()[0]
+        (run_obj.repo / src).unlink()
+        return src
+
+    def test_a_missing_copy_source_fails_before_any_mutation(self) -> None:
+        tmp, run_obj = sandbox(active="", existing="")
+        self.addCleanup(tmp.cleanup)
+        missing = self._drop_one_copy_source(run_obj)
+        res = run_obj.run()
+        self.assertNotEqual(res.returncode, 0, "a missing copy source must abort the install")
+        self.assertIn(missing, res.stdout + res.stderr, "the error must name the missing source")
+        self.assertIn(
+            "missing from this checkout",
+            res.stdout + res.stderr,
+            "the pre-flight error must identify itself",
+        )
+        # Fail-fast proof: the installer must not even have built or shipped a
+        # binary. The stub cargo is the only thing that would log "cargo" here.
+        self.assertEqual(
+            [c for c in run_obj.calls("cargo")], [],
+            "the pre-flight must reject the run before any binary is built or installed",
+        )
+
+    def test_the_preflight_list_tracks_the_installer(self) -> None:
+        # The check parses its own copy list; pin that it catches MORE than the
+        # two manifest units (i.e. it really parses the watchdog M8 additions)
+        # by removing a watchdog script and asserting the same abort.
+        tmp, run_obj = sandbox(active="", existing="")
+        self.addCleanup(tmp.cleanup)
+        watchdog = next(s for s in copy_unit_sources() if "watchdog.sh" in s)
+        (run_obj.repo / watchdog).unlink()
+        res = run_obj.run()
+        self.assertNotEqual(res.returncode, 0)
+        self.assertIn(watchdog, res.stdout + res.stderr)
+        self.assertEqual([c for c in run_obj.calls("cargo")], [])
+
+
 class SandboxIsHermetic(unittest.TestCase):
     """The suite must not be able to mutate the operator's real installation."""
 
