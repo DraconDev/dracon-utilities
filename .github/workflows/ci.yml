@@ -242,6 +242,14 @@ jobs:
       - name: Parent audit regression tests
         run: python3 -m unittest -v scripts.tests.test_audit_regressions
 
+      - name: Installer service gating tests
+        # The only guard against a recurrence of the 2026-09-28 F103 incident
+        # (install.sh deleting the operator's live ~/.local/bin/dracon-warden).
+        # Added 2026-10-08 after this suite was found 11/14 red and dead — the
+        # fixture had rotted against the M8 unit-source additions and nothing
+        # ran it. The suite is hermetic (sandbox HOME + stub PATH).
+        run: python3 -m unittest -v scripts.tests.test_install_service_gating
+
       - name: Verify nested source pins
         # RESTORED 2026-09-27 (audit decision D1). This gate was removed
         # in the 2026-08-22 monorepo conversion along with the `*-src`
