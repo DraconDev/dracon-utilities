@@ -12,14 +12,21 @@ no root required.
 | [`dracon-system`](#dracon-system) | "My disk filled up mid-build and everything froze." | Guards disk & memory pressure, cleans known space hogs, diagnoses storage issues |
 | [`dracon-warden`](#dracon-warden) | "I nearly pushed my API key to GitHub." | Transparently encrypts secret-shaped files (age) so they're safe at rest in git but plaintext in your editor |
 
-Everything here is one Cargo workspace: `cargo test` at the repo root
-builds and tests all three (~1400 tests).
+Everything here is one Cargo workspace by path: `cargo test` at the repo
+root builds and tests all three (~1700 tests). The three utility directories
+are nested standalone git repos (own `.git/`, history, remotes, and tags since
+2026-09-11 — the parent tracks only meta files), so a bare parent clone alone
+does not build; clone the utility repos next to it (see CONTRIBUTING Setup).
 
 ## Try it in 60 seconds
 
 ```bash
 git clone https://github.com/DraconDev/dracon-utilities.git
 cd dracon-utilities
+# nested utility repos (see CONTRIBUTING for the clone list)
+git clone https://github.com/DraconDev/dracon-sync-background-auto-commit-multi-remote.git dracon-sync
+git clone https://github.com/DraconDev/dracon-system-disk-process-guard-doctor.git dracon-system
+git clone https://github.com/DraconDev/dracon-warden-secret-encrypt-age-git-filter.git dracon-warden
 cargo build --release --locked
 
 ./target/release/dracon-system doctor      # health check of this machine
@@ -131,16 +138,18 @@ Per-tool builds: `cargo build --release --locked -p dracon-{sync,system,warden}`
 
 ## Releases
 
-Latest component releases: **2026-09-01** — see
+Latest component releases: **dracon-sync 0.113.95 · dracon-system 0.112.44 ·
+dracon-warden 0.113.15** — see
 [Releases](https://github.com/DraconDev/dracon-utilities/releases).
-Current component versions: `dracon-sync` 0.113.55 ·
-`dracon-system` 0.112.40 · `dracon-warden` 0.113.6.
-Details per tool in each directory's `CHANGELOG.md`.
+Utility releases are tagged in the nested repos (`dracon-sync-vX.Y.Z`, …);
+details per tool live in each directory's `CHANGELOG.md`, and the parent
+`CHANGELOG.md` is a frozen historical record.
 
-> History note: before 2026-08-22 each utility lived in its own repo
+> History note: each utility originally lived in its own repo
 > (`DraconDev/dracon-sync-background-auto-commit-multi-remote`,
 > `...-disk-process-guard-doctor`, `...-secret-encrypt-age-git-filter`).
-> Those remain as frozen mirrors; all development happens here now.
+> Development happens in the nested standalone checkouts of those same repos,
+> cloned next to this meta-repo (the parent tracks no utility source).
 
 ## Documentation
 
