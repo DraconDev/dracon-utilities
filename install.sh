@@ -132,6 +132,31 @@ for utility in dracon-sync dracon-system dracon-warden; do
     fi
 done
 
+# FIXED 2026-10-08 (audit F105): verify every unit/script source the installer
+# copies exists BEFORE any binary is replaced. The copy list is the set of
+# `copy_unit <src> <dst>` calls below; parsing them here keeps this check in
+# sync when the list changes (a hardcoded duplicate list rots — that is exactly
+# how the 2026-10 test fixture rotted against the M8 additions). Previously the
+# only pre-flight was the Cargo.toml loop above, so a checkout with code but
+# missing the watchdog units/scripts (a pre-M8 tag, a shallow clone that
+# omitted */scripts/) passed the gate, installed new binaries into
+# ~/.local/bin, and only then hit the fatal copy_unit failure — leaving the
+# machine half-installed with no units and no daemon-reload.
+missing_copy_sources=""
+while IFS= read -r src; do
+    [ -n "$src" ] || continue
+    if [ ! -f "$src" ]; then
+        missing_copy_sources="$missing_copy_sources $src"
+    fi
+done < <(grep -oE '^[[:space:]]*copy_unit [^[:space:]]+' "$0" | awk '{print $2}' | sort -u)
+if [ -n "$missing_copy_sources" ]; then
+    echo "ERROR: installer copy sources missing from this checkout:$missing_copy_sources"
+    echo "You may have a partial checkout — the installer copies systemd units"
+    echo "and watchdog scripts alongside the binaries; a partial tree would leave"
+    echo "new binaries with no units to run them."
+    exit 1
+fi
+
 # FIXED 2026-10-03 (audit R4-M-06): setting the global default branch is
 # config work, not binary installation — a --binaries-only run must not
 # rewrite the operator's global git config as a side effect. (Documented
