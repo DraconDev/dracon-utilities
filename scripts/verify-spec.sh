@@ -87,6 +87,17 @@ else
   failures=$((failures + 1))
 fi
 
+# Invariant 7: the installer service-gating suite (D4/F103 regression guard)
+# passes and its fixture tracks install.sh's unit copy list. Added 2026-10-08
+# after the suite was found 11/14 red with nothing running it.
+echo "--- Invariant 7: Installer service gating ---"
+if python3 -m unittest -v scripts.tests.test_install_service_gating; then
+  echo "PASS: Installer service gating tests pass"
+else
+  echo "FAIL: Installer service gating tests failed"
+  failures=$((failures + 1))
+fi
+
 # --- Add more checks above this line ---
 
 if [ "$failures" -eq 0 ]; then
