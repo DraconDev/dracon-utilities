@@ -257,7 +257,14 @@
 
           # All three binaries in one derivation
           default = pkgs.symlinkJoin {
-            name = "dracon-utilities-${self.packages.${system}.dracon-sync.version}";
+            # FIXED 2026-10-08 (audit F110): the meta-package name derived
+            # its version from dracon-sync alone, so the console reported
+            # `dracon-utilities-0.113.93` for a build that also contained
+            # system 0.112.44 and warden 0.113.15. A single sync version
+            # cannot speak for the merged set; the unversioned name is
+            # accurate for a meta-package wrapping three independent
+            # versions (per-tool versions stay on the individual packages).
+            name = "dracon-utilities";
             paths = with self.packages.${system}; [
               dracon-sync
               dracon-system
