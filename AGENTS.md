@@ -514,6 +514,30 @@ This is the operator-approved design from the 2026-08-10 discussion:
 "deprioritize heavy consumers during pressure, whitelist what must
 stay fast, never cap memory, steer the last-resort kill at offenders."
 
+### Guard auto-reap of abandoned dev servers (2026-10-04)
+
+A 2026-10-04 survey found 97 server-ish orphan processes (reparented
+test/dev servers, some 7 days old). The guard reports them by default
+(`reap_report_min_idle_hours`, `reap_report_max_cpu_seconds`,
+`reap_report_signatures` — the old report-only contract, still the only
+behavior when both knobs below are off). Two DESTRUCTIVE opt-ins
+(default OFF; destructive behavior requires an explicit opt-in, matching
+`revert_excluded_to_head` / `auto_cleanup_apply`):
+
+1. `reap_stale_dev_servers = true` — re-verify every candidate live at
+   kill time (starttime + every scan criterion) and SIGTERM/SIGKILL what
+   still verifies. Normalization floors `reap_report_min_idle_hours` at 1
+   on this path so a kill always has an age floor (2026-10-08, audit
+   F117). Each pass is capped at 60s on the blocking thread; the rest are
+   deferred to the next pass, which re-scans (F120).
+2. `reap_orphans_on_pressure = true` — under warn/critical memory
+   pressure, terminate parent-dead dev servers with NO age/CPU/state
+   gates (orphanhood is the proof). `guard once` renders both outcomes in
+   the table (`Reaped (stale servers)` / `Reaped (pressure orphans)`)
+   since 2026-10-08, F118.
+
+Design doc: `docs/design/guard-auto-reap-2026-10-04.md`.
+
 ## Disk cleanup & credential discipline (2026-08-10)
 
 Full writeup: `docs/design/disk-full-credentials-2026-08-10.md` (incident,
