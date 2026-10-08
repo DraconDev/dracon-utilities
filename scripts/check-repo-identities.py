@@ -16,13 +16,26 @@ Acceptable effective identities per repo:
 Anything else — especially the bootstrap defaults `dracon@local` /
 `dracon@localhost` — is a failure. Exits non-zero listing offenders;
 journalctl --user -u dracon-nested-pins-check.service shows details.
+
+Usage:
+  check-repo-identities.py            scan the fleet (default)
+  check-repo-identities.py --help     show this message, scan nothing
+
+Any other argument is a hard error (exit 2). Added 2026-10-08 (audit F106):
+the script previously had no argument handling at all — every sys.argv entry
+was silently ignored and `--help` ran a full fleet scan, which is especially
+misleading because this file is the ExecStart of
+`dracon-nested-pins-check.service`.
 """
 
 from __future__ import annotations
 
+import argparse
 import subprocess
 import sys
 from pathlib import Path
+
+USAGE = "usage: check-repo-identities.py [--help]"
 
 HOME = Path.home()
 DEV = HOME / "Dev"
@@ -67,7 +80,23 @@ def expected_loop_identity(repo: Path) -> tuple[str, str]:
     return (f"{base}-dev", f"{base}@dracon.local")
 
 
-def main() -> int:
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        prog="check-repo-identities.py",
+        description=(
+            "Verify every watched repository's git identity is canonical or a "
+            "deliberate loop identity. Scans ~/Dev plus nested game repos; "
+            "exits non-zero listing offenders."
+        ),
+        usage=USAGE,
+    )
+    # No options yet — the point of the parser is that --help is help and an
+    # unknown flag is an error instead of a silent full-fleet scan.
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    parse_args(sys.argv[1:] if argv is None else argv)
     failures: list[str] = []
     checked = 0
     for repo in discover_repos():
