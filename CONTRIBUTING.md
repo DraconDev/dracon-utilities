@@ -4,18 +4,21 @@ Thank you for contributing to Dracon Utilities. This repository publishes determ
 
 ## What Belongs Here
 
-This repository is the monorepo for three CLI utilities and owns their
+This repository is the meta-repo for three CLI utilities and owns their
 workspace build, installer, CI, and operational documentation:
 
 - `dracon-sync` — git sync automation (`dracon-sync/`)
 - `dracon-system` — disk/process/storage diagnostics and guard behavior (`dracon-system/`)
 - `dracon-warden` — git filter encryption and repo hardening (`dracon-warden/`)
 
-Each utility's implementation lives directly in its tracked directory here
-(imported via subtree merges on 2026-08-22, so history stays connected).
-The standalone GitHub repos of the same names are frozen mirrors — work in
-this repo, not in clones of those. The published `dracon-git` crate provides
-shared library functionality; do not add a local `dracon-libs` path dependency.
+Each utility directory is a **nested standalone git repository** (since
+2026-09-11): it has its own `.git/`, history, remotes, and tags, and the
+parent does NOT track utility source (`git ls-files dracon-sync` returns
+nothing — the directories are gitignored here; see AGENTS.md "Repository
+architecture"). Clone them next to the parent, edit inside the utility
+directory, and commit from there. The published `dracon-git` crate provides
+shared library functionality; do not add a local `dracon-libs` path
+dependency.
 
 ## License
 
@@ -32,14 +35,27 @@ All contributions are licensed under [AGPL-3.0-only](./LICENSE). By submitting a
 
 ## Setup
 
+Clone the meta-repo, then clone each nested utility next to it (a bare parent
+clone does not build — the parent `Cargo.toml` lists the nested crates by
+path):
+
 ```bash
-# Clone the monorepo and work in its tracked utility directories
+ # Clone the meta-repo
  git clone https://github.com/DraconDev/dracon-utilities.git
  cd dracon-utilities
+
+ # Clone each nested standalone utility repo next to it
+ git clone https://github.com/DraconDev/dracon-sync-background-auto-commit-multi-remote.git dracon-sync
+ git clone https://github.com/DraconDev/dracon-system-disk-process-guard-doctor.git dracon-system
+ git clone https://github.com/DraconDev/dracon-warden-secret-encrypt-age-git-filter.git dracon-warden
 
 # Optional local diagnostics
 ./doctor.sh
 ```
+
+Utility work happens inside the utility directory: `cd dracon-sync`, make the
+change, commit there, and push from there. The parent CI checks out all four
+repos explicitly.
 
 ## Validation
 
@@ -91,10 +107,10 @@ test(warden): cover plaintext sibling hatch
 
 ## Release Checklist
 
-1. Update crate/workspace versions as needed.
-2. Add release notes to [`CHANGELOG.md`](CHANGELOG.md).
+1. Update the utility's crate version in its nested repo (`dracon-<name>/Cargo.toml`); releases are tagged in the NESTED repo (`dracon-sync-vX.Y.Z`, …).
+2. Add release notes to that utility's `CHANGELOG.md` (the parent CHANGELOG is a frozen historical record).
 3. Run the full validation command set.
-4. Create and push an annotated tag, for example `v0.112.5`.
+4. Create and push the annotated tag in the nested repo, for example `dracon-sync-v0.113.95`.
 5. Create the GitHub release from the tag.
 6. Verify the release tag, release notes, and public README before announcing.
 
