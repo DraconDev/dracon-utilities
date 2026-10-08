@@ -35,7 +35,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-USAGE = "usage: check-repo-identities.py [--help]"
+USAGE = "check-repo-identities.py [--help]"
 
 HOME = Path.home()
 DEV = HOME / "Dev"
