@@ -242,28 +242,27 @@
             pname = "dracon-system";
             version = crateVersion "0.112.44" draconSystemSrc;
             buildAndTestSubdir = "dracon-system";
-            nativeCheckInputs = [ pkgs.git ];
+            nativeCheckInputs = [ pkgs.git pkgs.procps ];
             checkFlags = [
               "--test-threads=1"
               # Skip tests that require D-Bus (no D-Bus in Nix sandbox)
               "--skip" "guard_report_completes_for_ok_disk"
-              # ADDED 2026-09-27 (audit decision D1): these eight assert the
-              # HOST filesystem layout of /tmp and $HOME. Inside the Nix
-              # sandbox `std::env::temp_dir()` is /build/... rather than /tmp,
-              # so the very containment check under test refuses its own
-              # fixture and the test fails for a reason that has nothing to
-              # do with the code. They are skipped here rather than weakened
-              # so the other ~197 tests still gate the Nix build; the real
-              # coverage is the workspace `cargo test --workspace` job, which
-              # runs them on a normal filesystem.
-              "--skip" "tests::tmp_entry_must_remain_under_validated_root"
-              "--skip" "tests::safe_tmp_root_policy_allows_tmp_descendants_and_rejects_home"
-              "--skip" "tests::clean_tmp_paths_respects_age_dry_run_and_open_fds"
-              "--skip" "tests::clean_tmp_paths_keeps_old_process_cwd_directory"
-              "--skip" "tests::clean_tmp_paths_rejects_home_search_root_before_apply"
-              "--skip" "tests::storage_cleanup_apply_refuses_git_database_dirs"
-              "--skip" "tests::storage_cleanup_apply_accepts_home_artifact_dirs_and_refuses_system_roots"
-              "--skip" "tests::critical_tier_bypass_cleans_fresh_target"
+              # REMOVED 2026-10-09 (audit D7 follow-up): eight `--skip`
+              # filters added 2026-09-27 (decision D1) for tests that
+              # "assert the HOST filesystem layout of /tmp and $HOME" —
+              # inside the sandbox `std::env::temp_dir()` is /build/...
+              # rather than /tmp, so the containment check under test
+              # refused its own fixture. The tests themselves are now
+              # environment-independent (they create guard-facing roots
+              # under /tmp, and `relative_policy_paths_resolve_against_home`
+              # resolves against the runtime $HOME instead of a
+              # hardcoded operator path), so the real coverage runs in
+              # the Nix build again instead of being skipped in the one
+              # job that actually exercises the packaged tree.
+              # procps above provides the `ps` binary the cleanup guards
+              # fail-closed against — without it the storage-cleanup
+              # tests error with ENOENT for reasons unrelated to their
+              # assertions.
             ];
           });
 
