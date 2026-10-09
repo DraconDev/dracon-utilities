@@ -39,8 +39,27 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 INSTALL_SH = ROOT / "install.sh"
+DOCTOR_SH = ROOT / "doctor.sh"
 
 SERVICES = ("dracon-sync.service", "dracon-system-guard.service")
+
+
+def copy_unit_destinations() -> list[str]:
+    """Every destination path the installer's `copy_unit` calls copy, in order.
+
+    Same parser discipline as `copy_unit_sources`, second field instead of
+    first. `DoctorParity` uses it so doctor.sh cannot silently fall behind the
+    installer's copy list again (audit F127, 2026-10-09).
+    """
+    dests: list[str] = []
+    for line in INSTALL_SH.read_text().splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("copy_unit "):
+            continue
+        parts = stripped.split()
+        if len(parts) >= 3:
+            dests.append(parts[2])
+    return dests
 
 
 def copy_unit_sources() -> list[str]:
