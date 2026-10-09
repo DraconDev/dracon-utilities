@@ -243,6 +243,16 @@
             version = crateVersion "0.112.44" draconSystemSrc;
             buildAndTestSubdir = "dracon-system";
             nativeCheckInputs = [ pkgs.git pkgs.procps ];
+            # Storage-cleanup fixtures deliberately write under $HOME (the
+            # home-artifact protection paths are the behavior under test),
+            # but the sandbox's HOME=/homeless-shelter is read-only.
+            # Same pattern as dracon-sync above: point HOME at the writable
+            # build tmp. It stays OUTSIDE /tmp, so the "home must not be a
+            # tmp root" assertions keep their meaning.
+            preCheck = ''
+              export HOME=$TMPDIR
+              mkdir -p "$HOME"
+            '';
             checkFlags = [
               "--test-threads=1"
               # Skip tests that require D-Bus (no D-Bus in Nix sandbox)
