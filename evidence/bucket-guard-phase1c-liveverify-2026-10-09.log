@@ -39,3 +39,37 @@ A  .github/FUNDING.yml
 A  .gitignore
 A  LICENSE
 D  assets/sprite.bin328d921 protected asset
+
+--- PART 2: ordinary work still commits ---
+(sprite restored: sprite.bin)
+?? .dracon/
+?? notes.txt
+🛡️ /tmp/phase1c/plat/repo auto-hardened with warden before staging
+ℹ️ skip pull/merge for /tmp/phase1c/plat/repo (no origin remote)
+📝 committed 6 file(s) in /tmp/phase1c/plat/repo
+⚠️ push to github failed for /tmp/phase1c/plat/repo: git push-to-github failed in /tmp/phase1c/plat/repo with status exit status: 1: ❌ dracon-warden: refusing non-fast-forward push to refs/heads/main (history rewrite).
+   Merge instead: git pull --no-rebase
+   Bypass: DRACON_ALLOW_REWRITE=1
+error: failed to push some refs to 'github.com:DraconDev/repo.git'
+⚠️ push to gitlab failed for /tmp/phase1c/plat/repo: git push-to-gitlab failed in /tmp/phase1c/plat/repo with status exit status: 1: ❌ dracon-warden: refusing non-fast-forward push to refs/heads/main (history rewrite).
+   Merge instead: git pull --no-rebase
+   Bypass: DRACON_ALLOW_REWRITE=1
+error: failed to push some refs to 'gitlab.com:DraconDev/repo.git'
+⚠️ push failed for /tmp/phase1c/plat/repo (remotes: unknown)
+⚠️ /tmp/phase1c/plat/repo committed but push failed (see daemon log)
+SYNCNOW-EXIT=0
+--- after: commit exists, worktree clean-ish ---
+627af37 6 file(s) in .dracon,.github [LICENSE, .gitignore, .gitattributes] DELTA:+968/-0 | EXT:pub,txt,yml NEW:keys/owner_nixos.pub,.gitattributes,.github/FUNDING.yml,.gitignore,LICENSE,notes.txt
+328d921 protected asset
+commit 627af37720983c8c0ae62566a1d2204ed8a1b217
+Author: Fixture <fixture-phase1c@example.test>
+Date:   Fri Oct 9 21:09:20 2026 +0100
+
+    6 file(s) in .dracon,.github [LICENSE, .gitignore, .gitattributes] DELTA:+968/-0 | EXT:pub,txt,yml NEW:keys/owner_nixos.pub,.gitattributes,.github/FUNDING.yml,.gitignore,LICENSE,notes.txt
+
+ .dracon/data/keys/owner_nixos.pub |   1 +
+ .gitattributes                    | 123 +++++++
+ .github/FUNDING.yml               |  43 +++
+ .gitignore                        | 138 ++++++++
+ LICENSE                           | 662 ++++++++++++++++++++++++++++++++++++++
+ notes.txt                         |   1 +
