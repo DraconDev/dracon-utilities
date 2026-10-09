@@ -21,7 +21,7 @@ An auto-commit, multi-mirror daemon that watches repos, commits every change wit
 - Deterministic commit messages (no AI) — extractable facts from diffs for `git log --grep=` queries
 - Fingerprint-based scheduling — only syncs after the repo state stabilizes for N seconds
 - Filter-only cooldown — detects clean/smudge loops and backs off
-- Push timeout of 60s per remote — prevents one hung push from blocking the daemon
+- Push timeout of 300s per remote (code default; operator config overrides it to 900s) — prevents one hung push from blocking the daemon
 - `IndexLock` coordination — prevents working-tree writes during git checkout
 
 ### dracon-system — Disk & Process Guard
