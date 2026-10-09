@@ -94,6 +94,17 @@
             --exclude='codex-session-*.md' \
             . \
             | tar -C $out/dracon-utilities -xf -
+          # `tar` archives the top-level `.` entry itself, so the
+          # extraction above resets `dracon-utilities` to the source
+          # store path's mode (r-xr-xr-x) and the utility splices below
+          # then fail with "cannot create directory ... Permission
+          # denied" (caught by building the derivation alone, not in CI:
+          # ci.yml runs `nix flake check --no-build`). `cp -r` never had
+          # this behavior because it leaves the mkdir'd destination's own
+          # mode alone. Restore the write bit on the merge root before
+          # splicing; the existing `chmod -R u+w` at the end still makes
+          # the whole tree writable for Cargo.
+          chmod u+w $out/dracon-utilities
           rm -rf \
             $out/dracon-utilities/dracon-sync \
             $out/dracon-utilities/dracon-system \
