@@ -82,7 +82,14 @@ echo "⚙️  Systemd Units & Timers"
 # documents the consequence (timers firing every 2 min against removed units),
 # and the watchdog timers are the only backstop for a manually stopped or
 # disabled guard/sync service. Every unit the installer copies is now
-# reported: services must be ACTIVE, timers ENABLED *and* ACTIVE.
+# reported.
+#
+# Three expectations, because "is-active" is only the right question for one
+# of them: the two long-running services must be ACTIVE, the watchdog timers
+# must be ENABLED *and* ACTIVE, and the three watchdog `.service` files are
+# Type=oneshot units started BY their timer — on a healthy machine they are
+# inactive between runs, so demanding "active" would be the permanent false
+# WARN that audits F79/F10 removed elsewhere. Their contract is "installed".
 #
 # FIXED 2026-09-27 (audit F97): the unit-file list is captured ONCE and
 # grepped as a string. Piping it into `grep -q` closes the read end on the
@@ -90,11 +97,29 @@ echo "⚙️  Systemd Units & Timers"
 # under `set -o pipefail` the whole pipeline reports "not installed"
 # (measured 4/20 false negatives on this machine).
 USER_UNIT_FILES=$(systemctl --user list-unit-files 2>/dev/null || true)
+# Where this checkout ships each unit file (install.sh copies from the same
+# two crates), used to read a unit's Type instead of hard-coding which units
+# are oneshots — a future `Type=oneshot` unit is then reported correctly
+# without another doctor.sh edit.
+unit_source() {
+    local unit="$1" crate
+    for crate in dracon-sync dracon-system; do
+        if [ -f "$crate/$unit" ]; then
+            echo "$crate/$unit"
+            return 0
+        fi
+    done
+    return 1
+}
+check_unit_installed() {
+    local unit="$1"
+    grep -q "^$unit" <<< "$USER_UNIT_FILES"
+}
 for unit in dracon-sync.service dracon-system-guard.service \
     dracon-sync-watchdog.service dracon-sync-watchdog.timer \
     dracon-freeze-watchdog.service dracon-freeze-watchdog.timer \
     dracon-system-guard-watchdog.service dracon-system-guard-watchdog.timer; do
-    if ! grep -q "^$unit" <<< "$USER_UNIT_FILES"; then
+    if ! check_unit_installed "$unit"; then
         echo "  ⚠️  $unit (not installed)"
         WARN=$((WARN + 1))
         continue
@@ -113,7 +138,11 @@ for unit in dracon-sync.service dracon-system-guard.service \
             fi
             ;;
         *)
-            if systemctl --user is-active "$unit" &>/dev/null; then
+            src=$(unit_source "$unit" || true)
+            if [ -n "$src" ] && grep -q '^Type=oneshot' "$src"; then
+                echo "  ✅ $unit (installed; Type=oneshot, started by its timer — inactive between runs is expected)"
+                PASS=$((PASS + 1))
+            elif systemctl --user is-active "$unit" &>/dev/null; then
                 echo "  ✅ $unit (active)"
                 PASS=$((PASS + 1))
             else
