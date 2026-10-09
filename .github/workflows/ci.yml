@@ -250,6 +250,26 @@ jobs:
         # ran it. The suite is hermetic (sandbox HOME + stub PATH).
         run: python3 -m unittest -v scripts.tests.test_install_service_gating
 
+      - name: Release dispatcher tests
+        # FIXED 2026-10-09 (audit F128): scripts/test_release.sh was the ONLY
+        # coverage of the root release.sh dispatcher contract (meta-only +
+        # nested delegation) and was wired into no CI step and no verify-spec
+        # invariant. Same class as F104: a dead suite is a red light nobody
+        # sees. Runs the real script's help/`bash -n` paths in a sandbox HOME.
+        run: bash scripts/test_release.sh
+
+      - name: GitHub orphan cleanup tests
+        # FIXED 2026-10-09 (audit F128): same dead-suite class —
+        # scripts/test_cleanup_github_orphans.sh guards the confirmation
+        # regression of scripts/cleanup_github_orphans.sh and was unwired.
+        run: bash scripts/test_cleanup_github_orphans.sh
+
+      - name: Nested repin fallback tests
+        # FIXED 2026-10-09 (audit F128): scripts/tests/test_repin_fallback.py
+        # is the only coverage of repin-nested-sources.py's fallback path
+        # (what happens when a publish fails mid-repin) and was unwired.
+        run: python3 -m unittest -v scripts.tests.test_repin_fallback
+
       - name: Verify nested source pins
         # RESTORED 2026-09-27 (audit decision D1). This gate was removed
         # in the 2026-08-22 monorepo conversion along with the `*-src`
