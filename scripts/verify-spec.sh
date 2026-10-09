@@ -98,6 +98,38 @@ else
   failures=$((failures + 1))
 fi
 
+# Invariant 8: the root release.sh dispatcher keeps its meta-only contract and
+# delegates to the nested release scripts. FIXED 2026-10-09 (audit F128): this
+# suite existed as the only coverage of that contract and was wired into
+# neither CI nor this script.
+echo "--- Invariant 8: Release dispatcher contract ---"
+if bash scripts/test_release.sh; then
+  echo "PASS: Release dispatcher tests pass"
+else
+  echo "FAIL: Release dispatcher tests failed"
+  failures=$((failures + 1))
+fi
+
+# Invariant 9: the GitHub orphan cleanup confirmation regression still holds.
+# FIXED 2026-10-09 (audit F128): same dead-suite class as F104.
+echo "--- Invariant 9: GitHub orphan cleanup guard ---"
+if bash scripts/test_cleanup_github_orphans.sh; then
+  echo "PASS: GitHub orphan cleanup tests pass"
+else
+  echo "FAIL: GitHub orphan cleanup tests failed"
+  failures=$((failures + 1))
+fi
+
+# Invariant 10: repin-nested-sources.py's fallback path (publish failure
+# mid-repin) is covered. FIXED 2026-10-09 (audit F128).
+echo "--- Invariant 10: Nested repin fallback ---"
+if python3 -m unittest -v scripts.tests.test_repin_fallback; then
+  echo "PASS: Nested repin fallback tests pass"
+else
+  echo "FAIL: Nested repin fallback tests failed"
+  failures=$((failures + 1))
+fi
+
 # --- Add more checks above this line ---
 
 if [ "$failures" -eq 0 ]; then
