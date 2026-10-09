@@ -7,9 +7,20 @@
 # failure that says nothing about the code under test.
 #
 # Why a meta repo needs it: the books suite lives in a SIBLING repository
-# (dracon-platform/web/books), not a nested checkout, so it is unreachable from
-# here by path traversal. Contracts that assert on it are executed from this
-# repo's working directory, so the runner has to be told where the suite is.
+# (dracon-platform/web/books), not a nested checkout, so from here it is
+# reached as a relative path out of this repo: ../dracon-platform/web/books.
+# Contracts that assert on it are executed from this repo's working directory,
+# so the runner has to be told where the suite is.
+#
+# FIXED 2026-10-09 (audit F132): this used to be the absolute machine path
+# /home/dracon/Dev/dracon-platform/web/books, which made the file
+# machine-specific — any clone without that exact path got the very `bun test`
+# failure the header described. A relative root is resolved by bun against the
+# directory holding this bunfig.toml (verified with bun 1.3.14: relative to the
+# config file, NOT the caller's cwd), so it is portable across clones for as
+# long as the sibling checkout sits next to this repo. If the sibling is absent
+# the runner has nothing to find either way — that is a missing prerequisite,
+# not something a hardcoded home directory can fix.
 #
 # This is a discovery root only — it does not change assertions, fixtures or
 # exit semantics. The suite it selects must be green on its own merits; that it
