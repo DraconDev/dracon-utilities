@@ -74,7 +74,26 @@
         # revision and whatever is on disk.
         mergedSrc = pkgs.runCommand "dracon-merged-src" {} ''
           mkdir -p $out/dracon-utilities
-          cp -r ${self}/. $out/dracon-utilities/
+          # CHANGED 2026-10-09 (audit decision D7): the parent deliberately
+          # tracks ~26 MB of `pi-session-*.html` / `codex-session-*.md`
+          # agent-session transcripts (commit-all policy: deliberates are
+          # content, history, not scratch), but no build input needs them,
+          # and `cp -r ${self}/.` copied every one of them into the merged
+          # tree and thus into every `nix build .#default` store path. The
+          # tar copy below excludes those two basename globs so the
+          # transcripts never enter the build sandbox or the output.
+          # `${self}` contributes only meta files, so the excluded set is
+          # exactly these root-level transcripts; the three utility trees
+          # are spliced from their pinned inputs after this and any
+          # `dracon-system/pi-session-*.html` in that repo remains that
+          # repo's content. pipefail is set explicitly so a failing source
+          # tar cannot be masked by a succeeding extraction.
+          set -euo pipefail
+          tar -C ${self} -cf - \
+            --exclude='pi-session-*.html' \
+            --exclude='codex-session-*.md' \
+            . \
+            | tar -C $out/dracon-utilities -xf -
           rm -rf \
             $out/dracon-utilities/dracon-sync \
             $out/dracon-utilities/dracon-system \
