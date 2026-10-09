@@ -1,0 +1,21 @@
+=== Phase 1c live-verify 2026-10-09 ===
+binary: target/debug/dracon-sync
+4b5ac571b CLOSED: FIX, FIX, FIX | 1 file(s) in .pi-glla/audit-loop/findings.md DELTA:+3/-3 | EXT:md DOCSONLY:audit-loop/findings.md
+
+--- PART 1: staged protected-asset deletion (hellhunter pattern) ---
+D  assets/sprite.bin
+328d921 protected asset
+$ dracon-sync sync-now /tmp/phase1c/plat/repo
+🛡️ /tmp/phase1c/plat/repo auto-hardened with warden before staging
+ℹ️ skip pull/merge for /tmp/phase1c/plat/repo (no origin remote)
+⚠️ /tmp/phase1c/plat/repo ownership check failed at commit time (untrusted identity — see `dracon-sync ownership --explain`) — skipping auto-commit; the staged index is left intact
+⏸️  sync blocked for /tmp/phase1c/plat/repo (guard or manual intervention required)
+SYNCNOW-EXIT=0
+--- after: index intact, no commit? ---
+A  .dracon/data/keys/owner_nixos.pub
+A  .gitattributes
+A  .github/FUNDING.yml
+A  .gitignore
+A  LICENSE
+D  assets/sprite.bin
+328d921 protected asset
