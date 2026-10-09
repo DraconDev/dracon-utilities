@@ -38,24 +38,53 @@ shape, which has a rigid 40-char body) with a measured false-positive
 run over fleet history before enabling. Do NOT transliterate the
 `(?i)` / entropy shapes without that measurement.
 
-## Residual 2 — Newline-in-filename edge
+## Residual 2 — Newline-in-filename edge — CLOSED 2026-10-09 (audit D15)
 
-The hook iterates `git diff-tree -z` output via `tr '\0' '\n'` +
-`IFS= read -r` (main.rs PRE_PUSH_HOOK, "residual newline-in-filename
-edge is accepted as absurd"). A filename containing a literal newline
-splits into two fragments; neither fragment resolves to the real
-path, so the diff scan's pathspecs match nothing and the added-loop
-`git cat-file blob $sha:<fragment>` fails silent — a secret in such
-a file pushes clean (allow-shaped miss, both loops).
+**Status: CLOSED.** The operator chose to close it (audit D15, side (a))
+after this doc's own future-work note named the change and the hook had
+since gained `xargs -0` pathspec passing. Implementation: every
+`git diff-tree -z` list is captured and validated by
+`reject_newline_paths` (main.rs PRE_PUSH_HOOK) BEFORE the
+`tr '\0' '\n'` flattening, at all three scan sites (the hatch filter,
+the added-file blob loop, and the modified-binary loop). A path
+containing a newline now REFUSES the push with an actionable message.
 
-Why accepted: POSIX allows newline in filenames but no tool in the
+Why refuse rather than iterate: in `-z` mode git emits no newlines of
+its own, so any newline byte in the stream is inside a path — detection
+is exact and needs no reconstruction. True NUL-aware iteration was
+evaluated and rejected for this hook: the only portable construct is
+`xargs -0`, which runs a child shell in which `exit 1` cannot abort the
+push (a fail-OPEN trap) and in which the blob-novelty helper's lazily
+cached remote object list could not be shared without duplicating that
+helper or making it eager on every push; `while IFS= read -r -d ''` is
+bash-only and this hook ships with `#!/bin/sh` behind crates.io. The
+refusal is fail-closed: the pathological file cannot be verified, so it
+does not go up unnoticed.
+
+Cost accepted: a repo whose paths legitimately contain newlines must
+rename them (or bypass with `git push --no-verify`, this hook's already
+documented general bypass).
+
+Regression coverage:
+`test_prepush_newline_named_file_refuses_instead_of_skipping`
+(dracon-warden/tests/integration_test.rs) drives the real installed
+hook against a real repo holding `evil\nsecrets.env` containing a live
+AWS secret shape and asserts the push is refused and names the cause.
+Verified failing against the pre-fix hook (the push succeeded with zero
+output) and passing after. The paired
+`test_prepush_space_named_file_still_pushes` pins the F4.6 guarantee
+that space-containing paths keep pushing clean.
+
+Original text, for the record: the hook iterated `git diff-tree -z`
+output via `tr '\0' '\n'` + `IFS= read -r`, so a filename containing
+a literal newline split into two fragments; neither fragment resolved
+to the real path, the diff scan's pathspecs matched nothing and the
+added-loop `git cat-file blob $sha:<fragment>` failed silent — a secret
+in such a file pushed clean (allow-shaped miss, both loops). Why it had
+been accepted: POSIX allows newline in filenames but no tool in the
 fleet creates them; git itself quotes such paths in most non-`-z`
-outputs. Handling true NUL-delimited iteration in `/bin/sh` (no
-`read -d`) would require restructuring the loop around a helper.
-
-Future work: if ever needed, replace the `tr` stage with an
-NUL-aware iteration (e.g. a `while` over `git diff-tree -z` piped
-through `xargs -0 -n1`).
+outputs, and true NUL-delimited iteration in `/bin/sh` (no `read -d`)
+would have required restructuring the loop around a helper.
 
 ## Residual 3 — Modified-binary parent-match allowance
 
