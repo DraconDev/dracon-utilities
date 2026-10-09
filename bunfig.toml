@@ -33,4 +33,4 @@
 # them safe to run from a different working directory. Any test added to that
 # suite must follow the same rule, or it will pass locally and fail here.
 [test]
-root = "/home/dracon/Dev/dracon-platform/web/books"
+root = "../dracon-platform/web/books"
