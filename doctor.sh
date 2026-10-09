@@ -74,25 +74,74 @@ for binary in dracon-sync dracon-system dracon-warden; do
 done
 
 echo ""
-echo "⚙️  Systemd Services"
-# FIXED 2026-09-27 (audit F97): the unit-file list was piped straight
-# into `grep -q`. `grep -q` exits on the first match, closing the read
-# end of the pipe; if systemctl was still writing it takes SIGPIPE and
-# exits 141, and `set -o pipefail` turns the whole pipeline into a
-# false negative. Measured 4/20 false "not installed" on this machine.
-# The list is captured once instead, so the grep reads a string.
+echo "⚙️  Systemd Units & Timers"
+# FIXED 2026-10-09 (audit F127): install.sh has installed 8 unit files and 3
+# watchdog scripts since M8 (2026-10-02), while doctor.sh still listed only
+# dracon-sync.service and dracon-system-guard.service — so a failed copy_unit
+# or a disabled watchdog timer produced no signal here. uninstall.sh already
+# documents the consequence (timers firing every 2 min against removed units),
+# and the watchdog timers are the only backstop for a manually stopped or
+# disabled guard/sync service. Every unit the installer copies is now
+# reported: services must be ACTIVE, timers ENABLED *and* ACTIVE.
+#
+# FIXED 2026-09-27 (audit F97): the unit-file list is captured ONCE and
+# grepped as a string. Piping it into `grep -q` closes the read end on the
+# first match, so a still-writing systemctl takes SIGPIPE, exits 141, and
+# under `set -o pipefail` the whole pipeline reports "not installed"
+# (measured 4/20 false negatives on this machine).
 USER_UNIT_FILES=$(systemctl --user list-unit-files 2>/dev/null || true)
-for service in dracon-sync.service dracon-system-guard.service; do
-    if grep -q "^$service" <<< "$USER_UNIT_FILES"; then
-        if systemctl --user is-active "$service" &>/dev/null; then
-            echo "  ✅ $service (active)"
-            PASS=$((PASS + 1))
-        else
-            echo "  ⚠️  $service (installed but not running)"
-            WARN=$((WARN + 1))
-        fi
+for unit in dracon-sync.service dracon-system-guard.service \
+    dracon-sync-watchdog.service dracon-sync-watchdog.timer \
+    dracon-freeze-watchdog.service dracon-freeze-watchdog.timer \
+    dracon-system-guard-watchdog.service dracon-system-guard-watchdog.timer; do
+    if ! grep -q "^$unit" <<< "$USER_UNIT_FILES"; then
+        echo "  ⚠️  $unit (not installed)"
+        WARN=$((WARN + 1))
+        continue
+    fi
+    case "$unit" in
+        *.timer)
+            # A timer that is installed but not enabled never fires: that is
+            # the M8 regression this check exists to surface.
+            if systemctl --user is-enabled "$unit" &>/dev/null \
+                && systemctl --user is-active "$unit" &>/dev/null; then
+                echo "  ✅ $unit (enabled + active)"
+                PASS=$((PASS + 1))
+            else
+                echo "  ⚠️  $unit (installed but not enabled/active — its backstop will never fire)"
+                WARN=$((WARN + 1))
+            fi
+            ;;
+        *)
+            if systemctl --user is-active "$unit" &>/dev/null; then
+                echo "  ✅ $unit (active)"
+                PASS=$((PASS + 1))
+            else
+                echo "  ⚠️  $unit (installed but not running)"
+                WARN=$((WARN + 1))
+            fi
+            ;;
+    esac
+done
+
+echo ""
+echo "🛡️  Watchdog Scripts"
+# The three scripts the installer chmod +x into ~/.dracon/{sync,system}-notify.
+# A unit whose script is missing or not executable fails at run time with no
+# install-time signal, so the doctor checks existence AND the exec bit.
+for script in \
+    "$HOME/.dracon/sync-notify/dracon-sync-watchdog.sh" \
+    "$HOME/.dracon/sync-notify/dracon-freeze-watchdog.sh" \
+    "$HOME/.dracon/system-notify/dracon-system-guard-watchdog.sh"; do
+    script_name=$(basename "$script")
+    if [ -x "$script" ]; then
+        echo "  ✅ $script_name (installed + executable)"
+        PASS=$((PASS + 1))
+    elif [ -f "$script" ]; then
+        echo "  ⚠️  $script_name (present but NOT executable — its timer will fail to run it)"
+        WARN=$((WARN + 1))
     else
-        echo "  ⚠️  $service (not installed)"
+        echo "  ⚠️  $script_name (not installed)"
         WARN=$((WARN + 1))
     fi
 done
