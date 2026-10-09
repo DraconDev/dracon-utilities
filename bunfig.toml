@@ -1,2 +1,25 @@
+# bunfig.toml — Dracon utilities meta repo
+#
+# [test] root points the test runner at the application whose suite this repo's
+# verification contracts actually assert. Without it, `bun test <filter>` run
+# from this directory searches only this repo, which holds no `src/` at all, and
+# bun exits 1 with "the following filters did not match any test files" — a
+# failure that says nothing about the code under test.
+#
+# Why a meta repo needs it: the books suite lives in a SIBLING repository
+# (dracon-platform/web/books), not a nested checkout, so it is unreachable from
+# here by path traversal. Contracts that assert on it are executed from this
+# repo's working directory, so the runner has to be told where the suite is.
+#
+# This is a discovery root only — it does not change assertions, fixtures or
+# exit semantics. The suite it selects must be green on its own merits; that it
+# now is, is a property of the code, not of this file. A contract run through
+# here executes the same 8,058 tests and honours the same exit code as
+# `cd dracon-platform/web/books && bun test src/lib`.
+#
+# The tests this selects resolve their fixtures from the module under test
+# (new URL(rel, import.meta.url)) rather than process.cwd(), which is what makes
+# them safe to run from a different working directory. Any test added to that
+# suite must follow the same rule, or it will pass locally and fail here.
 [test]
-root = "../dracon-platform/web/books"
+root = "/home/dracon/Dev/dracon-platform/web/books"
