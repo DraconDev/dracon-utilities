@@ -650,5 +650,71 @@ class DeletionGuards(unittest.TestCase):
         )
 
 
+class DoctorParity(unittest.TestCase):
+    """doctor.sh must report every unit and script install.sh installs.
+
+    Added 2026-10-09 (audit F127). M8 (2026-10-02) made install.sh copy 8
+    unit files and 3 watchdog scripts, but doctor.sh still looped over two
+    services, so a failed `copy_unit` or a disabled watchdog timer produced no
+    signal at all — while uninstall.sh already documents the consequence of
+    missing timers (they fire every 2 min against removed units). The two files
+    are now pinned to each other: this test parses the installer's copy list
+    and fails when doctor.sh stops mentioning any installed unit or script.
+    """
+
+    def _doctor_text(self) -> str:
+        return DOCTOR_SH.read_text()
+
+    def test_every_installed_unit_is_covered_by_the_doctor(self) -> None:
+        doctor = self._doctor_text()
+        units = sorted(
+            Path(dest).name
+            for dest in copy_unit_destinations()
+            if dest.endswith((".service", ".timer"))
+        )
+        self.assertGreaterEqual(len(units), 8, f"expected the M8 unit set, parsed: {units}")
+        missing = [u for u in units if u not in doctor]
+        self.assertEqual(
+            missing,
+            [],
+            f"doctor.sh does not cover units install.sh installs: {missing}",
+        )
+
+    def test_every_installed_watchdog_script_is_covered(self) -> None:
+        doctor = self._doctor_text()
+        scripts = sorted(
+            Path(dest).name
+            for dest in copy_unit_destinations()
+            if dest.endswith(".sh")
+        )
+        self.assertGreaterEqual(len(scripts), 3, f"expected the 3 notify scripts, parsed: {scripts}")
+        missing = [s for s in scripts if s not in doctor]
+        self.assertEqual(
+            missing,
+            [],
+            f"doctor.sh does not cover the watchdog scripts install.sh installs: {missing}",
+        )
+
+    def test_oneshot_units_are_not_required_to_be_active(self) -> None:
+        """The watchdog .service files are Type=oneshot, started by their timer.
+
+        On a healthy machine they are inactive between runs, so a doctor that
+        demands `is-active` for them emits a permanent false WARN — the same
+        defect class that audits F79 and F10 removed from other sections.
+        """
+        doctor = self._doctor_text()
+        self.assertIn("Type=oneshot", doctor)
+        for unit in (
+            "dracon-sync-watchdog.service",
+            "dracon-freeze-watchdog.service",
+            "dracon-system-guard-watchdog.service",
+        ):
+            src = ROOT / "dracon-sync" / unit
+            if not src.is_file():
+                src = ROOT / "dracon-system" / unit
+            self.assertTrue(src.is_file(), f"missing unit source for {unit}")
+            self.assertIn("Type=oneshot", src.read_text(), f"{unit} must stay a oneshot")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
