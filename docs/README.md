@@ -48,7 +48,8 @@ Pre-2026-08 audits live in `docs/archive/audits-2026-07/`; root holds only
 
 | File | What it is |
 |---|---|
-| `nested-on-main-architecture-2026-07-02.md` | The current submodule-on-main design (canonical) |
+| `nested-standalone-remigration-2026-09-11.md` | **The current architecture (canonical)** — three independent nested standalone repos inside the parent, no submodules |
+| `nested-on-main-architecture-2026-07-02.md` | SUPERSEDED 2026-09-11 — the submodule-on-main design this repo used to describe as canonical; kept as history |
 | `daemon-standalone-removal-2026-07-01.md` | Why the standalone worktree layout was eliminated |
 | `big-repo-storage-strategy.md` | Big-repo storage approach |
 | `binary-asset-strategy-2026-07-03.md` | Binary assets in git (LFS vs bucket) |
