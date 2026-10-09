@@ -631,5 +631,26 @@ class DeletionGuards(unittest.TestCase):
         )
 
 
+DOCTOR_SH = ROOT / "doctor.sh"
+
+
+def copy_unit_destinations() -> list[str]:
+    """Every destination path the installer's `copy_unit` calls copy, in file order.
+
+    Same parser discipline as `copy_unit_sources`, second field instead of
+    first. Used by `DoctorParity` so doctor.sh cannot silently fall behind the
+    installer's copy list again (audit F127, 2026-10-09).
+    """
+    dests: list[str] = []
+    for line in INSTALL_SH.read_text().splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("copy_unit "):
+            continue
+        parts = stripped.split()
+        if len(parts) >= 3:
+            dests.append(parts[2])
+    return dests
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
