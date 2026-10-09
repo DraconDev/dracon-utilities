@@ -772,12 +772,14 @@ worktree layout was eliminated for all 10 game/hegemon submodules of
   `docs/design/nested-on-main-architecture-2026-07-02.md` for
   the new architecture and migration log.
 
-- **`fast_forward_daemon_standalone_to_main`** is a no-op stub
-  preserved for backwards compatibility with existing call sites.
-  No standalones exist (re-confirmed 2026-07-08, goal
-  `730eaf2a`, after the materialization path was removed and the
-  two re-created standalones were pruned), so the function is
-  never invoked.
+- **`fast_forward_daemon_standalone_to_main`** — REMOVED 2026-10-09
+  (audit F134). It had been a no-op stub since 2026-07-01 (the standalone
+  worktree sits on `main` directly, so each commit already advances it),
+  and both call sites still wrapped it in `if let Err(e) = … { eprintln!("…
+  (no-op) error …") }` arms that could never fire. The stub, the calls and
+  the error arms are gone. History for context: no standalones exist
+  (re-confirmed 2026-07-08, goal `730eaf2a`, after the materialization path
+  was removed and the two re-created standalones were pruned).
 
 ## Test discipline
 
