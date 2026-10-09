@@ -308,3 +308,20 @@ re-reported.
 
 - [?] DECIDE: [D13] `scripts/check-nested-pins.py --check-local` (scripts/check-nested-pins.py:172-173, wired at .github/workflows/ci.yml:265) gates on local nested HEAD == the CI pin, but that invariant is only true for a checkout made AT the pin — verified live: plain `check-nested-pins.py` exits 0 while `--check-local` exits 1 on this very worktree (dracon-warden local 8ce5a605 vs pin 2388bee4), and CI's own pinned checkout passes it. Side (a) keep as-is: the local gate stays a faithful mirror of what CI builds (the 2026-08-21 checkout-disappearance prevention), at the cost that every machine whose nested checkouts have advanced for a release sees a red check that CI itself does not. Side (b) relax the local gate (warn-only, or compare only that a checkout exists and is a git repo): local devs stop seeing a check they cannot satisfy, at the cost of losing the 24h "your local pins drifted from what CI builds" signal the design doc asks for.
 - [?] DECIDE: [D14] the warden-managed `.gitignore` block cannot round-trip an operator's negation — `build_gitignore_block_with_existing` (dracon-warden/src/main.rs:949-995) regenerates every `!<protected glob>` line from `policy.effective_protected_patterns()` + `plaintext_patterns` on each pass, and `extract_existing_patterns` (main.rs:918-947) deliberately DROPS `!`-prefixed lines when re-reading the block. Side (a) keep as-is: negations stay a pure function of policy, so an operator edit of a negation is impossible to get wrong and cannot poison a later policy merge; cost is that any hand-written negation in the managed block is silently discarded on the next `unignore` run. Side (b) preserve `!` lines as a third merged set: operators gain a durable escape hatch; cost is `all_hygiene` becomes a mix of ignore and negate entries, the `BTreeSet` merge with `policy_hygiene` needs a separate set plus ordering rules, and a stale preserved negation can now re-expose a protected path the policy means to ignore.
+
+### [F129 reclassified 2026-10-09 — after reading the source, NOT a FIX]
+
+Investigation-first correction: the newline-in-filename scan evasion
+listed above as `FIX: MED [F129]` is a **documented, audit-accepted
+residual**, not an undiscovered defect. `docs/design/warden-hook-tier2-residuals-2026-10-03.md`
+("Residual 2 — Newline-in-filename edge", Status: Accepted, audit
+R4-W-10: "none required; track Tier-2 hook coverage as future work")
+describes this exact bypass, records "Why accepted" (POSIX allows it,
+no fleet tool creates such names, and true NUL iteration in `/bin/sh`
+needs `read -d` which is unavailable), and names the future work
+verbatim ("replace the `tr` stage with an NUL-aware iteration"). The
+hook header at PRE_PUSH_HOOK carries the same note. Per the honesty law
+("never silently turn a DECIDE into a fix") this is raised as a decision
+instead, in the DECIDE section below. The two FIX items that remain in
+the same hook (F137 malformed-tag silence, F138 merge-parent rescan) are
+NOT covered by any residual doc and stay FIX.
