@@ -19,3 +19,23 @@ A  .gitignore
 A  LICENSE
 D  assets/sprite.bin
 328d921 protected asset
+
+--- PART 1b: bless fixture via owned=true, restore exact staged-deletion state ---
+D  assets/sprite.bin
+?? .gitignore
+--- files staged for daemon (expect: deletion + override file) ---
+
+--- PART 1c: sync-now with owned fixture + staged protected deletion ---
+D  assets/sprite.bin
+?? .dracon/🛡️ /tmp/phase1c/plat/repo auto-hardened with warden before staging
+ℹ️ skip pull/merge for /tmp/phase1c/plat/repo (no origin remote)
+⚠️ /tmp/phase1c/plat/repo bucket forward-only guard blocked auto-commit; staged/worktree content retained: bucket guard refused staged tree (BUCKET_STRATEGY_GUARD_FORWARD_ONLY): staged: assets/sprite.bin
+⏸️  sync blocked for /tmp/phase1c/plat/repo (guard or manual intervention required)
+SYNCNOW-EXIT=0
+--- after: index intact (D staged), no new commit ---
+A  .dracon/data/keys/owner_nixos.pub
+A  .gitattributes
+A  .github/FUNDING.yml
+A  .gitignore
+A  LICENSE
+D  assets/sprite.bin328d921 protected asset
