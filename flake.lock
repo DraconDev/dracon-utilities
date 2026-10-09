@@ -20,11 +20,11 @@
     "dracon-system-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1791510565,
-        "narHash": "sha256-gnd/5RBrjsImlc88OHWMjpyljN8Z9iaU+ldtZV0Juik=",
+        "lastModified": 1791511170,
+        "narHash": "sha256-rDFUgbeeHGhskP+SDR067ttRri8E0NhJpQjRXr6lpOA=",
         "owner": "DraconDev",
         "repo": "dracon-system-disk-process-guard-doctor",
-        "rev": "50cbdeee03774707ae4ca904bed0a794d5bcd1dd",
+        "rev": "93b0edd93ec7710c21ad00a783e6dce596408885",
         "type": "github"
       },
       "original": {
