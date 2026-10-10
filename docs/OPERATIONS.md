@@ -91,11 +91,21 @@ The sync service kills stale `dracon-git pulse` processes before starting to pre
 
 ### Restart Behavior
 
-- `Restart=on-failure` — restarts crashes, abnormal signal termination, and
-  other nonzero failures, but not a clean exit from a valid disabled policy
-- `RestartSec=5` (sync) / `10` (guard)
-- `RestartPreventExitStatus=2 78` — don't restart on CLI usage errors or the
-  guard's startup policy status 78 (`EX_CONFIG`)
+The two services deliberately differ:
+
+| Service | `Restart` | `RestartSec` | `RestartPreventExitStatus` |
+|---------|-----------|--------------|---------------------------|
+| `dracon-sync.service` | `always` | 5 | `2 78` |
+| `dracon-system-guard.service` | `on-failure` | 10 | `2 78` |
+
+- `Restart=on-failure` (guard) restarts crashes, abnormal signal termination,
+  and other nonzero failures, but **not** a clean exit from a valid disabled
+  policy.
+- `Restart=always` (sync) restarts the daemon even after a clean exit, so a
+  daemon that exits 0 in a bad state still comes back — the watchdog's job is
+  to cover the case where systemd itself is not managing it.
+- `RestartPreventExitStatus=2 78` on both — no restart on CLI usage errors (2)
+  or the guard's startup policy status 78 (`EX_CONFIG`).
 
 The guard emits `guard disabled in policy` and exits 0 when
 `[guard].enabled = false`; systemd therefore leaves that intentionally
@@ -106,6 +116,43 @@ signal termination, and runtime failures to restart. Deliberate SIGTERM/SIGINT
 shutdown is handled cleanly. Fix the policy, then run
 `systemctl --user reset-failed dracon-system-guard.service` (if needed) and
 restart the service.
+
+### Watchdogs and the quiesce policy
+
+Three timer-driven oneshots (every 2 minutes) are the fleet's backstop against
+silent downtime:
+
+- **`dracon-sync-watchdog`** — restarts `dracon-sync.service` whenever
+  `systemctl --user is-active` says it is not running.
+- **`dracon-freeze-watchdog`** — watches the `dracon-sync pause` freeze marker:
+  warns (journal + `notify-send`) at **10 minutes**, auto-clears it at
+  **30 minutes**, while the daemon hard-clears any survivor at **1 hour**.
+- **`dracon-system-guard-watchdog`** — restarts the guard if it is ever
+  inactive, including after a manual `stop` or a disabled unit.
+
+**Do not use `systemctl --user stop` to quiesce sync for remediation.** A
+manual stop has no backstop (`Restart=always` covers crashes, not a forgotten
+restart), and the watchdog would simply restart the daemon mid-surgery. Use
+one of the sanctioned paths instead:
+
+```bash
+dracon-sync maintenance -- <cmd...>   # pause → run → ALWAYS resume
+dracon-sync pause                     # interactive multi-step work
+```
+
+A forgotten `pause` self-heals (10m warn, 30m auto-clear, 1h hard TTL). For
+genuine multi-minute downtime, touch the hold marker first and remove it
+afterwards:
+
+```bash
+touch ~/.dracon/dracon-sync.maintenance-hold    # suppresses the sync watchdog
+```
+
+Guard-side equivalent for its own maintenance:
+
+```bash
+touch ~/.dracon/dracon-system.maintenance-hold  # suppresses the guard watchdog
+```
 
 ## Incident Response
 
