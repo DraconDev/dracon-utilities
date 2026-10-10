@@ -34,6 +34,21 @@ class SpecExitStatus(unittest.TestCase):
                 python = stubs / "python3"
                 python.write_text(f"#!{shell}\nexit 0\n")
                 python.chmod(0o755)
+                # FIXED 2026-10-10 (list item 1, audit F128 follow-up):
+                # verify-spec invariants 8 + 9 were wired on 2026-10-09 and run
+                # `bash scripts/test_release.sh` / `bash scripts/test_cleanup_github_orphans.sh`
+                # with cwd=root. The fixture never got matching stubs, so those
+                # two invariants always failed inside the fixture and the
+                # "cargo reports success" subTest could never pass. Provide
+                # the same kind of stand-in the existing cargo / python3 stubs
+                # are: a real-shell shebang, exit 0 (the fixture isolates
+                # verify-spec's exit-code plumbing from the real suites; the
+                # real scripts are exercised in the non-fixture run).
+                (root / "scripts").mkdir()
+                for name in ("test_release.sh", "test_cleanup_github_orphans.sh"):
+                    script = root / "scripts" / name
+                    script.write_text(f"#!{shell}\nexit 0\n")
+                    script.chmod(0o755)
                 result = subprocess.run([shell, str(ROOT / "scripts/verify-spec.sh")],
                                         cwd=root, capture_output=True, text=True,
                                         env={**os.environ, "PATH": str(stubs) + ":" + os.environ["PATH"]})
