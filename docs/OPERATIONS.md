@@ -49,10 +49,10 @@ systemctl --user restart dracon-system-guard.service
 ### Resource Limits
 
 Values below are what `install.sh` ships from the unit files in
-`dracon-sync/` and `dracon-system/`. (Earlier revisions of this table listed
-`CPUQuota=15%` and `Restart=on-failure` for sync — both were changed years
-ago to fix a measured classifier-starvation wedge; the shipped units and
-`flake.nix` are authoritative.)
+`dracon-sync/` and `dracon-system/`. (An earlier revision of this table listed
+`CPUQuota=15%` and `Restart=on-failure` for sync — both were changed in
+`dracon-sync` `4f22bd7` (2026-09-17) after a measured classifier-starvation
+wedge. The shipped units and `flake.nix` are authoritative.)
 
 **dracon-sync.service:**
 | Setting | Value | Purpose |
