@@ -233,6 +233,15 @@ Pre-2026-08 audits live in `docs/archive/audits-2026-07/`; root holds only
 | `followup-tasklist-2026-07-03.md` | Follow-up tasklist (from full-audit-2026-07-03) |
 | `cli-print-style.md` | CLI print style |
 
+## Commit protocol & warden
+
+| File | What it is |
+| `commit-message-index-general-2026-09-03.md` | **Mechanical commit index improvements (implemented)** — supersedes the harness-trail proposal |
+| `commit-message-harness-trails-2026-09-03.md` | Harness-trail commit pointers (proposed; superseded same day) |
+| `warden-global-hook-ownership-2026-08-15.md` | What `setup-hooks --global` owns in `~/.config/git/hooks/` and how it chains |
+| `warden-filter-protected-patterns-wiring-2026-08-09.md` | Protected-patterns wiring + the junk-runner wedge it caused |
+| `warden-hook-tier2-residuals-2026-10-03.md` | **Accepted pre-push Tier-2 residuals** (incl. the now-closed newline-in-filename case) |
+
 ## Archive (`docs/archive/`)
 
 Superseded process iterations kept for history (not for reading):
@@ -249,5 +258,5 @@ Superseded process iterations kept for history (not for reading):
 
 ---
 
-*Generated 2026-07-23 (docs cleanup); shrunk to design-index-only 2026-09-09 (D5: user-facing map lives in `ROADMAP.md`). If a doc you need is missing
+*Last regenerated 2026-10-10: 43 design docs written between 2026-07-24 and 2026-10-07 were unindexed (the index had last been regenerated 2026-09-09). Original note: generated 2026-07-23 (docs cleanup); shrunk to design-index-only 2026-09-09 (D5: user-facing map lives in `ROADMAP.md`). If a doc you need is missing
 here, it's in git history (commit-all policy) or `docs/archive/`.*
