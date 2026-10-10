@@ -337,3 +337,37 @@ itself, verified live before listing.
 - [x] FIX: MED [F140]: the `bunfig.toml` root was the WHOLE sibling package, so the parity its own header claimed was false — the header states "A contract run through here executes the same 8,058 tests and honours the same exit code as `cd dracon-platform/web/books && bun test src/lib`", but `root` selected the package directory, so bun collected the sibling's `scripts/*.test.ts` suites as well: 8,091 tests across 33 files instead of 8,066 across 25. Two of the extra suites are currently RED inside the sibling repo itself (verified from the sibling's own cwd, so they are pre-existing there, not caused by running them from here): `scripts/cover-repair-manifest.test.ts` ("checked-in repair manifest independently binds all 15 source records") and `scripts/reconciliation-manifest.test.ts` ("all 174 Auto records bind to canonical writer metadata and target") — 2 fail / 8066 pass. A discovery root that drags an unrelated repo's broken suites into THIS repo's gate makes this repo's gate permanently red for failures this repo cannot fix, and the header's parity claim was already off by 25 tests before that. Fixed in parent cab12ab2c/00c6c88df/454059845/663666478 (root pinned to `../dracon-platform/web/books/src/lib`; measured 8066 pass / 0 fail / 25 files both ways on 2026-10-09, bun 1.3.14; the count in the header corrected from 8,058 to 8,066). NOT fixed (out of scope for this project — it lives in the sibling repo and is recorded here so it is not lost): the two red sibling suites.
 
 - [x] FIX: LOW [F141]: the F129 ledger row still read `- [ ] FIX: MED … — fixed in warden` (an un-filled commit placeholder) while the prose note directly beneath it recorded the reclassification to DECIDE D15 — a self-contradicting ledger whose row re-surfaces a documented residual as pending fix work (and which a future pass would either re-report or "fix" in violation of the honesty law). The row now carries the reclassification and its reason inline. — fixed in parent 2d1ab3b2 (the findings.md commit that rewrote the stale F129 row)
+
+---
+
+## Read-only verification pass (2026-10-10) — `repos` commit-age legibility
+
+Operator question: "the last commit seems pretty long ago, did we update the
+frequency or show it poorly?" Read-only pass, no code changed. Scope: the
+`dracon-sync repos` table's ACTIVITY / LAST COMMIT / 1H/6H/24H semantics,
+cross-checked against two independent sources.
+
+### Verified truthful (no defect)
+
+- **Cadence unchanged.** Live config `pulse_interval_secs = 1`,
+  `inactivity_push_delay_secs = 2` (code defaults); zero cadence-related
+  commits in dracon-sync's last 30 (all `bucket_guard` / `stuck_route` /
+  `report`). Commit pulse measured live: dracon-platform 31/1h, 528/24h;
+  junk-runner 17/1h, 178/24h.
+- **Ages are live, not cached.** `last_unix` advances across consecutive
+  `dracon-sync repos --json` runs 12s apart (1791640240 → 1791640407 for
+  dracon-platform); `commit_counts` (report.rs:3307-3344) shells
+  `git log --format=%ct --after=1 day ago HEAD` per invocation.
+- **Report == git == GitHub, to the minute.** All 38 rows re-measured against
+  `git log -1` + `gh api user/repos` (`pushed_at`). Examples: dracon-utilities
+  report `18h` / git `2026-10-09 21:09 +0100` / GitHub `2026-10-09T20:09:37Z`;
+  pi-codebuddy-sdk `21d` / git `2026-09-16`; folder-auto-banner `11d` /
+  git `2026-09-29`; dracon-log `9d` / git `2026-10-01`. The only deltas were
+  +1/+2 counts for repos that committed between the render and the probe.
+- GitHub's repo page reads "rather active" because it sorts by `pushed_at`
+  and the game loops + pi-plugins push every few minutes — the report's own
+  top rows say the same (`now` / `synced 0m` … `idle 1h`).
+
+### Real legibility defects found (all three documented, none fixed)
+
+- [ ] DECIDED [D16] (2026-10-10 — operator chose: explanation is enough, no code change this turn) — was: [?] DECIDE: three `repos` display defects, each a legibility problem with correct underlying data. (a) **`ACTIVITY`'s number is unexplained**: the legend (report.rs:3521-3568) documents `PUSH = last push result + age` but for ACTIVITY only lists the icons (`🔄 now · 🟡 waiting · ⏳ dirty · 🟢 synced · ⚪ idle · ⚫ cold`), never saying the number is *time since that repo's last commit*; the words also read as activity verdicts, so `neonbreak` shows `idle 1h` while having 150 commits/24h. (b) **The default 16-col table drops the age entirely**: `state_plus_act_cell` (report.rs:3084) has a 15-col budget, so `⚪ idle · ⚪ idle 4h` does not fit and the whole activity half is discarded — bare `⚪ idle` / `⚫ cold`; `LAST COMMIT` is hash + subject only (report.rs:2949-2962), so that view has no column showing how long ago the last commit was. (c) **Neither layout is complete**: compact (the wide-TTY default) carries ACTIVITY + 1H/6H/24H but no LAST COMMIT hash/subject; default carries LAST COMMIT but no pulse counts and no age. Cost of leaving it: operators misread `idle`/`cold` as daemon liveness or as a cadence regression. Cost of fixing: touches the newest width-budget cell plus layout tests. Candidate fixes offered and declined for now: keep the age in `state_plus_act_cell`, a dedicated LAST-AGO column, or legend + honest label wording.
