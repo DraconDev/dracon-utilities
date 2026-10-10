@@ -159,6 +159,19 @@ Pre-2026-08 audits live in `docs/archive/audits-2026-07/`; root holds only
 | `concerns-investigation-2026-07-18.md` | Concerns investigation (drove v0.112.19–21) |
 | `auto-commit-junk-investigation-2026-07-01.md` | Auto-commit junk investigation |
 | `auto-private-repo-fix-2026-07-15.md` | Auto-private-repo fix |
+| `browser-ext-virtual-pet-loop-decision-2026-07-27.md` | Decision: keep the virtual-pet loop, constrained (operator-approved) |
+| `warden-nested-discovery-gap-2026-07-31.md` | Non-recursive discovery leaked 1.32 GiB of `.pi/` screenshots into hellhunter |
+
+### Disk, storage, and guard behavior
+| File | What it is |
+| `disk-full-credentials-2026-08-10.md` | **98%-full incident + the credential-verification protocol + cleanup discipline** |
+| `memory-tuning-and-tmp-cleanup-2026-08-25.md` | Swap thrash; 320 GiB manual sweep; the VM tuning that removed the pattern |
+| `host-tmp-cleanup-service-sandbox-2026-09-09.md` | `PrivateTmp=true` silently defeated the guard's host-`/tmp` cleanup |
+| `sanctioned-slimming-2026-09-26.md` | **The only sanctioned history-rewrite procedure** (operator-approved, bundle-backup, leased force-push) |
+| `git-and-object-storage-plan-2026-10-01.md` | Fleet storage plan → the authoritative design now lives in `dracon-sync/docs/design/object-storage-roadmap-2026-10-01.md` |
+| `guard-stateful-reporting-2026-08-14.md` | Guard state machine + multi-signal pressure classification (v0.112.37) |
+| `guard-auto-reap-2026-10-04.md` | **The two destructive reaper opt-ins**, the idled-age floor, and the pass budget |
+| `pack-size-concern-2026-07-28.md` | github pack-too-large → CONCERN classification (v0.113.7) |
 
 ### Untracked / dirty / daemon fixes
 | File | What it is |
