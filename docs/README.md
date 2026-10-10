@@ -7,7 +7,7 @@ contributing, security, version history), see
 [`docs/ROADMAP.md`](ROADMAP.md) — it is the single map; this file
 indexes only the design/history layer so no tree is mapped twice.
 The commit-all policy means these are all in git history; this index
-is so you don't have to read 264 files to find the one you need.
+is so you don't have to read 178 files to find the one you need.
 **Convention**: `docs/design/` = durable design + investigation docs;
 `docs/archive/` = superseded process iterations (kept for history);
 root `*.md` = canonical audits, release notes, and core files.
