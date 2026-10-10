@@ -125,6 +125,16 @@ Pre-2026-08 audits live in `docs/archive/audits-2026-07/`; root holds only
 | `mirror-divergence-and-secret-remediation-2026-06-21.md` | Mirror divergence + secret remediation |
 | `mirror-only-push-and-empty-repo-remotes-2026-06-20.md` | Mirror-only push + empty-repo remotes |
 | `gitlab-storage-and-divergence-2026-06-23.md` | GitLab storage + divergence |
+| `push-failure-local-hook-classification-2026-10-07.md` | **A local hook refusal is not a transport failure** — fail-fast classification (latest) |
+| `filteronly-push-starvation-2026-07-26.md` | FilterOnly push starvation + stale upstream display |
+| `dirty-nothing-to-stage-push-wedge-2026-08-09.md` | Dirty-but-nothing-to-stage repos never pushed ahead commits (HIGH, silent) |
+| `detached-head-push-refspec-2026-08-09.md` | Detached-HEAD push refspec bug (v0.113.48) |
+| `pi-goal-loop-audit-divergence-2026-08-09.md` | Loop `git reset` discarding a published 197-file commit |
+| `hellhunter-reset-divergence-2026-08-14.md` | Same incident family — hellhunter rewound published history |
+| `junk-runner-history-rewrite-2026-07-28.md` | junk-runner history-rewrite incident record |
+| `cag-github-push-block-2026-07-28.md`, `cag-github-push-block-corrected-2026-07-28.md` | capture-anime-girls GitHub push block — investigation + corrected size analysis |
+| `dracon-platform-stale-ref-cleanup-2026-07-30.md` | The 12 GiB platform pack was stale refs, not the games |
+| `incident-amend-race-and-trust-2026-07-25.md` | Amend-race + untrusted agent identities + the libgit2 transport regression (the whack-a-mole audit) |
 
 ### Per-repo investigations (kiki-sassy, hegemon, dracon-platform, junk-runner, capture-anime-girls)
 | File | What it is |
