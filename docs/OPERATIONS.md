@@ -6,12 +6,26 @@ Systemd services, incident response, and troubleshooting for dracon-utilities.
 
 ### Service Files
 
-| Service | Binary | Purpose |
-|---------|--------|---------|
-| `dracon-sync.service` | `dracon-sync daemon` | Git sync automation |
-| `dracon-system-guard.service` | `dracon-system guard daemon` | Disk/process protection |
+`install.sh` ships **eight** unit files (two long-running services plus three
+watchdog service/timer pairs) and three notify scripts. All three timers are
+enabled with `--now` at install time.
 
-> `dracon-warden` has no systemd service. Git hooks (installed via `setup-hooks --global`) are the primary enforcement layer.
+| Unit | Runs | Cadence | Purpose |
+|------|------|---------|---------|
+| `dracon-sync.service` | `dracon-sync daemon` | continuous | Git sync automation |
+| `dracon-system-guard.service` | `dracon-system guard daemon` | continuous | Disk/process protection |
+| `dracon-sync-watchdog.{service,timer}` | `~/.dracon/sync-notify/dracon-sync-watchdog.sh` | every 2 min | Restarts `dracon-sync.service` if it is ever inactive |
+| `dracon-freeze-watchdog.{service,timer}` | `~/.dracon/sync-notify/dracon-freeze-watchdog.sh` | every 2 min | Warns on a forgotten `dracon-sync pause`, auto-clears it |
+| `dracon-system-guard-watchdog.{service,timer}` | `~/.dracon/system-notify/dracon-system-guard-watchdog.sh` | every 2 min | Restarts the guard if it is ever inactive |
+
+The notify scripts are installed to `~/.dracon/sync-notify/` and
+`~/.dracon/system-notify/`; the timer units call them from there, so a missing
+script shows up as a failed oneshot in the journal rather than silently
+passing. `doctor.sh` checks all eight units, all three timers, and all three
+scripts — run `./doctor.sh` when you suspect an install gap.
+
+> `dracon-warden` has no systemd service. Git hooks (installed via
+> `setup-hooks --global`) are the primary enforcement layer.
 
 ### Common Commands
 
@@ -19,10 +33,13 @@ Systemd services, incident response, and troubleshooting for dracon-utilities.
 # Status
 systemctl --user status dracon-sync.service
 systemctl --user status dracon-system-guard.service
+systemctl --user list-timers 'dracon-*'      # watchdog backstops
 
 # Logs
 journalctl --user -u dracon-sync -f
 journalctl --user -u dracon-system-guard -f
+journalctl --user -u dracon-sync-watchdog -n 20
+journalctl --user -u dracon-freeze-watchdog -n 20
 
 # Restart after config changes
 systemctl --user restart dracon-sync.service
@@ -31,14 +48,21 @@ systemctl --user restart dracon-system-guard.service
 
 ### Resource Limits
 
+Values below are what `install.sh` ships from the unit files in
+`dracon-sync/` and `dracon-system/`. (Earlier revisions of this table listed
+`CPUQuota=15%` and `Restart=on-failure` for sync — both were changed years
+ago to fix a measured classifier-starvation wedge; the shipped units and
+`flake.nix` are authoritative.)
+
 **dracon-sync.service:**
 | Setting | Value | Purpose |
 |---------|-------|---------|
 | `Nice` | 10 | Lower CPU priority |
-| `CPUQuota` | 15% | Max 15% CPU usage |
-| `MemoryMax` | 2G | Max 2GB RAM |
+| `CPUQuota` | 100% | No throttling — the 15% cap starved classification |
 | `MemoryHigh` | 768M | Soft memory limit |
+| `MemoryMax` | 2G | Max 2GB RAM |
 | `TasksMax` | 96 | Max 96 threads |
+| `Restart` | always | Restarts even on clean exit (see below) |
 
 **dracon-system-guard.service:**
 | Setting | Value | Purpose |
@@ -46,6 +70,7 @@ systemctl --user restart dracon-system-guard.service
 | `MemoryMax` | 250M | Max 250MB RAM |
 | `CPUQuota` | 20% | Max 20% CPU usage |
 | `TasksMax` | 64 | Max 64 threads |
+| `Restart` | on-failure | See the disabled-policy note below |
 
 ### Security Hardening (both services)
 
