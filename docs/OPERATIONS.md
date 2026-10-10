@@ -148,7 +148,8 @@ afterwards:
 touch ~/.dracon/dracon-sync.maintenance-hold    # suppresses the sync watchdog
 ```
 
-Guard-side equivalent for its own maintenance:
+Guard-side equivalent for its own maintenance (nothing removes this marker
+automatically — delete it when the window ends):
 
 ```bash
 touch ~/.dracon/dracon-system.maintenance-hold  # suppresses the guard watchdog
