@@ -51,6 +51,10 @@ Pre-2026-08 audits live in `docs/archive/audits-2026-07/`; root holds only
 | `nested-standalone-remigration-2026-09-11.md` | **The current architecture (canonical)** — three independent nested standalone repos inside the parent, no submodules |
 | `nested-on-main-architecture-2026-07-02.md` | SUPERSEDED 2026-09-11 — the submodule-on-main design this repo used to describe as canonical; kept as history |
 | `daemon-standalone-removal-2026-07-01.md` | Why the standalone worktree layout was eliminated |
+| `utilities-checkout-disappearance-2026-08-21.md` | The 2026-08-19 deletion of all three canonical checkouts — why they must never be removed |
+| `daemon-quiesce-policy-2026-08-07.md` | **Never `systemctl stop` the sync daemon** — sanctioned `pause` / `maintenance --` paths + watchdog backstops |
+| `ownership-and-codeberg-auto-provisioning.md` | Watched-path ownership model + Codeberg auto-provisioning (v0.113.39) |
+| `daemon-push-ahead-bypass-2026-09-26.md` | Push-ahead bypass when classification starves (phase-ordering fix) |
 | `big-repo-storage-strategy.md` | Big-repo storage approach |
 | `binary-asset-strategy-2026-07-03.md` | Binary assets in git (LFS vs bucket) |
 | `lfs-vs-bucket-vs-grow-2026-07-03.md` | The LFS/bucket/grow decision |
@@ -84,6 +88,13 @@ Pre-2026-08 audits live in `docs/archive/audits-2026-07/`; root holds only
 | `post-migration-audit-2026-07-03.md` | Post-migration audit |
 | `all-green-investigation-2026-06-15.md` | The all-green investigation |
 | `final-audit-2026-06-16.md` | Final audit 06-16 |
+| `committer-stalls-2026-10-01.md` | Classifier spawn-gate bug: 20k+ rapid failures plus multi-hour quiet stalls |
+| `loop-oversubscription-2026-10-04.md` | 20 agent loops on 16 cores — oversubscription + pressure blindness |
+| `sync-wedge-filter-hang-2026-10-04.md` | `filter-process` hang pinning tasks 7.5h as daemon children |
+| `quarantine-treadmill-2026-10-04.md` | Quarantine became the disk filler itself (192G / 49 entries) |
+| `parent-bloat-quarantine-analysis-2026-09-26.md` | Corrected bloat targeting: `web/music/libs` history, not the games |
+| `sync-convergence-remediation-proposal-2026-09-25.md` | Proposal-only convergence remediation (daemon deliberately frozen; sealed evidence in `audit/sync-convergence-2026-09-25/`) |
+| `commit-activity-audit.md` | Generated commit-activity snapshot — classifies low activity, never manufactures commits |
 
 ## Incidents & fixes (per-repo and daemon)
 
