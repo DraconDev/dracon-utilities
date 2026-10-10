@@ -13,7 +13,7 @@ no root required.
 | [`dracon-warden`](#dracon-warden) | "I nearly pushed my API key to GitHub." | Transparently encrypts secret-shaped files (age) so they're safe at rest in git but plaintext in your editor |
 
 Everything here is one Cargo workspace by path: `cargo test --workspace --locked` at the repo
-root builds and tests all three (2318 tests on 2026-10-08; 0 failed). The three utility directories
+root builds and tests all three (2347 tests on 2026-10-10; 0 failed, 25 ignored). The three utility directories
 are nested standalone git repos (own `.git/`, history, remotes, and tags since
 2026-09-11 — the parent tracks only meta files), so a bare parent clone alone
 does not build; clone the utility repos next to it (see CONTRIBUTING Setup).
