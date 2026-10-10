@@ -192,6 +192,9 @@ Pre-2026-08 audits live in `docs/archive/audits-2026-07/`; root holds only
 | `secret-scan-text-files-2026-06-16.md` | Secret-scan text files |
 | `warden-hook-pi-goals-skip-2026-06-18.md` | Warden hook pi-goals skip |
 | `owner-nixos-pub-tracking.md` | owner-nixos-pub tracking |
+| `installed-binary-drops-patch-dracon-git-2026-08-08.md` | `cargo publish` strips `[patch.crates-io]` → phantom untracked counts |
+| `clippy-low-hygiene-2026-07-28.md` | `clippy --all-targets` LOW-hygiene cleanup (closed in `93790a1`) |
+| `stale-backup-branch-cleanup-2026-07-29.md` | The `backup/*` janitor + what the SIZE-vs-STATUS distinction means |
 
 ### `repos` table / report work
 | File | What it is |
@@ -213,6 +216,9 @@ Pre-2026-08 audits live in `docs/archive/audits-2026-07/`; root holds only
 | `dracon-platform-cleanup-2026-06-16.md` | dracon-platform cleanup |
 | `dracon-platform-pack-size-hint-fix-2026-07-07.md` | dracon-platform pack-size hint fix |
 | `platform-stupid-amount-of-changes-2026-06-21.md` | Platform change-volume investigation |
+| `repos-rich-table-columns-2026-07-29.md` | The rich-table column set the operator asked for (ACTIVITY · CHANGES · PUSH · REM · 1H/6H/24H · SIZE · TOUCHED) |
+| `repos-perf-fix-v0.112.40-2026-07-24.md` | `repos` perf: count-objects fast path + the size-cache TTL |
+| `refresh-visibility-origin-preference-2026-08-06.md` | refresh-visibility prefers `github` over `origin` (v0.113.43) |
 
 ## Release process
 
