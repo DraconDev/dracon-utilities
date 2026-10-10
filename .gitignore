@@ -37,6 +37,7 @@
 .git/
 .venv/
 /**/note.md
+/result
 __pycache__/
 artifacts/krita/*.kra
 artifacts/krita/*.kra~
@@ -60,13 +61,6 @@ locks/
 nixos/.fusion/
 nixos/result
 node_modules/
-# FIXED 2026-10-09 (audit F125): `result` is a nix build artifact symlink
-# into the machine-local /nix/store path (added by accident in ccb7cd493).
-# The root-level one is not covered by the `nixos/result` rule above, so it
-# was tracked as a mode-120000 blob pointing at a store path that exists on
-# exactly one machine. Tracked in every clone as a dangling symlink and
-# copied into mergedSrc by flake.nix's `cp -r ${self}/.`.
-/result
 pi-session-*.html
 rag_index.json
 repo-runtime/
