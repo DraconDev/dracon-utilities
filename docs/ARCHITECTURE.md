@@ -11,6 +11,16 @@ dracon-utilities/
 └── dracon-warden/    →  ~/.local/bin/dracon-warden     (git hooks, no systemd service)
 ```
 
+Both services have watchdog backstops shipped in-repo and enabled by
+`install.sh` (full unit inventory, cadences, and the quiesce rules live in
+[docs/OPERATIONS.md](OPERATIONS.md)):
+
+```
+dracon-sync-watchdog.{service,timer}          every 2 min — restart sync if inactive
+dracon-freeze-watchdog.{service,timer}        every 2 min — warn 10m / auto-clear 30m
+dracon-system-guard-watchdog.{service,timer}  every 2 min — restart guard if inactive
+```
+
 ### dracon-sync — Invisible Git Sync
 
 An auto-commit, multi-mirror daemon that watches repos, commits every change with deterministic facts-based messages, and pushes to GitHub, GitLab, and Codeberg simultaneously.
@@ -33,7 +43,9 @@ Proactive disk space monitoring, automatic cleanup, and process management.
 **Key design decisions:**
 - Graduated renice (never kills) — higher CPU → higher nice value
 - Build-aware cleanup — protects target/ dirs with active cargo/rustc processes
-- Proactive cleanup at 50% — prevents disk pressure from building up
+- Proactive cleanup scans begin at `proactive_cleanup_percent` (default
+  80%), on top of the four guard bands: early-warn 70 / warn 80 / action 90 /
+  critical 95 (`~/.dracon/utilities/system.toml` can lower them)
 - Inode monitoring — catches the "many small files" failure mode
 
 ### dracon-warden — Repo Encryption & Hardening

@@ -174,11 +174,24 @@ Common `scope` values: `safety` (safety guard triggers), `repair` (auto-repair),
 1. Read the incident ledger to understand what happened
 2. Check the repo status: `git status` and `git log --oneline -5`
 3. Take appropriate action based on the incident type
-4. For intentional destructive operations: `git add -A && git commit -m 'delete files'` directly
+4. For an intentional destructive operation, `git add` the exact paths you
+   mean (e.g. `git add -- old-assets/`), commit, and let the daemon push it.
+   Never use a bare `git add -A` or `git add .`: enumerate the paths so a
+   stray secret or credential file cannot ride along — see AGENTS.md
+   "Forbidden actions".
 
 ### Removing Large Numbers of Files
 
-Use `git add -A && git commit -m 'delete files'` directly — no daemon involvement needed.
+Enumerate the paths explicitly rather than staging everything:
+
+```bash
+git ls-files 'old-assets/*' > /tmp/paths.txt
+git add --pathspec-from-file=/tmp/paths.txt
+git commit -m 'retire old-assets'
+```
+
+A bare `git add -A` sweeps anything currently in the worktree, including files
+added since the incident started.
 
 ## Troubleshooting
 
