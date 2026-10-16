@@ -1,1 +1,5 @@
-    Finished `release` profile [optimized] target(s) in 0.30s
+   Compiling dracon-sync v0.113.95 (/home/dracon/Dev/dracon-utilities/dracon-sync)
+   Compiling dracon-security v0.4.0 (/home/dracon/Dev/dracon-utilities/dracon-warden/src/security)
+   Compiling dracon-system v0.112.45 (/home/dracon/Dev/dracon-utilities/dracon-system)
+   Compiling dracon-warden v0.113.15 (/home/dracon/Dev/dracon-utilities/dracon-warden)
+    Finished `release` profile [optimized] target(s) in 1m 34s
