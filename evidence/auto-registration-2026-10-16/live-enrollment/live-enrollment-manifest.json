@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "bucket": "dracon-lfs",
+  "repository": "repo-live-qual",
+  "namespace": "games/auto/repo-live-qual",
+  "assets": [
+    {
+      "id": "asset-472b71cb20083eb4fe0244e22fb24ea36717091dfd140daab4093b31a6259a86",
+      "kind": "image",
+      "logicalPath": "authorized/icon.png",
+      "sourcePath": "authorized/icon.png",
+      "objectKey": "games/auto/repo-live-qual/{sha256}.{ext}",
+      "sha256": "7884ac7225df090731d8a00b56b6de69cb34cc1fe8763b8aeb15132f810664d7",
+      "bytes": 103,
+      "regenerable": true,
+      "visibility": "private",
+      "bucketed": true,
+      "generator": {
+        "adapterId": "solid-rgba-png",
+        "adapterVersion": 1,
+        "runner": {
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "version": 1
+        },
+        "inputs": []
+      },
+      "provenance": {
+        "schemaVersion": 1,
+        "adapterId": "solid-rgba-png",
+        "adapterVersion": 1,
+        "repositoryId": "repo-live-qual",
+        "sourcePath": "authorized/icon.png",
+        "sha256": "7884ac7225df090731d8a00b56b6de69cb34cc1fe8763b8aeb15132f810664d7",
+        "bytes": 103,
+        "recipe": {
+          "width": 32,
+          "height": 32,
+          "rgba": [
+            255,
+            46,
+            136,
+            255
+          ]
+        },
+        "recipeDigest": "96c92c5064acad8ee7f3543a2a05cf8e765dcd5102e89fc96e648a94c8129c6d",
+        "toolchain": {
+          "node": "24.18.0",
+          "zlib": "1.3.2"
+        },
+        "inputDigests": [],
+        "consumer": {
+          "id": "filesystem-restore",
+          "version": 1
+        }
+      }
+    }
+  ]
+}

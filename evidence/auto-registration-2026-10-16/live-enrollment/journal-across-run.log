@@ -1,0 +1,15 @@
+Oct 17 00:10:39 nixos dracon-sync[2936146]: 🔄 trailing-drain: 1 task(s) still running — deferred to detached registry (repos stay in-flight until tasks finish)
+Oct 17 00:10:39 nixos dracon-sync[2936146]: 🛡️ /home/dracon/.dracon auto-hardened with warden before staging
+Oct 17 00:10:39 nixos dracon-sync[2936146]: 📝 committed 1 file(s) in /home/dracon/.dracon
+Oct 17 00:11:04 nixos dracon-sync[2936146]: 🔁 synced (late) /home/dracon/Dev/dracon-platform/web/games/wip/polis
+Oct 17 00:11:14 nixos dracon-sync[2936146]: 🔄 trailing-drain: 1 task(s) still running — deferred to detached registry (repos stay in-flight until tasks finish)
+Oct 17 00:12:07 nixos dracon-sync[2936146]: 🔁 synced (late) /home/dracon/Dev/browser-extensions-shared
+Oct 17 00:12:17 nixos dracon-sync[2936146]: 🔁 synced (late) /home/dracon/Dev/dracon-platform/web/games/wip/hellhunter
+Oct 17 00:12:24 nixos dracon-sync[2936146]: 🔄 trailing-drain: 1 task(s) still running — deferred to detached registry (repos stay in-flight until tasks finish)
+Oct 17 00:12:25 nixos dracon-sync[2936146]: 📝 committed 2 file(s) in /home/dracon/Dev/dracon-platform/web/games/wip/hellhunter
+Oct 17 00:12:33 nixos dracon-sync[2936146]: 🔁 synced (late) /home/dracon/Dev/dracon-platform
+Oct 17 00:12:37 nixos dracon-sync[2936146]: 🔁 synced (late) /home/dracon/.dracon
+Oct 17 00:12:55 nixos dracon-sync[2936146]: 🔁 synced (late) /home/dracon/Dev/dracon-platform/web/games/wip/hellhunter
+Oct 17 00:13:15 nixos dracon-sync[2936146]: 🔄 trailing-drain: 1 task(s) still running — deferred to detached registry (repos stay in-flight until tasks finish)
+Oct 17 00:13:15 nixos dracon-sync[2936146]: 🛡️ /home/dracon/Dev/dracon-utilities/dracon-sync auto-hardened with warden before staging
+Oct 17 00:13:15 nixos dracon-sync[2936146]: 📝 committed 2 file(s) in /home/dracon/Dev/dracon-utilities/dracon-sync

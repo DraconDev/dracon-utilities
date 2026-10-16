@@ -1,0 +1,10 @@
+[2026-10-16T23:13:15.264Z] live enrollment qualification started (stub transport; no live bucket write)
+[2026-10-16T23:13:15.267Z] scratch repo: /tmp/live-qual-mRyLas
+[2026-10-16T23:13:15.294Z] source asset written: authorized/icon.png sha256=7884ac7225df090731d8a00b56b6de69cb34cc1fe8763b8aeb15132f810664d7 bytes=103
+[2026-10-16T23:13:15.531Z] pass 1 published at 2026-10-16T23:13:15.295Z: manifestWritten=true toUpload=1 indexRebound=true
+[2026-10-16T23:13:15.531Z] manifest digest: 95c15782671697baab6659a0a41bad78827224774ac92f7493530494e7cdbb86
+[2026-10-16T23:13:15.531Z] index updatedAt: 2026-10-16T23:13:15.530Z namespace=games/auto/repo-live-qual
+[2026-10-16T23:13:15.773Z] pass 2 retry at 2026-10-16T23:13:15.531Z: manifestWritten=false uploads=0 manifest-digest-unchanged
+[2026-10-16T23:13:15.774Z] fresh-consumer restore: authorized/icon.png sha256=7884ac7225df090731d8a00b56b6de69cb34cc1fe8763b8aeb15132f810664d7 bytes=103 (verified)
+{"startedAt":"2026-10-16T23:13:15.261Z","finishedAt":"2026-10-16T23:13:15.774Z","pass1At":"2026-10-16T23:13:15.295Z","pass2At":"2026-10-16T23:13:15.531Z","manifestDigest":"95c15782671697baab6659a0a41bad78827224774ac92f7493530494e7cdbb86","indexUpdatedAt":"2026-10-16T23:13:15.530Z","namespace":"games/auto/repo-live-qual","objectKey":"games/auto/repo-live-qual/7884ac7225df090731d8a00b56b6de69cb34cc1fe8763b8aeb15132f810664d7.png","restoredSha256":"7884ac7225df090731d8a00b56b6de69cb34cc1fe8763b8aeb15132f810664d7","retryIdempotent":true,"transport":"in-process-stub (no live bucket write)"}
+[2026-10-16T23:13:15.775Z] QUALIFY-PASS: timestamped enrollment, retry idempotence and fresh restore all hold
