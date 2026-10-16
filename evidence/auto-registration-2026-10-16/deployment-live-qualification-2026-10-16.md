@@ -1,5 +1,14 @@
 # Deployment and live qualification report — automatic bucket registration
 
+> **2026-10-16 verification correction — NOT live enrollment qualification.**
+> This historical report does not establish the goal's deployment or live gates.
+> `qualify-live-enrollment.mjs` uses an in-memory transport in an unwatched
+> scratch repository; it is not autonomous daemon registration or real storage
+> routing. The daemon does not call the new publisher yet. Tasks 3 and 5 have
+> been reopened. The earlier build duration and source-to-binary correspondence
+> are not independently established. See `verification-correction.md` for
+> freshly captured full gates and the unresolved executable identity mismatch.
+
 Date (UTC): 20261016T231018Z
 Source commit: dd7681bf29844717d33b1f3c1c0be92c666eb2c0
 Active daemon PID: 2936146

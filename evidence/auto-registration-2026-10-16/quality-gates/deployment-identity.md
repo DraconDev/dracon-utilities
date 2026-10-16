@@ -1,5 +1,14 @@
 # Deployment identity record
 
+> **Historical claim, not current qualification.** A fresh full-workspace
+> rebuild after touching Rust inputs produced SHA
+> `8f7f45c9a82b41dfb5bf762fa9d3347837a8ffe534eee6c8115c5242e8db2030`,
+> not the running/installed `f3b79691…` below. No deployment was performed
+> during that verification. The replaced gate logs are the new full runs
+> (2430 tests; full release build 1m34s; four-crate clippy 5.79s), not evidence
+> of the historical timing claimed below. Tested-to-installed identity and
+> autonomous enrollment remain open; see `../verification-correction.md`.
+
 Date (UTC): 20261016T230929Z
 Repository HEAD: dd7681bf29844717d33b1f3c1c0be92c666eb2c0
 Source commit: dd7681bf29844717d33b1f3c1c0be92c666eb2c0
