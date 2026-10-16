@@ -2,10 +2,12 @@
 
 ## Current ownership
 
-The nested `dracon-sync` main line is single-writer. Production S3 transport
-handoff is complete (four files through 5cdfd9d); independent read-only review
-is pending. The sole remaining writer owns only consumer.mjs and its tests;
-parent is read-only in that checkout until its handoff. No production profile,
+The nested `dracon-sync` main line is single-writer. Transport and consumer
+handoffs and their independent reviews are settled. Parent fixed both storage
+P1s and the consumer nested-standalone/bounded-enumeration findings. The sole
+current writer owns runner CLI/tests, bundled artifact/build helper, plus an
+explicit minimal consumer whitelist/test seam for the persistent manifest lock.
+Parent remains read-only in that checkout until handoff. No production profile,
 credential, service or application build script has been changed.
 
 ## Settled parent checks
@@ -13,11 +15,13 @@ credential, service or application build script has been changed.
 Binding component static review accepted the authority boundary, with a P2
 failed-write temporary leak. Parent fixed the leak and injected write/fsync
 failure regressions; retries succeed without leftover temporary state files.
-Measured-budget routing and changed managed source renewal are implemented;
-60 tests passed before the storage component. Storage worker reports 69 tests
-including 9 new transport tests, not independently re-executed by parent yet.
-The aggregate shell gate still explicitly enumerates 60 tests and needs a
-single update after consumer integration, including storage/consumer suites.
+Measured-budget routing and changed managed source renewal are implemented.
+Parent independently ran the updated aggregate gate: 139 tests passed with
+zero failures, including storage, consumer, create-only restore, index-write
+recovery and sealed allowed-candidate regressions. All source changes through
+that checkpoint are committed (design checkpoint 3579ba5; evidence at
+storage-consumer-restore-regressions.log in nested repo). Pinned esbuild build
+tooling is installed/locked; runtime code is not yet bundled/installed.
 
 ## Consumer seam decision
 
