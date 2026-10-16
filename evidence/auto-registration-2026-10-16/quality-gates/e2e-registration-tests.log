@@ -1,0 +1,44 @@
+✔ renderSolidPng: actual brand golden and bounded numeric recipe (4.509401ms)
+✔ probeCandidate: deterministic evidence and other recipes (32.746111ms)
+✔ probeCandidate: malformed, bomb, oversized, non-solid and noncanonical PNGs (125.915289ms)
+✔ verifyEvidence: edits and every authority/provenance field fail closed (14.017465ms)
+✔ probeCandidate: traversal, exclusions, consumers, symlinks and nested ownership (9.719425ms)
+✔ probeCandidate: same-size valid replacement during read is retryable/source-changed (59.649022ms)
+✔ profile authority is strict, immutable and independent of caller mutation (4.421754ms)
+✔ authorized subtrees cover new nested repositories without a per-repo registry (0.986995ms)
+✔ every object request is bound to trusted namespace, not manifest claims (3.065512ms)
+✔ consumer transport has no write operation even if underlying client can write (0.4339ms)
+✔ operator loader enforces ownership permissions and runner hash without reading credential files (20.069731ms)
+✔ operator loader refuses symlink ancestors/leaves, malformed and oversized profiles (9.719945ms)
+✔ e2e: unregistered eligible asset enrolls, verifies and restores on a fresh consumer (410.767848ms)
+✔ e2e: ineligible assets are never uploaded, the manifest is empty and no transport calls leak (306.043017ms)
+✔ e2e: repeat enrollment is idempotent (no second upload, no second manifest write) (665.593553ms)
+✔ recovery: storage outage during upload keeps local worktree and manifest absent; retry succeeds (449.584769ms)
+✔ recovery: partial upload (storage lies about head()) is detected, manifest absent, retry succeeds (448.190465ms)
+✔ recovery: concurrent manifest change aborts the second publisher; retry re-reads and succeeds (471.377625ms)
+✔ recovery: simulated daemon interruption between storage upload and manifest write preserves invariant (533.780952ms)
+✔ e2e: fresh consumer restores a renamed asset and refuses a deleted one (520.798873ms)
+✔ inspectRepository: discovers supported eligible asset and ignores unsafe/unsupported files (133.81261ms)
+✔ inspectRepository: new asset root only enrolls files beneath it (96.168163ms)
+✔ inspectRepository: existing manifest is preserved, legacy entries retained and changed ones refused (108.540751ms)
+✔ inspectRepository: manifest/binding mismatch and unsafe consumer are refused (117.154786ms)
+✔ inspectRepository: missing/deleted source keeps the prior manifest entry and reports missing (70.277494ms)
+✔ inspectRepository: phantom checkout, symlink and nested gitlink are refused (91.224462ms)
+✔ inspectRepository: same plan twice is idempotent; new file is enrolled on the second pass (403.864855ms)
+✔ planRepository: returns concrete eligible candidates needing upload (131.97095ms)
+✔ planRepository: idempotent re-plan reports no new candidates (150.79132ms)
+✔ publishRepository: writes manifest, verifies, sets bucketed:true, and binds index (554.583188ms)
+✔ publishRepository: refuses to upload when transport reports a different object (313.589105ms)
+✔ publishRepository: rejects transport claiming a wrong bucket namespace (237.201536ms)
+✔ publishRepository: writes manifest even when storage raced a concurrent create (223.922436ms)
+✔ publishRepository: concurrent publisher blocks until the first releases the lock (235.751526ms)
+✔ publishRepository: refuses an unsafely rooted manifest path (13.829881ms)
+ℹ tests 35
+ℹ suites 0
+ℹ pass 35
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3934.466633
+bucket-runner qualification passed: 35/35 tests, all required e2e scenarios executed.

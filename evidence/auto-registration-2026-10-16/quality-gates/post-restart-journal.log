@@ -1,0 +1,33 @@
+Oct 17 00:07:21 nixos dracon-sync[2674977]: 🔁 synced (late) /home/dracon/Dev/dracon-platform/web/games/wip/darklord
+Oct 17 00:07:25 nixos dracon-sync[2674977]: 🔁 synced (late) /home/dracon/.dracon
+Oct 17 00:08:12 nixos dracon-sync[2674977]: 🔄 trailing-drain: 1 task(s) still running — deferred to detached registry (repos stay in-flight until tasks finish)
+Oct 17 00:08:12 nixos dracon-sync[2674977]: 📝 committed 4 file(s) in /home/dracon/Dev/dracon-utilities
+Oct 17 00:08:26 nixos dracon-sync[2674977]: 🔄 trailing-drain: 1 task(s) still running — deferred to detached registry (repos stay in-flight until tasks finish)
+Oct 17 00:08:26 nixos dracon-sync[2674977]: 📝 committed 2 file(s) in /home/dracon/.dracon
+Oct 17 00:08:30 nixos dracon-sync[2674977]: 🔄 trailing-drain: 1 task(s) still running — deferred to detached registry (repos stay in-flight until tasks finish)
+Oct 17 00:08:33 nixos dracon-sync[2674977]: 📝 committed 1 file(s) in /home/dracon/Dev/dracon-platform/web/games/wip/darklord
+Oct 17 00:08:33 nixos dracon-sync[2674977]: 🔁 synced (late) /home/dracon/Dev/dracon-platform/web/games/wip/polis
+Oct 17 00:08:44 nixos dracon-sync[2674977]: 🔄 trailing-drain: 1 task(s) still running — deferred to detached registry (repos stay in-flight until tasks finish)
+Oct 17 00:08:45 nixos dracon-sync[2674977]: 📝 committed 3 file(s) in /home/dracon/Dev/dracon-platform/web/games/wip/polis
+Oct 17 00:08:48 nixos dracon-sync[2674977]: 🔁 synced (late) /home/dracon/Dev/dracon-platform
+Oct 17 00:08:54 nixos systemd[1224]: Stopping Dracon Sync (deterministic sync runtime)...
+Oct 17 00:08:55 nixos systemd[1224]: Stopped Dracon Sync (deterministic sync runtime).
+Oct 17 00:08:55 nixos systemd[1224]: dracon-sync.service: Consumed 7h 59min 12.848s CPU time, 1.5G memory peak, 461.6M memory swap peak.
+Oct 17 00:08:55 nixos systemd[1224]: Starting Dracon Sync (deterministic sync runtime)...
+Oct 17 00:08:55 nixos systemd[1224]: Started Dracon Sync (deterministic sync runtime).
+Oct 17 00:08:55 nixos dracon-sync[2936146]: 🔄 dracon-sync daemon started
+Oct 17 00:08:55 nixos dracon-sync[2936146]: 📋 startup: 1 repo(s) in the stuck-push ledger:  (1 failures)
+Oct 17 00:08:55 nixos dracon-sync[2936146]: 🧹 startup: running cleanup...
+Oct 17 00:08:55 nixos dracon-sync[2936146]: 🧹 startup: pruned 1 stale stuck repos
+Oct 17 00:08:55 nixos dracon-sync[2936146]: 🧹 startup: pruned 56 stale visibility cache entries
+Oct 17 00:09:06 nixos dracon-sync[2936146]: 🔄 trailing-drain: 5 task(s) still running — deferred to detached registry (repos stay in-flight until tasks finish)
+Oct 17 00:09:06 nixos dracon-sync[2936146]: 🛡️ /home/dracon/Dev/dracon-platform/web/games/wip/polis auto-hardened with warden before staging
+Oct 17 00:09:06 nixos dracon-sync[2936146]: 📝 committed 1 file(s) in /home/dracon/Dev/dracon-platform/web/games/wip/polis
+Oct 17 00:09:10 nixos dracon-sync[2936146]: 🔄 trailing-drain: 2 task(s) still running — deferred to detached registry (repos stay in-flight until tasks finish)
+Oct 17 00:09:10 nixos dracon-sync[2936146]: 🛡️ /home/dracon/Dev/dracon-platform/web/games/wip/neonbreak auto-hardened with warden before staging
+Oct 17 00:09:11 nixos dracon-sync[2936146]: ⚠️ /home/dracon/Dev/dracon-platform/web/games/wip/neonbreak bucket forward-only guard blocked auto-commit; staged/worktree content retained: bucket guard refused staged tree (BUCKET_STRATEGY_GUARD_FORWARD_ONLY): staged: static/audio/factions-choose.mp3; staged: static/audio/hover-stinger.mp3
+Oct 17 00:09:11 nixos dracon-sync[2936146]: 📝 committed 1 file(s) in /home/dracon/Dev/browser-extensions-shared
+Oct 17 00:09:29 nixos dracon-sync[2936146]: 🔄 trailing-drain: 1 task(s) still running — deferred to detached registry (repos stay in-flight until tasks finish)
+Oct 17 00:09:30 nixos dracon-sync[2936146]: 🛡️ /home/dracon/Dev/dracon-platform/web/games/wip/hellhunter auto-hardened with warden before staging
+Oct 17 00:09:30 nixos dracon-sync[2936146]: 📝 committed 1 file(s) in /home/dracon/Dev/dracon-platform/web/games/wip/hellhunter
+Oct 17 00:09:38 nixos dracon-sync[2936146]: 📝 committed 3 file(s) in /home/dracon/Dev/dracon-platform
