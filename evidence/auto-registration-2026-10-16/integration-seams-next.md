@@ -16,12 +16,16 @@ Binding component static review accepted the authority boundary, with a P2
 failed-write temporary leak. Parent fixed the leak and injected write/fsync
 failure regressions; retries succeed without leftover temporary state files.
 Measured-budget routing and changed managed source renewal are implemented.
-Parent independently ran the updated aggregate gate: 139 tests passed with
-zero failures, including storage, consumer, create-only restore, index-write
-recovery and sealed allowed-candidate regressions. All source changes through
-that checkpoint are committed (design checkpoint 3579ba5; evidence at
-storage-consumer-restore-regressions.log in nested repo). Pinned esbuild build
-tooling is installed/locked; runtime code is not yet bundled/installed.
+The first independent review of the dependency-closed runner protocol found
+three P1 issues (stranded index-ahead, local-only as stage-suppression,
+missing/unsupported vetoes). All three were fixed with durable root-cause
+fixes (publisher stranded-index recovery, runner bucketed-only suppression,
+`local-only` per-outcome reason) plus regression tests. The bounded gate now
+runs 153 tests; all pass. Source committed at 747f0ed; evidence at
+`dracon-sync/evidence/auto-registration-2026-10-16/runner-review-regressions.log`.
+Pinned esbuild build tooling is installed/locked; the runner bundle is
+rebuilt and verified. Installed protocol CLI, Rust bridge, fresh installed
+lifecycle qualification and real-storage rollout remain open.
 
 ## Consumer seam decision
 
