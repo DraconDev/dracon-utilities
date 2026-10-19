@@ -610,6 +610,209 @@ A5-14 also repairs this for the never-pushed case, but the independence should b
 `ahead > 0` conjunct keeps the branch unreachable for a never-pushed repo — which is exactly
 the case this finding is about.
 
+### A5-29 — HIGH — branch-deletion now occupies the fleet's single push permit, and retries every commit cycle
+
+**This is live in the deployed binary.** Verified: the deployed `~/.local/bin/dracon-sync`
+contains both `"push semaphore closed"` (the shared lane) and the `"delete remote branch"`
+op-label — **neither exists at `v0.113.95`** (`git show dracon-sync-v0.113.95:src/git/branch.rs
+| grep -c "delete remote branch"` → 0), and the change landed 2026-10-15, before the
+2026-10-19 deployment.
+
+`dracon-sync/src/git/branch.rs:25-33` (post-delta):
+
+```rust
+let result = super::push_resources::push_phase(super::run_git_with_timeout_env(
+    repo, &["push", remote, "--delete", branch], 60, "delete remote branch", …
+```
+
+Pre-delta this ran on a plain `std::process::Command` and never touched the push lane. Now:
+
+- `push_resources::isolated_push` (`src/git/push_resources.rs:85`) matches `args[0] == "push"`
+  **and** the `PUSH_PHASE` marker → the deletion **takes the shared push permit**.
+- `push_slots()` (`src/git/push_resources.rs:88-91`) is `Semaphore::new(1)` — **one permit for
+  the whole fleet**.
+- The permit is acquired with `acquire_owned().await` — **no acquisition timeout** — and is
+  held for the entire work future (`push_resources.rs:95-115`).
+- `prune_other_default_branch(repo).await` runs **after every commit**
+  (`src/sync.rs:4678`, unconditional), and the remote delete is attempted whenever
+  `remote_branch_exists(repo, other)` — a **local** `git show-ref` check
+  (`src/git/branch.rs:255`, `:264-277`).
+
+**Impact.** AGENTS.md states *"every live main/master across the fleet is protected
+(allow_force_push=false, maintainers push)"*. If a repo on `main` has a second default
+branch (`master`) whose remote copy is protected, the remote refuses the deletion, the
+local tracking ref survives, and **every commit cycle re-issues the delete** — each attempt
+holding the fleet's only push permit for a full SSH round trip (up to the 60 s timeout) while
+every other repo's real push queues behind it. The single-push lane itself is by design
+(`docs/design/push-isolation-2026-10-15.md:20`, *"one daemon push command at a time"*), but a
+**branch cleanup** is not a fleet push and does not belong on that lane.
+
+**Fix.** Run the deletion off the shared push lane, or make a rejected deletion sticky
+(record it and stop retrying until the tracking ref changes). Note also that the design doc
+does not document the interaction between the single permit and `push_op_timeout_secs = 900`:
+one slow push head-of-line-blocks the whole fleet for up to 15 minutes.
+
+### A5-30 — HIGH — stuck-push routing never fires for repos without a bucket guard script
+
+`dracon-sync/src/stuck_route.rs:191-222`:
+
+```rust
+match crate::bucket_guard::check_push_range(repo, timeout_secs, env_override).await {
+    Ok(Some(verdict)) if !verdict.ok => { …file a finding… }
+    Ok(_) => Ok(false),
+    Err(_) => { …maybe_route_stuck_push(&request)… }
+}
+```
+
+`check_push_range` returns `Ok(None)` when **no guard script is discoverable**
+(`src/bucket_guard.rs:77-80` `discover_guard` → `None` → `Ok(None)`), when the override is
+missing (`:82-84`), or when HEAD is detached / there is no upstream. `Ok(None)` falls into
+the `Ok(_)` arm → `Ok(false)`: **no filing and no fallback**. The summary path
+`maybe_route_stuck_push` is reachable only from the `Err(_)` arm, which requires a guard to
+have been **found and then to have failed** (spawn error, timeout, unparseable JSON).
+
+**Impact.** The documented fallback is not implemented. `maybe_route_stuck_push` has exactly
+one production caller (`:223`) and is effectively dead code for the ordinary case — precisely
+the repos it was written for. The only test of that path
+(`routes_hook_refusal_with_guard_json_cause`, `:318`) calls it directly, so the suite gives
+false confidence: the new routing feature is inert in production.
+
+**Fix.** Route `Ok(None)` to the summary fallback as well: `Ok(Some(v)) if !v.ok` → file;
+`Ok(Some(v))` → `Ok(false)`; **`Ok(None)` and `Err`** → summary fallback. Add a regression
+test that drives `maybe_route_with_rederive` for a repo with no guard script.
+
+### A5-31 — MEDIUM — forge-controlled text is written into an auto-committed, multi-forge-pushed repo file
+
+`dracon-sync/src/stuck_route.rs:70-80` and `:259-268`. For a server-side rejection the
+"cause" is the **forge's own message**: `extract_route_cause` takes the first two non-empty
+lines of the raw push stderr (`git push` echoes `remote: <server text>`). That text is
+written into `<repo>/.pi-glla/audit-loop/findings.md` — **inside a daemon-watched repo**.
+
+Under the commit-all policy (AGENTS.md) the daemon stages that file and pushes it to the
+repo's *other* remotes; no per-repo `auto_commit_exclude_patterns` covers `.pi-glla` in the
+fleet's `~/.dracon/utilities/sync/dracon-sync.toml`.
+
+**Impact.** A compromised or hostile forge (the fleet pushes to codeberg as well as
+github/gitlab) can inject arbitrary text into a git-tracked file that is then pushed to the
+other forges, and into a ledger an AI loop reads and acts on (*"Fix the cause"*) — a
+cross-forge content-injection and prompt-injection vector. The redaction applied covers URL
+userinfo only (`redact_url_credentials`), so a token in any other form is written verbatim.
+Reachable today via the `Err(_)` fallback, and **fully** reachable once A5-30 is fixed.
+
+**Fix.** Treat the cause as untrusted: record it in the daemon's own incident ledger, or
+sanitise it to a fixed vocabulary (guard code + file paths). Never embed raw remote text in
+a tracked file.
+
+### A5-32 — MEDIUM — the "one row per stuck episode" dedup can never fire
+
+`dracon-sync/src/stuck_route.rs:235-240`:
+
+```rust
+let marker = format!("[STUCK-PUSH tip:{short_tip}]");
+let existing = std::fs::read_to_string(&ledger).unwrap_or_default();
+```
+
+The episode key is the **current HEAD tip**. But the daemon keeps committing while the push
+is paused (commit-despite-paused-push, `src/daemon.rs:8099/8195`), and the row the daemon
+itself just appended is such a commit → HEAD changes → the next filing window sees a new tip
+→ a new row.
+
+**Impact.** The stated invariant (*"one row per stuck episode"*, `stuck_route.rs:13-14`) does
+not hold. The ledger gains one daemon-authored row per throttle window (`daemon.rs:8109`)
+for as long as the repo stays stuck, and the daemon re-commits each row — a self-sustaining
+commit stream in the repos that are already the least healthy. This is the same failure
+shape as A5-16.
+
+**Fix.** Key the episode on the **classified cause** (code + first error path), or on the tip
+captured at *first* filing, and persist that key instead of re-deriving it from HEAD.
+
+### A5-33 — MEDIUM — the LFS classifier follows symlinks *(latent: modules are not wired)*
+
+`dracon-sync/src/lfs_classify.rs:66`, `:82`, `:116`. `fs::metadata`, `fs::File::open` and
+the size read all resolve **through symlinks**, while the allow-list check uses the
+*symlink's* extension (`:100`). A symlink `render.png` → `~/.ssh/id_rsa` is classified
+`ApprovedAsset` with the **target's** size; if that size crosses `individual_trigger_bytes`,
+`evaluate` returns `EnrollLfs` (`src/lfs_policy.rs:181-184`) and `git lfs` would upload the
+**target's raw bytes** to the LFS remote — bypassing the warden clean filter, which is the
+only thing keeping secrets encrypted. Secondarily, `File::open` on a **FIFO** blocks until a
+writer appears, and `read_exact` then blocks for 16 bytes: an unbounded hang inside
+`classify` (the daemon's classification timeout wraps `repo_diff_entries`, not this).
+
+**Severity is tempered by one fact I verified:** `lfs_classify` and `lfs_policy` are
+referenced **nowhere** outside their own files and the `pub mod` declarations in
+`src/lib.rs:7-8`. They are inert library code. The finding is **latent** — it becomes a
+release blocker the moment someone wires them.
+
+**Fix.** Use `fs::symlink_metadata`; return `Unknown` (→ `Hold`) for symlinks/FIFOs/sockets/
+devices; only open regular files.
+
+### A5-34 — MEDIUM — the LFS policy cannot express the staging-size invariant *(latent)*
+
+`dracon-sync/src/lfs_policy.rs:181`, `:84-89`; `src/lfs_classify.rs:283-296`. `is_valid()`
+never references `max_stage_file_bytes` (104857600, `src/policy.rs:1258-1260`), and
+`Evidence.bytes` is the **worktree** size (`lfs_classify.rs:116`) whereas the daemon's stage
+gate measures the **staged (post-filter) blob** (`src/exclude.rs:1762-1776`). The module's
+own test comment claims *"selection is NOT a staging-size exception"* — nothing enforces it,
+and the module's override test uses `individual_trigger_bytes: 50 MiB`, squarely inside the
+range the daemon stages as an ordinary Git blob. The same path then gets two
+representations, one of them a raw blob pushed to the remote.
+
+**Latent** for the same reason as A5-33 (the modules are unwired).
+
+**Fix.** Add `max_stage_file_bytes` to `Policy`/`Evidence`; require
+`individual_trigger_bytes > max_stage_file_bytes` in `is_valid()` (else `Hold(InvalidPolicy)`);
+measure the candidate with the same staged-blob measurement the stage gate uses.
+
+### A5-35 — LOW — remote-branch pruning hinges on a *local* remote-tracking ref
+
+`dracon-sync/src/git/branch.rs:255`, `:264-277`. `remote_branch_exists` is
+`git show-ref --verify --quiet refs/remotes/origin/<branch>` — a local snapshot, while the
+act is a remote deletion. The local branch is deleted unconditionally (`:239-250`); the
+remote one only if the local tracking ref exists. With a narrow `remote.origin.fetch`
+refspec, a `--single-branch` clone, or an unfetched repo, the remote alternate default
+branch is **never pruned** — the dual-default-branch drift this function exists to prevent
+persists, and the repo is left split (no local `master`, remote `master` present). The code
+already handles "already absent" idempotently (`:11-13`, `:30-33`), so the guard adds no
+safety.
+
+**Fix.** Check with `git ls-remote --exit-code origin refs/heads/<branch>`, or keep the
+unconditional attempt and rely on the existing idempotency.
+
+### A5-36 — LOW — stdout is piped on a looser predicate than the push lane uses
+
+`dracon-sync/src/git/ops.rs:366` and `:496`:
+
+```rust
+.stdout(if args.contains(&"push") { Stdio::piped() } else { Stdio::null() })
+```
+
+`args.contains(&"push")` matches the literal **anywhere** in argv, while the lane's own
+predicate is `args.first() == Some(&"push")` (`push_resources.rs:85`). A future git command
+with "push" as a *value* (`git log --grep push`, `git config --get remote.pushurl`) would
+have its stdout captured and appended to the failure text, where it was previously
+`/dev/null`. No such call exists today (all production push arg vectors start with `"push"`)
+— latent only.
+
+**Fix.** Use `args.first() == Some(&"push")` in both places.
+
+### A5-37 — LOW — the LFS sensitive set is narrower than warden's, and `ApprovedAsset` is content-blind *(latent)*
+
+`dracon-sync/src/lfs_classify.rs:85-89`, `:97-99`, `:147`;
+`dracon-warden/src/security/src/modules/filter.rs:339-370`. Warden protects
+`.p12 .pfx .asc .ovpn .tfvars .kdbx …`, `id_ecdsa`, `id_dsa`, `credentials`, `vault.yml`,
+`.env.local`, `.env.production`; the LFS classifier knows only `pem|key|age|env` plus
+`.env|id_rsa|id_ed25519|secrets.json`. Those files land in `Unknown` → `Hold`
+(`lfs_policy.rs:150-152`), which **is** fail-closed for LFS, so there is no leak today. Two
+residuals: `.sql` is `SourceText` → `KeepGit` (the one branch meaning "not sensitive") while
+warden treats `.sql` as sensitive-and-encrypted; and `ApprovedAsset` — the only gateway to
+`EnrollLfs` — is decided by **extension alone**, with the module's own reviewed list
+containing the content-agnostic `bin` (`:147`), so `credentials.bin` would be an "approved
+asset".
+
+**Fix.** Derive the LFS sensitive list from the same source of truth as warden's; require a
+magic-byte signature before an extension may promote a file to `ApprovedAsset`; drop
+content-agnostic extensions.
+
 ## LOW
 
 ### A5-09 — LOW — AGENTS.md is stale after the 2026-10-19 operator-service migration
