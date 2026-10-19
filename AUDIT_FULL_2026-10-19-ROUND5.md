@@ -262,6 +262,14 @@ Drift against the `.github/workflows/ci.yml` pins:
 *"which is what makes this a real gate"*) and is currently red, so the drift is detected and
 not acted on.
 
+**Sharpened by the delta review.** The pinned tree contains **no `bucket_runner_bridge` code
+at all** (`git ls-tree -r <pin> | grep -c bucket_runner_bridge` → 0). The module was added
+entirely on the path from the pin to HEAD. CI therefore could not have caught A5-01 even in
+principle — it never built the code that contains the flaw. The pin sits only 8 commits after
+the `v0.113.95` release, so re-pinning to the release tag would have brought CI close to
+current; leaving it at the 2026-10-08 pin means the pipeline has been blind to everything
+since.
+
 **Fix.** Re-pin to the current nested HEADs (`scripts/repin-nested-sources.py` exists for this),
 after A5-03's formatting is landed, so CI exercises the code that actually ships.
 
