@@ -6,26 +6,30 @@ Scope: `dracon-utilities` parent meta repo + the three nested standalone utility
 plus the live `dracon-sync` daemon state and the `dracon-sync repos` fleet table.
 
 Trigger: operator request — "audit this project also check out Detail: `dracon-sync repos <name>`"
-for the single repo flagged in the fleet table (`bridge-fixture`).
+for the repo the fleet table flagged as needing attention (`bridge-fixture`), cross-read against
+the full key (`dracon-sync repos --legend`) and the rest of the supplied table — which turned
+up a second row carrying a failing push that the summary line had not named
+(`mcode-plugins`, row 18).
 
 Method: mechanical gate execution (build/test/clippy/fmt/deny/doctor/health) + targeted source
-review of code introduced since ROUND4 (2026-10-03) + live daemon/host supervision inspection.
-Every finding below is backed by a command output or a `file:line` reference read in source.
+review of code introduced since ROUND4 (2026-10-03) + live daemon/host supervision inspection +
+live fleet triage of every row the supplied table marked with a failing push. Every finding
+below is backed by a command output or a `file:line` reference read in source.
 No repository state was mutated by this audit: no commit, no push, no service change, no
 freeze, no file written outside this report and `/tmp`.
 
 Severity: CRITICAL = arbitrary code execution or credential exposure; HIGH = broken
 security control or red gate; MEDIUM = correctness/operational gap; LOW = docs, drift, noise.
 
-## Counts (13 findings)
+## Counts (16 findings)
 
 | Severity | Count | Ids |
 |---|---|---|
 | CRITICAL | 1 | A5-01 |
-| HIGH | 3 | A5-02, A5-03, A5-04 |
-| MEDIUM | 5 | A5-05 … A5-08, A5-13 |
+| HIGH | 5 | A5-02, A5-03, A5-04, A5-14, A5-16 |
+| MEDIUM | 6 | A5-05 … A5-08, A5-13, A5-17 |
 | LOW | 4 | A5-09 … A5-12 |
-| **Total** | **13** | |
+| **Total** | **16** | |
 
 ## Requested item — `dracon-sync repos bridge-fixture` (resolved)
 
@@ -67,6 +71,50 @@ The untracked PNG is **not** an accidental leftover: `bucket-runner.json` lists 
 transport failure injected)"* — the refusal is the deliberate state under qualification. The
 daemon correctly refuses to commit. The defects here are diagnostic, not behavioural
 (A5-08, A5-12).
+
+### The second attention item the footer never named: `mcode-plugins`
+
+The supplied table's row 18 read:
+
+```
+│ 18  ┆ ✅ CLEAN  ┆ mcode-plugins ┆ … ┆ ✅ OK  … ┆ ❌ FAIL ┆ … ┆ 3 ┆ 3 ┆ 3 ┆ 2.4 MiB ┆ DraconDev ┆
+```
+
+`❌ FAIL` in the PUSH column, `✅ CLEAN` in STATUS — and the footer still said
+*"💡 1 repo requiring attention"*, naming only `bridge-fixture`. `dracon-sync repos
+mcode-plugins` gives the detail:
+
+```
+1. ✅ CLEAN  /home/dracon/Dev/mcode-plugins
+   publish:   ⚠️ origin/main …
+   changes:   0 mod, 0 stg, 0 ut
+   ahead/behind: 0/0
+   push:      ❌ FAIL 30m
+   activity:  ⚪ idle      state: ⚪ idle
+   hint:      🛑 push-stuck (5 failures): git push returned non-zero (remotes: github,
+              gitlab, origin…) — run dracon-sync repair concerns --apply
+```
+
+Tracing it produced three findings that the table's own summary line had suppressed:
+
+- **A5-14** — the repo has **25 commits and an empty remote**, yet the view reports
+  `0/0` and `✅ CLEAN`. The report never applies the never-pushed ahead fallback that the
+  daemon has used since v0.112.31; git omits `# branch.ab` when there is no tracking ref, so
+  the parser leaves ahead at 0.
+- **A5-16** — the push fails because the repo's own pre-push guard refuses to publish a
+  **plaintext `password=` credential** embedded in a 6.4 MB `.orig.bak` bundle that is still
+  in the pending push range. The remote (`git@github.com:DraconDev/mcode-plugins.git`) exists
+  and SSH auth works — it simply has **zero branches**, so nothing has ever been published.
+- **A5-17** — because the ahead count is 0, `current_health::classify` returns
+  `Current::Converged` and the `PUSH_STUCK → Stalled` branch is unreachable, so the row is
+  **omitted from the "requiring attention" footer** even though it carries a push-stuck hint
+  and the daemon had fired a `Push Stuck (budget exhausted)` alert for it.
+
+While pushes are paused the daemon stays in "commit-only mode" and keeps committing —
+`📝 committed 1 file(s) in /home/dracon/Dev/mcode-plugins` appears every ~20-60 s from 14:43
+to 14:52 — so the unpublished pile grows without bound. This is a live credential exposure
+guarded by exactly one local hook, and it needs an operator decision (rotate the credential;
+then the sanctioned-slimming rewrite or a fresh push of a sanitised `main`).
 
 ## CRITICAL
 
@@ -216,6 +264,110 @@ not acted on.
 
 **Fix.** Re-pin to the current nested HEADs (`scripts/repin-nested-sources.py` exists for this),
 after A5-03's formatting is landed, so CI exercises the code that actually ships.
+
+### A5-14 — HIGH — the `repos` view reports "0 ahead / CLEAN" for a repo that has never been pushed
+
+**Evidence.** The report's ahead/behind comes from the porcelain-v2 parser
+(`src/report.rs:4029` → `src/git/inspection.rs:parse_status`), which reads the
+`# branch.ab +N -M` line. Git emits that line **only when the remote-tracking ref exists**.
+For a repo whose upstream is configured but never fetched, git emits
+`# branch.upstream origin/main` and **no** `branch.ab`:
+
+```
+$ git status --porcelain=v2 --branch -z --untracked-files=all
+# branch.oid 067139798d0a33c449ee9f38128ca4ab921048a4
+# branch.head main
+# branch.upstream origin/main
+$ git status --porcelain=v2 --branch | grep -c branch.ab
+0
+```
+
+`parse_status` therefore never sees an ahead/behind value, and `status.ahead` / `status.behind`
+stay at their default **0**.
+
+The daemon compensates — but the report does not. `count_all_head_commits` and
+`upstream_tracking_ref_missing` (`src/git/status.rs:311-330`, `:360-393`) are referenced
+**only** from `src/daemon.rs:8528`; `src/report.rs` uses neither. The daemon's own comment at
+`src/daemon.rs:8520-8530` names this exact defect:
+
+> "…then libgit2 computed ahead=0 (nothing to compare against), and
+> `has_local_or_pending_work` evaluated false — the repo was skipped forever and **the report
+> showed a false 'synced'**. When the tracking ref is missing, every commit on HEAD is
+> unpushed; `count_all_head_commits` is the fallback after the mirror-based counts."
+
+That fallback was added to the daemon in v0.112.30/0.112.31 and never to the report.
+
+**Live confirmation** — `mcode-plugins`:
+
+| Measurement | Value |
+|---|---|
+| `git rev-list --count HEAD` | **25** commits |
+| `git ls-remote --heads origin` | **0** branches (empty remote) |
+| `git for-each-ref refs/remotes/` | *(no output — no tracking ref)* |
+| `dracon-sync repos` AHEAD / BEHIND | **0 / 0** |
+| `dracon-sync repos` STATUS | **✅ CLEAN** |
+
+Twenty-five commits are unpublished and the operator's table says zero.
+
+**Impact.** The ahead column is the operator's measure of outstanding work. Reading "0 ahead,
+✅ CLEAN" for a repo with 25 unpushed commits and a broken remote is a false all-clear, and it
+is the same false "synced" the daemon's comment says was fixed. It also silently disarms the
+report-side push-stuck classification (A5-17).
+
+**Fix.** Apply the daemon's fallback in the report: when `upstream_tracking_ref_missing` is
+true, set `ahead = count_all_head_commits(repo)` (and `behind = 0`). The helper already exists
+and is unit-tested (`src/git/status.rs:656-800`).
+
+### A5-16 — HIGH — a plaintext `password=` credential sits in mcode-plugins history, in the pending push range, guarded only by a local hook
+
+**Evidence.** `mcode-plugins` is push-stuck with an exhausted budget:
+
+```
+Oct 19 14:51:50 🛑 push stuck (5 consecutive failures ≥ budget 5) — auto-push paused
+Oct 19 14:51:50 🔔 sync alert: Push Stuck (budget exhausted): 5 consecutive push failures —
+   local pre-push hook refused the push (repo policy: asset-guard / size budget / secret scan
+   / history guard — fix the policy, not the network); auto-push paused
+```
+
+Replaying the repo's own pre-push guard reproduces the refusal exactly:
+
+```
+$ printf 'refs/heads/main %s refs/heads/main 0000…0000\n' "$(git rev-parse HEAD)" \
+    | .git/hooks/pre-push origin git@github.com:DraconDev/mcode-plugins.git
+⚠️  Possible plaintext secrets detected in added file
+   mcode-chrome/chunk-5ADYFF2U.js.orig.bak (binary-safe scan).
+   The warden filter may have been bypassed.
+   Run: dracon-warden once /home/dracon/Dev/mcode-plugins
+HOOK_EXIT=1
+```
+
+The offending file is a **6.4 MB JavaScript bundle backup** (blob `f5b32e814ed9de69a4f6b74f…`):
+
+- added by `b9d4365` — *"auto: initial commit (18 files)"*
+- deleted by `e867003` (the worktree copy is now covered by `*.orig.bak` in the warden's
+  managed `.gitignore` block, line 128 — but the blob is still reachable)
+- `git rev-list --objects HEAD --not --remotes | grep -c chunk-5ADYFF2U.js.orig.bak` → **1**
+  — i.e. it is **inside the range that a push to the empty remote would publish**
+
+Scanning the blob against the guard's own `SECRET_RE` categories (reporting only which
+category matched, never the value) identifies it as a **`password = "…"` assignment** — a
+plaintext credential, not an exotic false positive. The private-key, GitHub PAT, GitLab PAT,
+AWS, Stripe, Slack, OpenAI, Google, SendGrid, npm, HuggingFace, Square and OVH alternatives
+all did not match.
+
+**Impact.** A plaintext password is committed to git history in a repo whose remote is empty,
+so **the local pre-push hook is the only thing standing between it and a public GitHub push**.
+The AGENTS.md policy forbids agent loops from rewriting history, and the sanctioned remedy
+(`docs/design/sanctioned-slimming-2026-09-26.md`) is operator-only, so this cannot be
+self-healed. Meanwhile the daemon keeps committing — the journal shows
+`📝 committed 1 file(s)` every ~20-60 s from 14:43 to 14:52 — because "commit-only mode"
+continues while pushes are paused. The local pile grows without bound, and each new commit
+is another candidate for the next push attempt.
+
+**Fix (operator).** Treat the credential as compromised and rotate it. Then either rewrite the
+history to drop the blob (sanctioned-slimming procedure, operator-approved) or push a
+sanitised `main` to a fresh remote and re-point `origin`. The 6.4 MB blob is also a
+GitHub-push size risk in its own right.
 
 ## MEDIUM
 
@@ -376,6 +528,47 @@ knob, and represent a timed-out repo as an explicit in-table row (e.g. `❔ UNKN
 `status inspection timed out`) rather than dropping it, so the count in the header always
 equals the number of discovered repos.
 
+### A5-17 — MEDIUM — the "N repos requiring attention" footer cannot see a push-stuck repo
+
+**Evidence.** The footer is built by `rich_hint_link_out` (`src/report.rs:6871-6897`), which
+keeps only rows whose `current_health::classify(row)` is one of
+`Blocked | Stalled | Retrying | Paused | Unknown | Queued | Excluded`. `classify`
+(`src/current_health.rs:39-95`) starts with:
+
+```rust
+let pending = row.modified + row.staged + row.untracked > 0 || row.ahead > 0 || row.behind > 0;
+…
+if !pending {
+    return if row.excluded_dirty > 0 { Current::Excluded } else { Current::Converged };
+}
+```
+
+and only later:
+
+```rust
+if row.ahead > 0 && row.push_status == "PUSH_STUCK" {
+    return Current::Stalled;
+}
+```
+
+For `mcode-plugins` the report's `ahead` is **0** (A5-14) and the worktree is clean, so
+`pending` is false → `Current::Converged` → the row is **excluded from the footer** — even
+though the row's own hint reads
+`🛑 push-stuck (5 failures): git push returned non-zero (remotes: github, gitlab, origin…)`
+and the daemon had fired a `Push Stuck (budget exhausted)` alert for it.
+
+**Impact.** The operator's summary line under-reports. In the fleet table supplied with this
+audit request, `mcode-plugins` (row 18) showed `❌ FAIL` in the PUSH column while the footer
+read *"💡 1 repo requiring attention"*, naming only `bridge-fixture`. A repo that is
+permanently un-pushable, blocked on a credential, and committing every minute was not in that
+count.
+
+**Fix.** Make the footer's inclusion test depend on the *evidence* rather than only on
+`pending`: a row whose `push_status` is `PUSH_STUCK` / `BROKEN` / `BLOCKED`, or whose hint
+carries a push-stuck marker, must reach the footer regardless of the ahead count. Fixing
+A5-14 also repairs this for the never-pushed case, but the independence should be fixed too —
+`PUSH_STUCK` is defined by *exhausted-budget evidence*, and the report already carries it.
+
 ## LOW
 
 ### A5-09 — LOW — AGENTS.md is stale after the 2026-10-19 operator-service migration
@@ -452,16 +645,24 @@ hint should prefer affirmative block evidence over an unmeasured pack check.
 1. **A5-01** — move the profile location under operator/global authority; refuse a
    repo-supplied `profilePath`. *This is the one finding that can be triggered by a routine
    commit to a watched repo.*
-2. **A5-02** — enforce `profile.runner.sha256` before spawn.
-3. **A5-03 + A5-04** — `cargo fmt --all` in the three nested repos, commit, re-pin, turn CI
+2. **A5-16** — operator action, today: rotate the `password` credential exposed in
+   `mcode-plugins` history, then either run the sanctioned-slimming rewrite or push a
+   sanitised `main` to a fresh remote. Until then a single local hook is the only thing
+   preventing a plaintext credential from reaching GitHub, and the daemon keeps committing
+   every minute.
+3. **A5-02** — enforce `profile.runner.sha256` before spawn.
+4. **A5-03 + A5-04** — `cargo fmt --all` in the three nested repos, commit, re-pin, turn CI
    green. The drift is 754 commits on `dracon-sync`; CI currently proves nothing about it.
-4. **A5-05** — apply the prepared operator module (or an equivalent persistent unit) so the
+5. **A5-14 + A5-17** — apply the daemon's never-pushed ahead fallback in the report and make
+   the attention footer depend on push evidence rather than on the ahead count. These two make
+   the fleet view tell the truth about `mcode-plugins` and every other never-pushed repo.
+6. **A5-05** — apply the prepared operator module (or an equivalent persistent unit) so the
    daemon survives a reboot.
-5. **A5-06 + A5-07** — make `doctor.sh` and `install.sh` topology-aware.
-6. **A5-08** — surface the verdict `reason`.
-7. **A5-13** — align the `repos` status budget with the daemon's 60s and render a timed-out
+7. **A5-06 + A5-07** — make `doctor.sh` and `install.sh` topology-aware.
+8. **A5-08** — surface the verdict `reason`.
+9. **A5-13** — align the `repos` status budget with the daemon's 60s and render a timed-out
    repo as an explicit row rather than dropping it.
-8. **A5-09 … A5-12** — documentation and alert-noise hygiene.
+10. **A5-09 … A5-12** — documentation and alert-noise hygiene.
 
 ## Out of scope / not verified here
 
@@ -475,3 +676,13 @@ hint should prefer affirmative block evidence over an unmeasured pack check.
   remains outstanding.
 - `dracon-warden` 0.113.16 and `dracon-system` 0.112.45 release deltas were covered by the
   mechanical gates only, not by source review.
+- **No credential value was printed, stored, or transmitted.** The category identification in
+  A5-16 was done by matching the guard's own `SECRET_RE` alternatives against the blob and
+  reporting only which category matched. The temporary working copy of the blob was moved to
+  recoverable trash (`/tmp/blob.bin` → trash) rather than deleted outright, because the
+  permission gate blocks irrecoverable destruction — **note that this places a copy of a
+  plaintext credential in the trash store**, which is exactly what the 2026-08-10 credential
+  discipline in AGENTS.md warns against. The operator should purge that trash entry.
+- **No history rewrite, no force-push, no service change, no freeze and no push was performed
+  by this audit.** The `mcode-plugins` credential and the `dracon-platform` reset incident both
+  need operator action; neither was touched.
