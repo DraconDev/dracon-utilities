@@ -367,6 +367,13 @@ self-healed. Meanwhile the daemon keeps committing — the journal shows
 continues while pushes are paused. The local pile grows without bound, and each new commit
 is another candidate for the next push attempt.
 
+**This is actively worsening.** Re-measured at 16:15 (75 minutes after the first
+measurement): the commit count went **25 → 88**, the reported git size **2.4 MiB → 10.2 MiB**,
+the remote still has **0 branches**, there is still **no remote-tracking ref**, and the
+6.4 MB secret blob is still inside `git rev-list --objects HEAD --not --remotes`. Every one
+of those 88 commits is a fresh candidate for publication, and the fleet table still reports
+the repo as `✅ CLEAN` with `0/0`.
+
 **Fix (operator).** Treat the credential as compromised and rotate it. Then either rewrite the
 history to drop the blob (sanctioned-slimming procedure, operator-approved) or push a
 sanitised `main` to a fresh remote and re-point `origin`. The 6.4 MB blob is also a
