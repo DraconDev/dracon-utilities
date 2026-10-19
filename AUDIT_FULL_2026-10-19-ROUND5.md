@@ -626,22 +626,43 @@ hint should prefer affirmative block evidence over an unmeasured pack check.
 
 The R4 (2026-10-03) audit covered dracon-sync 0.113.93, dracon-system 0.112.44, dracon-warden
 0.113.15, security 0.4.0. The current versions are 0.113.95 / 0.112.45 / 0.113.16 / 0.4.0.
-Delta scope, measured:
 
-| Utility | Commits | Changed lines | Files |
-|---|---|---|---|
-| dracon-sync | 183 | +3313 | 20 |
-| dracon-system | — | +4301 / −124 | 27 |
-| dracon-warden | — | +6704 / −506 | 35 |
+**An important correction to the first pass of this audit:** the CI pins are *not* older than
+the R4 tags — they are **newer**. `git merge-base --is-ancestor <pin> <R4-tag>` is false for
+all three, and `<pin>..<R4-tag>` counts 0, i.e. the R4 tag is an ancestor of the pin. The
+actual relationship is:
+
+| Anchor | dracon-sync |
+|---|---|
+| `dracon-sync-v0.113.93` (R4) | 2026-10-03 |
+| `dracon-sync-v0.113.95` (release) | 2026-10-05 — **8 commits before the CI pin** |
+| CI pin `2759b8c8` | 2026-10-08 |
+| `HEAD` (`9d2fb22`) | 2026-10-19 — **754 commits after the pin** |
+
+So the true unreviewed range is **`dracon-sync-v0.113.95..HEAD` = 762 commits, 100 source
+files, 58,308 insertions** — not the 183-commit release delta first quoted. The `bucket_runner_bridge`
+module — where A5-01 (CRITICAL) lives — was added **entirely after the CI pin**
+(`git ls-tree -r <pin> | grep -c bucket_runner_bridge` → **0**). CI is testing a tree that
+contains no bridge code at all, which is precisely why the CRITICAL finding could not have
+been caught by the pipeline.
+
+Per-utility unreviewed production surface (`v<release>..HEAD`, source files only):
+
+| Utility | Unreleased range | Production surface |
+|---|---|---|
+| dracon-sync | 762 commits | 100 files, 58,308 insertions — new modules: `daemon/discovery_scheduler.rs`, `daemon/push_history.rs`, `daemon/recovery.rs`, `daemon/scheduler_evidence.rs`, `git/inspection.rs`, `git/push_resources.rs`, `lfs_classify.rs`, `lfs_policy.rs`, `stuck_route.rs` |
+| dracon-system | 6 commits | 2 files, 27 insertions — a correct zombie-exclusion fix in `src/main.rs` (skips a zombie wrapper whose cmdline is legitimately empty) |
+| dracon-warden | 0 commits | none — the warden tree is exactly at `v0.113.16` |
 
 The live deployed binary was confirmed to be the audited one: the running process
 (`/proc/2039261/exe` → `~/.local/bin/dracon-sync`) hashes to
 `2fc714a1252ed64f3102175a67587c848567629df9b8e099d38d45789744a2cd`, matching the deployed
 hash recorded in `evidence/sync-blockers-2026-10-19/live-verification-2026-10-19.md`.
 
-The delta was reviewed by component, with the destructive paths (system) and the new module
-(warden) reviewed in depth. 11 further findings; the ones I could disprove by reading the
-surrounding code are listed at the end as "checked and found correct".
+The delta was reviewed by component, with the destructive paths (system) and the new modules
+(warden, sync) reviewed in depth. The findings below are in addition to the 16 already
+recorded; the ones I could disprove by reading the surrounding code are listed at the end as
+"checked and found correct".
 
 ### A5-18 — HIGH — `systemd --user` reparenting is treated as proof the owner died
 
