@@ -33,6 +33,9 @@ security control or red gate; MEDIUM = correctness/operational gap; LOW = docs, 
 | LOW | 13 | A5-09 … A5-12, A5-24 … A5-28, A5-35 … A5-38 |
 | **Total** | **37** | |
 
+The tally is document-wide: it covers the `CRITICAL`/`HIGH`/`MEDIUM`/`LOW` sections *and* the
+`## R4 → now delta review` section, whose findings carry their severity in their own heading.
+
 ## Requested item — `dracon-sync repos bridge-fixture` (resolved)
 
 The fleet table flagged exactly one repo: `bridge-fixture`, `❔ UNKNOWN`, with the hint
