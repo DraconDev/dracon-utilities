@@ -23,15 +23,15 @@ and `/tmp`.
 Severity: CRITICAL = arbitrary code execution or credential exposure; HIGH = broken
 security control or red gate; MEDIUM = correctness/operational gap; LOW = docs, drift, noise.
 
-## Counts (36 findings)
+## Counts (37 findings)
 
 | Severity | Count | Ids |
 |---|---|---|
 | CRITICAL | 1 | A5-01 |
 | HIGH | 8 | A5-02, A5-03, A5-04, A5-14, A5-16, A5-18, A5-29, A5-30 |
 | MEDIUM | 15 | A5-05 … A5-08, A5-13, A5-17, A5-19 … A5-23, A5-31 … A5-34 |
-| LOW | 12 | A5-09 … A5-12, A5-24 … A5-28, A5-35 … A5-37 |
-| **Total** | **36** | |
+| LOW | 13 | A5-09 … A5-12, A5-24 … A5-28, A5-35 … A5-38 |
+| **Total** | **37** | |
 
 ## Requested item — `dracon-sync repos bridge-fixture` (resolved)
 
@@ -697,13 +697,13 @@ The delta was reviewed by component, with the destructive paths (system) and the
 recorded; the ones I could disprove by reading the surrounding code are listed at the end as
 "checked and found correct".
 
-**Index for this section** — HIGH: A5-29 (branch-deletion holds the fleet push permit),
-A5-30 (stuck-push routing is inert) · MEDIUM: A5-18 (`systemd --user` orphan proof),
-A5-19 (binary PEM regression), A5-20 (`sha256sum` dependency), A5-21 (signature breadth),
-A5-22 (pressure behind the reap), A5-23 (quarantine fsync), A5-31 (forge text into a
-tracked file), A5-32 (stuck-episode dedup), A5-33 (LFS symlinks), A5-34 (LFS staging-size) ·
-LOW: A5-24 … A5-28, A5-35 (local-ref pruning), A5-36 (stdout predicate), A5-37 (LFS sensitive
-set).
+**Index for this section** — HIGH: A5-18 (`systemd --user` orphan proof), A5-29
+(branch-deletion holds the fleet push permit), A5-30 (stuck-push routing is inert) ·
+MEDIUM: A5-19 (binary PEM regression), A5-20 (`sha256sum` dependency), A5-21 (signature
+breadth), A5-22 (pressure behind the reap), A5-23 (quarantine fsync), A5-31 (forge text into
+a tracked file), A5-32 (stuck-episode dedup), A5-33 (LFS symlinks), A5-34 (LFS
+staging-size) · LOW: A5-24 … A5-28, A5-35 (local-ref pruning), A5-36 (stdout predicate),
+A5-37 (LFS sensitive set), A5-38 (`pidfd` is available; doc residual is wrong).
 
 ### A5-18 — HIGH — `systemd --user` reparenting is treated as proof the owner died
 
@@ -1286,7 +1286,9 @@ Recorded so the coverage is auditable and the next round does not re-tread it:
    the fleet view tell the truth about `mcode-plugins` and every other never-pushed repo.
 9. **A5-18** — do **not** enable `reap_orphans_on_pressure` until `systemd --user` is
    distinguished from PID 1 and an age floor is restored. As written it would kill the
-   operator's own dev servers (109 live candidates on this host today). The knob is OFF.
+   operator's own dev servers (**28 kill candidates** among 165 tty-less systemd-parented
+   processes on this host today, including live vite servers on 5173/5178/5189 and the
+   operator's own `opencode-chrome-bridge`). The knob is OFF.
 10. **A5-19 + A5-20** — restore binary PEM header detection in the warden hook and replace the
     `sha256sum` hard dependency with a hasher fallback. Both are in the guard that stands
     between a secret and a public push.
@@ -1301,7 +1303,7 @@ Recorded so the coverage is auditable and the next round does not re-tread it:
 16. **A5-33 + A5-34 + A5-37** — fix the LFS classifier's symlink handling and the
     staging-size invariant **before** the LFS modules are wired to anything. They are inert
     today, so these are cheap to fix now and release blockers later.
-17. **A5-09 … A5-12, A5-24 … A5-28, A5-35, A5-36** — documentation, alert-noise and
+17. **A5-09 … A5-12, A5-24 … A5-28, A5-35, A5-36, A5-38** — documentation, alert-noise and
     low-severity hygiene.
 
 ## Out of scope / not verified here
