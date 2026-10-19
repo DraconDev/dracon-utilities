@@ -695,6 +695,14 @@ The delta was reviewed by component, with the destructive paths (system) and the
 recorded; the ones I could disprove by reading the surrounding code are listed at the end as
 "checked and found correct".
 
+**Index for this section** — HIGH: A5-29 (branch-deletion holds the fleet push permit),
+A5-30 (stuck-push routing is inert) · MEDIUM: A5-18 (`systemd --user` orphan proof),
+A5-19 (binary PEM regression), A5-20 (`sha256sum` dependency), A5-21 (signature breadth),
+A5-22 (pressure behind the reap), A5-23 (quarantine fsync), A5-31 (forge text into a
+tracked file), A5-32 (stuck-episode dedup), A5-33 (LFS symlinks), A5-34 (LFS staging-size) ·
+LOW: A5-24 … A5-28, A5-35 (local-ref pruning), A5-36 (stdout predicate), A5-37 (LFS sensitive
+set).
+
 ### A5-18 — HIGH — `systemd --user` reparenting is treated as proof the owner died
 
 `dracon-system/src/reap.rs:703-714`:
@@ -1219,28 +1227,43 @@ Recorded so the coverage is auditable and the next round does not re-tread it:
    `mcode-plugins` history, then either run the sanctioned-slimming rewrite or push a
    sanitised `main` to a fresh remote. Until then a single local hook is the only thing
    preventing a plaintext credential from reaching GitHub, and the daemon keeps committing
-   every minute.
-3. **A5-02** — enforce `profile.runner.sha256` before spawn.
-4. **A5-03 + A5-04** — `cargo fmt --all` in the three nested repos, commit, re-pin, turn CI
-   green. The drift is 754 commits on `dracon-sync`; CI currently proves nothing about it.
-5. **A5-14 + A5-17** — apply the daemon's never-pushed ahead fallback in the report and make
+   every minute. Do **not** use the advertised `repair concerns --apply` as the fix — the
+   push failure is deterministic, so that only resumes failing attempts.
+3. **A5-29** — take the branch-deletion push off the shared fleet push permit, or make a
+   refused deletion sticky. This is **live in the deployed binary**: a protected remote
+   `master` makes every commit cycle hold the fleet's single push permit for a full SSH
+   round trip.
+4. **A5-30** — route `Ok(None)` to the summary fallback in `stuck_route.rs`. The documented
+   stuck-push routing is currently inert for every repo without a bucket guard script.
+5. **A5-31 + A5-32** — stop writing forge-controlled text into an auto-committed repo file,
+   and key the stuck-episode dedup on the cause rather than on HEAD. Both are live and both
+   amplify damage in exactly the repos that are already unhealthy.
+6. **A5-02** — enforce `profile.runner.sha256` before spawn.
+7. **A5-03 + A5-04** — `cargo fmt --all` in the three nested repos, commit, re-pin, turn CI
+   green. The pinned tree contains **no** bucket-bridge code at all, so CI could not have
+   caught A5-01 even in principle.
+8. **A5-14 + A5-17** — apply the daemon's never-pushed ahead fallback in the report and make
    the attention footer depend on push evidence rather than on the ahead count. These two make
    the fleet view tell the truth about `mcode-plugins` and every other never-pushed repo.
-6. **A5-18** — do **not** enable `reap_orphans_on_pressure` until `systemd --user` is
+9. **A5-18** — do **not** enable `reap_orphans_on_pressure` until `systemd --user` is
    distinguished from PID 1 and an age floor is restored. As written it would kill the
    operator's own dev servers (109 live candidates on this host today). The knob is OFF.
-7. **A5-19 + A5-20** — restore binary PEM header detection in the warden hook and replace the
-   `sha256sum` hard dependency with a hasher fallback. Both are in the guard that stands
-   between a secret and a public push.
-8. **A5-05** — apply the prepared operator module (or an equivalent persistent unit) so the
-   daemon survives a reboot.
-9. **A5-06 + A5-07** — make `doctor.sh` and `install.sh` topology-aware.
-10. **A5-08** — surface the verdict `reason`.
-11. **A5-13** — align the `repos` status budget with the daemon's 60s and render a timed-out
+10. **A5-19 + A5-20** — restore binary PEM header detection in the warden hook and replace the
+    `sha256sum` hard dependency with a hasher fallback. Both are in the guard that stands
+    between a secret and a public push.
+11. **A5-05** — apply the prepared operator module (or an equivalent persistent unit) so the
+    daemon survives a reboot.
+12. **A5-06 + A5-07** — make `doctor.sh` and `install.sh` topology-aware.
+13. **A5-08** — surface the verdict `reason`.
+14. **A5-13** — align the `repos` status budget with the daemon's 60s and render a timed-out
     repo as an explicit row rather than dropping it.
-12. **A5-21 … A5-23** — reap signature breadth, pressure/reap sequencing, and the quarantine
+15. **A5-21 … A5-23** — reap signature breadth, pressure/reap sequencing, and the quarantine
     fsync gap.
-13. **A5-09 … A5-12, A5-24 … A5-28** — documentation, alert-noise and low-severity hygiene.
+16. **A5-33 + A5-34 + A5-37** — fix the LFS classifier's symlink handling and the
+    staging-size invariant **before** the LFS modules are wired to anything. They are inert
+    today, so these are cheap to fix now and release blockers later.
+17. **A5-09 … A5-12, A5-24 … A5-28, A5-35, A5-36** — documentation, alert-noise and
+    low-severity hygiene.
 
 ## Out of scope / not verified here
 
