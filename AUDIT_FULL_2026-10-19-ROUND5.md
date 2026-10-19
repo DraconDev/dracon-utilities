@@ -21,15 +21,15 @@ freeze, no file written outside this report and `/tmp`.
 Severity: CRITICAL = arbitrary code execution or credential exposure; HIGH = broken
 security control or red gate; MEDIUM = correctness/operational gap; LOW = docs, drift, noise.
 
-## Counts (16 findings)
+## Counts (27 findings)
 
 | Severity | Count | Ids |
 |---|---|---|
 | CRITICAL | 1 | A5-01 |
-| HIGH | 5 | A5-02, A5-03, A5-04, A5-14, A5-16 |
-| MEDIUM | 6 | A5-05 … A5-08, A5-13, A5-17 |
-| LOW | 4 | A5-09 … A5-12 |
-| **Total** | **16** | |
+| HIGH | 6 | A5-02, A5-03, A5-04, A5-14, A5-16, A5-18 |
+| MEDIUM | 11 | A5-05 … A5-08, A5-13, A5-17, A5-19 … A5-23 |
+| LOW | 9 | A5-09 … A5-12, A5-24 … A5-28 |
+| **Total** | **27** | |
 
 ## Requested item — `dracon-sync repos bridge-fixture` (resolved)
 
@@ -612,6 +612,311 @@ bridge refusal) was not surfaced in the row at all — the row showed `❔ UNKNO
 activity with no indication that the repo is blocked-by-guard and has been for 24 h. The
 hint should prefer affirmative block evidence over an unmeasured pack check.
 
+## R4 → now delta review (the previously-outstanding gap)
+
+The R4 (2026-10-03) audit covered dracon-sync 0.113.93, dracon-system 0.112.44, dracon-warden
+0.113.15, security 0.4.0. The current versions are 0.113.95 / 0.112.45 / 0.113.16 / 0.4.0.
+Delta scope, measured:
+
+| Utility | Commits | Changed lines | Files |
+|---|---|---|---|
+| dracon-sync | 183 | +3313 | 20 |
+| dracon-system | — | +4301 / −124 | 27 |
+| dracon-warden | — | +6704 / −506 | 35 |
+
+The live deployed binary was confirmed to be the audited one: the running process
+(`/proc/2039261/exe` → `~/.local/bin/dracon-sync`) hashes to
+`2fc714a1252ed64f3102175a67587c848567629df9b8e099d38d45789744a2cd`, matching the deployed
+hash recorded in `evidence/sync-blockers-2026-10-19/live-verification-2026-10-19.md`.
+
+The delta was reviewed by component, with the destructive paths (system) and the new module
+(warden) reviewed in depth. 11 further findings; the ones I could disprove by reading the
+surrounding code are listed at the end as "checked and found correct".
+
+### A5-18 — HIGH — `systemd --user` reparenting is treated as proof the owner died
+
+`dracon-system/src/reap.rs:703-714`:
+
+```rust
+/// True when `ppid`'s command name is the init system — i.e. the process
+/// was reparented because its real parent died. Covers PID 1 and the
+/// systemd user manager alike (both are comm `systemd`).
+pub(crate) fn parent_comm_is_systemd(proc_root: &Path, ppid: i32) -> bool {
+    …
+        .map(|comm| comm.trim() == "systemd")
+```
+
+The premise is wrong for the systemd **user** manager. On this host PID 1224 is
+`/run/current-system/systemd/lib/systemd/systemd --user --deserialize=10` — the session
+manager, not PID 1. Every background job whose launching shell exits is reparented there
+while remaining in active use.
+
+`scan_pressure_orphans` (`src/reap.rs:716-719`) is *"Deliberately IGNORENT of age, CPU, and
+run state"*, and the policy doc for `reap_orphans_on_pressure` (`src/policy.rs:106-110`) bakes
+the same assumption in: *"parent-dead (reparented to init/systemd) … with NO age/CPU/state
+gates"*.
+
+**Live measurement on this host** — 109 tty-less processes are reparented to `systemd --user`
+and match the default signature list, including:
+
+```
+14120   1224 ?  10053  node node_modules/vite/bin/vite.js dev --port 5173 --host 127.0.0.1
+973041  1224 ?   8455  node node_modules/vite/bin/vite.js dev --port 5178 --host 127.0.0.1
+1145842 1224 ? 158800  node …/pi-goal-list-loop-audit/scripts/goal-auditor-worker.mjs …
+1178395 1224 ? 158751  node …/pi-goal-list-loop-audit/scripts/goal-auditor-worker.mjs …
+1508407 1224 ?  13954  timeout 900 bun test --max-concurrency=1 --timeout=120000
+1218279 1224 ?    997  node server/index.mjs
+```
+
+**Impact.** Enabling `reap_orphans_on_pressure` would SIGTERM/SIGKILL the operator's own dev
+servers and in-flight audit workers under memory pressure — with no age, CPU or state gate to
+filter them. The age-gated path (`reap_stale_dev_servers`) is well-tuned by comparison and
+targets only genuinely abandoned processes.
+
+**Severity note:** both destructive knobs are **currently OFF** — neither
+`reap_stale_dev_servers` nor `reap_orphans_on_pressure` appears in
+`~/.dracon/utilities/system/dracon-system.toml`, and both default to `false`
+(`src/policy.rs:409-410`). This is latent, not an active incident.
+
+**Fix.** Read the parent's **cmdline**, not just `comm`; treat `systemd --user` as a session
+manager rather than an orphan proof (or require `ppid == 1`). Re-introduce the ≥1 h age floor
+on the pressure path, per the F117 precedent. Add a regression test that fabricates a
+`systemd --user` parent and asserts the candidate is **not** reaped.
+
+### A5-19 — MEDIUM — warden 0.113.16 no longer detects a binary PEM key split by a NUL byte
+
+`dracon-warden/src/main.rs` (hook template `blob_secret_matches`, binary branch). The new
+binary branch discards the PEM header and relies solely on an awk adjacency rule:
+
+```sh
+grep -aoE "$SECRET_RE" "$BLOB_SCAN" | grep -v '^-----''BEGIN ' || true
+…
+    if (i > 1) { pending = 0 }
+```
+
+**Verified empirically** against the live deployed hook
+(`/home/dracon/Dev/mcode-plugins/.git/hooks/pre-push`), using the hook's own `SECRET_RE`:
+
+| Blob shape | New hook | Pre-delta (`grep -aqE "$SECRET_RE"`) |
+|---|---|---|
+| PEM header + base64 body separated by **NUL**, no newline | **NOT DETECTED** | **DETECTED** (header matched) |
+| PEM header + body separated by newline | DETECTED | DETECTED |
+| Compiled label only (header, no material) | not detected | detected *(the false positive the change targets)* |
+
+The NUL-separated case is a genuine **detection regression**: `pending` is reset at the start
+of every NUL-separated segment, so a header in one segment and the key material in the next
+are never associated, and the header itself is filtered out.
+
+**Impact.** A private key embedded in a binary — where the header and body are separated by a
+NUL byte rather than a newline — now passes the pre-push guard. The text path is unaffected.
+The trade-off is deliberate (the design doc `rollback-binary-hook-false-positive-2026-10-16.md`
+targets the compiled-label false positive) but it is a net loss of true positives.
+
+**Fix.** Keep a header-only signal for binary blobs: emit a distinct `PEM-HEADER` marker when
+a header is seen with no material in the same segment, and treat it as a match. That restores
+v0.113.15's strictness for real headers without re-flagging the compiled-label shape.
+
+### A5-20 — MEDIUM — `sha256sum` is a new hard runtime dependency of the `#!/bin/sh` pre-push hook
+
+`dracon-warden/src/main.rs`, hook template `reviewed_text_matches` (live hook lines 221/225):
+
+```sh
+reviewed_blob=$(sha256sum "$BLOB_SCAN") || return 2
+…
+reviewed_match=$(printf '%s' "$reviewed_candidate" | sha256sum) || return 2
+```
+
+New in 0.113.16 (`git show dracon-warden-v0.113.15:src/main.rs | grep -c sha256sum` → **0**;
+v0.113.16 → **2**). It is reached on the push path for **every** text blob: `blob_secret_matches`
+pipes into it unconditionally (`printf '%s\n' "$text_matches" | reviewed_text_matches`).
+
+`return 2` propagates to the caller —
+`MATCHES=$(blob_secret_matches "$scan_commit:$af") || { echo 'warden: blob scan failed' >&2; exit 1; }`
+— so on a host without GNU coreutils **every push containing an added text file is refused**.
+
+**Impact.** Fail-closed (no plaintext leak), so this is availability, not confidentiality. The
+hook is `#!/bin/sh` and ships to arbitrary hosts, where `sha256sum` may be absent (macOS/BSD
+have `shasum -a 256`; minimal containers have neither).
+
+**Fix.** Resolve a hasher once — `command -v sha256sum || command -v shasum || command -v openssl` —
+and keep the hard refusal only when none exists.
+
+### A5-21 — MEDIUM — reap signature matching is a whole-command-line substring
+
+`dracon-system/src/reap.rs:164-170`:
+
+```rust
+fn matches_signature(args: &str, signatures: &[String]) -> Option<String> {
+    signatures
+        .iter()
+        .find(|needle| !needle.is_empty() && args.contains(needle.as_str()))
+        .cloned()
+}
+```
+
+The needle is matched against the **entire argv**, not `argv[0]`, so a process whose *arguments*
+merely mention a signature word is a candidate. The default signature list contains `.mjs`,
+which matches **any** Node ESM script by extension — including the operator's own
+`goal-auditor-worker.mjs` and `opencode-chrome-bridge/bridge.mjs`, not just test litter. The
+example config documents this substring breadth for the **exempt** list only ("use bare process
+names here, not argument fragments"); the identical breadth on the *signature* list is
+undocumented.
+
+**Fix.** Match against the executable basename (`argv[0]`) or require the match at the start
+of the command line; document the breadth on the signature list too.
+
+### A5-22 — MEDIUM — the memory-pressure verdict is sequenced behind the 60 s stale-servers reap
+
+`dracon-system/src/main.rs:7489-7501`:
+
+```rust
+let reaped = if guard.reap_stale_dev_servers && !reap_candidates.is_empty() {
+    …
+    tokio::task::spawn_blocking(move || { auto_reap_stale_servers(…) }).await.unwrap_or_default()
+} else { Vec::new() };
+check_large_logs(guard, state).await;
+let memory = check_memory_pressure(guard, state, &samples).await;
+```
+
+The blocking reap (60 s pass cap) is awaited **before** the pressure verdict is computed, so
+the renice mitigation (`main.rs:4797`) and the OOM-bias adjustment (`main.rs:4847`) — the
+response to a critical box — wait behind it. `REAP_PASS_BUDGET` is per *pass* and is checked
+only before each candidate, so a single `terminate_process` can overshoot it by a full ~7 s
+grace window; with two passes per cycle the guard's cycle can reach ~140 s against a 30 s
+default interval.
+
+**Fix.** Compute pressure and apply the mitigation before the stale-servers reap; make the
+budget a per-cycle deadline and check it between grace polls.
+
+### A5-23 — MEDIUM — quarantine/relocate copy → verify → delete with no fsync
+
+`dracon-system/src/quarantine.rs:515-528`, `src/relocate.rs:95` (`copy_tree`),
+`src/relocate.rs:125` (`fs::copy`). `copy_tree` never calls `sync_all`; the cross-device
+restore path copies the entry, verifies it by **inode metadata only** (file count + byte
+totals — page-cache state), then `fs::remove_dir_all(&entry_dir)` destroys the last copy. A
+power loss between the copy and the delete leaves an empty origin and no quarantine entry.
+
+This shape is pre-existing, but the delta adds `replace_older_auto_generations`
+(`src/quarantine.rs:288+`), which deletes the previous verified generation immediately after
+publishing the new un-fsynced one — so the restore path is now a single un-fsynced copy.
+
+**Impact is bounded** because the affected origins are regeneratable build output
+(`target/`, `node_modules/`).
+
+**Fix.** `sync_all` each copied file and the containing directory before removing the source.
+
+### A5-24 — LOW — `terminate_process` hardcodes `/proc` instead of the threaded `proc_root`
+
+`dracon-system/src/reap.rs:421-441`: `pid_is_alive` builds `format!("/proc/{pid}/stat")`
+directly, while the rest of the module threads a `proc_root` through for testability. Correct
+in production (`proc_root == "/proc"`), but the fixture tests only pass because the signal
+tests spawn a **real** child — the liveness check reads a different tree than the verifier, so
+a future fabricated `proc_root` would silently exercise the host's `/proc`.
+
+### A5-25 — LOW — warden's `is_hatched` public API changed semantics silently
+
+`dracon-warden/src/security/src/modules/filter.rs:31`, re-exported at
+`src/security/src/lib.rs:22`. `is_hatched` previously returned `true` for an absolute path
+with a `.plaintext` sibling; it now returns `false` for absolute paths and any `..` component.
+The `dracon-security` crate is publishable (`publish` is not set), so this is a silent
+behavioural break for external consumers. There is no in-tree production caller left, so the
+change is invisible here. The new test `clean_encrypts_absolute_hatched_path_fail_closed`
+documents the new intent; nothing flags the API break.
+
+### A5-26 — LOW (needs verification) — the `index_batch` helper inherits descriptors 3+
+
+`dracon-warden/src/index_batch.rs:218-224` spawns the `git cat-file --batch` helper with
+`stdin`/`stdout` piped and `stderr` null; the `close_range` call is executed **only** in the
+guardian clone child (`:340`). `docs/evidence/index-batch-transport.md` states "It closes every
+inherited FD via close_range", which is true of the guardian but not of the exec'd helper — that
+one relies on Rust's `O_CLOEXEC` for fd 3+. *To confirm:* run the driver with an extra
+inherited fd 3 open and inspect `/proc/<cat-file-pid>/fd` after spawn.
+
+### A5-27 — LOW — the gitlink skip converts paths lossily, so a non-UTF-8 submodule path still gets unstaged every cycle
+
+`dracon-sync/src/git/staging.rs:186-201` (0.113.95 hotfix). The gitlink skip inserts
+`PathBuf::from(String::from_utf8_lossy(name).into_owned())` into `skipped`, while `blind` is
+computed with `candidates.iter().filter(|p| !measured.contains(*p) && !skipped.contains(*p))`.
+For a path whose bytes are not valid UTF-8 the lossy conversion yields a *different* `PathBuf`,
+so the match fails, the gitlink lands in `blind`, and it is unstaged on every cycle — the exact
+symptom the hotfix was written to stop. (The same lossy conversion in the pre-existing
+`indexed` push has the same effect for regular files, where it fails closed by never
+committing them.) The hotfix itself is otherwise **correct**: `skipped` is joined *before*
+`continue`, and `blind` honours `skipped`, so ordinary gitlinks are correctly skipped.
+
+**Fix.** Use `PathBuf::from(OsStr::from_bytes(name))` rather than the lossy conversion.
+
+### A5-28 — LOW — the askpass token file leaks if its path is not UTF-8
+
+`dracon-sync/src/git/push.rs:67-74` (and the gitlab leg at `:123-130`, codeberg at `:167-174`):
+
+```rust
+match super::git_askpass_script(&token).await {
+    Ok(askpass) => {
+        if let Some(askpass_str) = askpass.to_str() {
+            let _askpass_guard = super::AskpassScript::new(askpass.clone());
+```
+
+The `AskpassScript` guard — which unlinks the 0o700 file containing the plaintext token on
+drop — is constructed **inside** the `to_str()` branch. If the temp path is not valid UTF-8
+(possible when `TMPDIR` contains non-UTF-8 bytes), the guard is never created, the token file
+stays in `/tmp` indefinitely, and no warning is logged (the else branch only records
+"askpass path not UTF-8" as a push failure). The rest of the askpass implementation is solid:
+`O_EXCL|O_NOFOLLOW`, mode `0o700`, and the token is refused if it contains a single quote
+(`src/git/ops.rs:616-633`).
+
+**Fix.** Construct the guard immediately after `git_askpass_script` returns, before the
+`to_str()` check.
+
+### Checked in the delta and found CORRECT
+
+Recorded so the coverage is auditable and the next round does not re-tread it:
+
+- **`dracon-sync/src/secrets.rs`** — the R4-SR-15 fix (`.env` value extraction) is
+  implemented and the F52/M27 control-character refusal is still applied *after* the new
+  value stripping; no bypass. `strip_env_value` handles `export `, quoted values, and
+  whitespace-delimited `#` comments without panicking on multi-byte UTF-8 (the NUL/byte-offset
+  arithmetic stays on char boundaries).
+- **`dracon-sync/src/ownership.rs`** — the R4-SR-13 probe hardening (bounded git probes with
+  kill-on-timeout, policy-routed git, prompt sealing) is sound. A probe timeout yields
+  `None` for the affected signal, and `OwnershipReport::Unknown` is grouped with `Unowned` in
+  the daemon's skip decision (`src/daemon.rs:1595-1596`), so a wedged git **fails closed** —
+  the repo is skipped, not synced.
+- **`dracon-sync/src/git/staging.rs`** — R4-SC-10 (`:(literal)` pathspecs) and R4-SC-14
+  (fail-loud instead of `Ok(vec![])` on a failed `rev-list`) are both correctly implemented;
+  the gitlink hotfix is correct for ordinary paths (A5-27 is the edge case).
+- **`dracon-sync/src/git/mod.rs`** — the R4-SC-04 fix moves the pack measurement to the
+  blocking pool with a documented, deliberately timeout-free await (an outer timeout would
+  leak the blocking thread and its git child); a panic fails closed toward skipping the
+  GitHub leg.
+- **`dracon-sync/src/report.rs`** — R4-SC-14's fail-loud treatment was applied to
+  `handle_ahead`; `detect_large_blobs_ahead` has no other call site, so no residual
+  `unwrap_or_default()` remains on that path.
+- **`dracon-warden/src/index_batch.rs`** — no security defect found. Fail-closed everywhere:
+  every transport error returns `Err` → no reuse → fresh encryption. `clean_reusing_index`
+  requires authenticated, byte-exact decryption **and** still-policy-conformant cleaning
+  before reuse, so a failed decrypt (which returns raw ciphertext) can never equal the
+  plaintext. `size` is capped before allocation; `Drop` signals the process group before
+  reaping (PGID-reuse safe) with an `exit(1)` backstop.
+- **`dracon-warden/src/security/src/modules/scanner.rs`** — F123 is complete: exactly one
+  supported secret marker, and all three production construction sites pass it. The
+  `starts_with(tag_prefix)` change is strictly tighter than the old `contains("_SECRET:")`.
+- **`dracon-warden/src/security/src/modules/filter.rs`** — F137 collapses the failure arms
+  into one that emits the tag **verbatim** (no plaintext); the new diagnostic prints a byte
+  **offset**, not content.
+- **`dracon-warden/src/main.rs`** — the reviewed-hook-matches feature binds a receipt to the
+  complete blob SHA-256 *and* the individual match SHA-256; any byte change invalidates it,
+  and an additional unreviewed match in the same blob is still blocked. `mktemp` failures
+  `exit 1` and the `trap` cleans every temp file.
+- **`dracon-system/src/safety.rs`**, **`src/relocate.rs`**, **`src/quarantine.rs`** — all
+  fail closed. `relocate` refuses symlinks, non-directories, git-tracked content (unless
+  `--allow-tracked`), an existing destination, and source/dest nesting. `quarantine` reads
+  manifests fail-closed, and the `PIN_REASON` fail-safe prevents a manifest-less entry from
+  ever ageing out; a durable `quarantine restore` CLI exists.
+- **`dracon-system/src/doctor.rs`** — the new JSON envelope is backward-compatible, and
+  `resolve_bin_for_readonly_probe` is used **only** for read-only probes; every mutating
+  `systemctl` exec still uses `resolve_bin_strict`.
+
 ## Gate results (2026-10-19, local HEADs)
 
 | Gate | Command | Result |
@@ -656,13 +961,21 @@ hint should prefer affirmative block evidence over an unmeasured pack check.
 5. **A5-14 + A5-17** — apply the daemon's never-pushed ahead fallback in the report and make
    the attention footer depend on push evidence rather than on the ahead count. These two make
    the fleet view tell the truth about `mcode-plugins` and every other never-pushed repo.
-6. **A5-05** — apply the prepared operator module (or an equivalent persistent unit) so the
+6. **A5-18** — do **not** enable `reap_orphans_on_pressure` until `systemd --user` is
+   distinguished from PID 1 and an age floor is restored. As written it would kill the
+   operator's own dev servers (109 live candidates on this host today). The knob is OFF.
+7. **A5-19 + A5-20** — restore binary PEM header detection in the warden hook and replace the
+   `sha256sum` hard dependency with a hasher fallback. Both are in the guard that stands
+   between a secret and a public push.
+8. **A5-05** — apply the prepared operator module (or an equivalent persistent unit) so the
    daemon survives a reboot.
-7. **A5-06 + A5-07** — make `doctor.sh` and `install.sh` topology-aware.
-8. **A5-08** — surface the verdict `reason`.
-9. **A5-13** — align the `repos` status budget with the daemon's 60s and render a timed-out
-   repo as an explicit row rather than dropping it.
-10. **A5-09 … A5-12** — documentation and alert-noise hygiene.
+9. **A5-06 + A5-07** — make `doctor.sh` and `install.sh` topology-aware.
+10. **A5-08** — surface the verdict `reason`.
+11. **A5-13** — align the `repos` status budget with the daemon's 60s and render a timed-out
+    repo as an explicit row rather than dropping it.
+12. **A5-21 … A5-23** — reap signature breadth, pressure/reap sequencing, and the quarantine
+    fsync gap.
+13. **A5-09 … A5-12, A5-24 … A5-28** — documentation, alert-noise and low-severity hygiene.
 
 ## Out of scope / not verified here
 
@@ -671,9 +984,11 @@ hint should prefer affirmative block evidence over an unmeasured pack check.
 - The bucket-runner component's own JS test suites (`planner`, `publisher`, `storage`,
   `bindings`, `restore`, `consumer`, `e2e`, `adapters`, `routing`, `capabilities`) were not
   re-run in this round; only the Rust workspace gates were.
-- The 754-commit `dracon-sync` delta since the CI pin was **not** line-by-line reviewed. A5-01
-  and A5-02 were found by targeted review of the bridge; a full component audit of that delta
-  remains outstanding.
+- The 754-commit `dracon-sync` delta since the **CI pin** was **not** line-by-line reviewed.
+  The **release** delta since R4 (0.113.93 → 0.113.95, 183 commits) *was* reviewed by
+  component, and A5-01, A5-02, A5-27 and A5-28 come from it. The gap between the CI pin and
+  the current HEAD is the same code as the release delta plus unreleased work; a full
+  component audit of everything since the pin remains outstanding.
 - `dracon-warden` 0.113.16 and `dracon-system` 0.112.45 release deltas were covered by the
   mechanical gates only, not by source review.
 - **No credential value was printed, stored, or transmitted.** The category identification in
