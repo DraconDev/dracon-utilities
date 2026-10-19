@@ -12,11 +12,13 @@ up a second row carrying a failing push that the summary line had not named
 (`mcode-plugins`, row 18).
 
 Method: mechanical gate execution (build/test/clippy/fmt/deny/doctor/health) + targeted source
-review of code introduced since ROUND4 (2026-10-03) + live daemon/host supervision inspection +
-live fleet triage of every row the supplied table marked with a failing push. Every finding
-below is backed by a command output or a `file:line` reference read in source.
-No repository state was mutated by this audit: no commit, no push, no service change, no
-freeze, no file written outside this report and `/tmp`.
+review of code introduced since ROUND4 (2026-10-03) — the **full unreleased range**
+`v<release>..HEAD` for all three utilities, 762 commits and 58.3k source insertions on
+dracon-sync alone — + live daemon/host supervision inspection + live fleet triage of every row
+the supplied table marked with a failing push. Every finding below is backed by a command
+output or a `file:line` reference read in source. No repository state was mutated by this
+audit: no commit, no push, no service change, no freeze, no file written outside this report
+and `/tmp`.
 
 Severity: CRITICAL = arbitrary code execution or credential exposure; HIGH = broken
 security control or red gate; MEDIUM = correctness/operational gap; LOW = docs, drift, noise.
