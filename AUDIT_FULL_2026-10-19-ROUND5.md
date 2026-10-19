@@ -21,15 +21,15 @@ freeze, no file written outside this report and `/tmp`.
 Severity: CRITICAL = arbitrary code execution or credential exposure; HIGH = broken
 security control or red gate; MEDIUM = correctness/operational gap; LOW = docs, drift, noise.
 
-## Counts (27 findings)
+## Counts (36 findings)
 
 | Severity | Count | Ids |
 |---|---|---|
 | CRITICAL | 1 | A5-01 |
-| HIGH | 6 | A5-02, A5-03, A5-04, A5-14, A5-16, A5-18 |
-| MEDIUM | 11 | A5-05 … A5-08, A5-13, A5-17, A5-19 … A5-23 |
-| LOW | 9 | A5-09 … A5-12, A5-24 … A5-28 |
-| **Total** | **27** | |
+| HIGH | 8 | A5-02, A5-03, A5-04, A5-14, A5-16, A5-18, A5-29, A5-30 |
+| MEDIUM | 15 | A5-05 … A5-08, A5-13, A5-17, A5-19 … A5-23, A5-31 … A5-34 |
+| LOW | 12 | A5-09 … A5-12, A5-24 … A5-28, A5-35 … A5-37 |
+| **Total** | **36** | |
 
 ## Requested item — `dracon-sync repos bridge-fixture` (resolved)
 
