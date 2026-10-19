@@ -301,13 +301,16 @@ That fallback was added to the daemon in v0.112.30/0.112.31 and never to the rep
 
 | Measurement | Value |
 |---|---|
-| `git rev-list --count HEAD` | **25** commits |
+| `git rev-list --count HEAD` | **25** commits at 15:00 → **88** at 16:15 |
 | `git ls-remote --heads origin` | **0** branches (empty remote) |
 | `git for-each-ref refs/remotes/` | *(no output — no tracking ref)* |
 | `dracon-sync repos` AHEAD / BEHIND | **0 / 0** |
 | `dracon-sync repos` STATUS | **✅ CLEAN** |
+| reported git size | 2.4 MiB → **10.2 MiB** |
 
-Twenty-five commits are unpublished and the operator's table says zero.
+Twenty-five commits were unpublished and the operator's table said zero; by 16:15 the pile had
+grown to 88 commits, still with nothing published. The growth is the daemon continuing to
+commit in "commit-only mode" while the push budget is exhausted.
 
 **Impact.** The ahead column is the operator's measure of outstanding work. Reading "0 ahead,
 ✅ CLEAN" for a repo with 25 unpushed commits and a broken remote is a false all-clear, and it
