@@ -604,6 +604,12 @@ carries a push-stuck marker, must reach the footer regardless of the ahead count
 A5-14 also repairs this for the never-pushed case, but the independence should be fixed too —
 `PUSH_STUCK` is defined by *exhausted-budget evidence*, and the report already carries it.
 
+**Still open at HEAD.** `src/current_health.rs:74` still reads
+`if row.ahead > 0 && row.push_status == "PUSH_STUCK"`, and
+`src/report.rs:6879-6881` still filters the footer on `current_health::classify(row)`. The
+`ahead > 0` conjunct keeps the branch unreachable for a never-pushed repo — which is exactly
+the case this finding is about.
+
 ## LOW
 
 ### A5-09 — LOW — AGENTS.md is stale after the 2026-10-19 operator-service migration
