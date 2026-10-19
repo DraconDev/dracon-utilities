@@ -329,6 +329,12 @@ report-side push-stuck classification (A5-17).
 true, set `ahead = count_all_head_commits(repo)` (and `behind = 0`). The helper already exists
 and is unit-tested (`src/git/status.rs:656-800`).
 
+**Still open at HEAD.** Re-checked on the 762-commit unreleased range: `count_all_head_commits`
+and `upstream_tracking_ref_missing` are referenced from `src/daemon.rs` and `src/sync.rs`
+only — `src/report.rs` still never applies the fallback. The parsing site is
+`src/git/inspection.rs:79-89`, which sets `status.ahead`/`status.behind` **only** when git
+emits the `# branch.ab` record; with no tracking ref git omits it, so both stay 0.
+
 ### A5-16 — HIGH — a plaintext `password=` credential sits in mcode-plugins history, in the pending push range, guarded only by a local hook
 
 **Evidence.** `mcode-plugins` is push-stuck with an exhausted budget:
@@ -381,6 +387,17 @@ the remote still has **0 branches**, there is still **no remote-tracking ref**, 
 6.4 MB secret blob is still inside `git rev-list --objects HEAD --not --remotes`. Every one
 of those 88 commits is a fresh candidate for publication, and the fleet table still reports
 the repo as `✅ CLEAN` with `0/0`.
+
+**Re-measured again at 17:34: 88 → 133 commits, `.git` 10.2 → 17 MiB.** Still 0 remote
+branches, still no tracking ref, secret blob still in the push range.
+
+**The advertised remediation cannot work.** The row's own hint says *"run `dracon-sync
+repair concerns --apply`"*, and `dracon-sync repair stuck-unstuck <repo>` does clear the
+stuck flag (`src/daemon.rs:5643-5658` — it removes the repo from the stuck-push ledger so the
+next cycle retries). But the push failure is **deterministic**: the pre-push guard refuses
+the same blob every time. Clearing the flag would resume push attempts that fail identically
+and add more commits to the pile, while the operator believes the problem was addressed. The
+only thing that actually clears this is removing the credential from the pushed range.
 
 **Fix (operator).** Treat the credential as compromised and rotate it. Then either rewrite the
 history to drop the blob (sanctioned-slimming procedure, operator-approved) or push a
