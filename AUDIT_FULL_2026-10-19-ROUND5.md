@@ -17,15 +17,15 @@ freeze, no file written outside this report and `/tmp`.
 Severity: CRITICAL = arbitrary code execution or credential exposure; HIGH = broken
 security control or red gate; MEDIUM = correctness/operational gap; LOW = docs, drift, noise.
 
-## Counts (12 findings)
+## Counts (13 findings)
 
 | Severity | Count | Ids |
 |---|---|---|
 | CRITICAL | 1 | A5-01 |
 | HIGH | 3 | A5-02, A5-03, A5-04 |
-| MEDIUM | 4 | A5-05 … A5-08 |
+| MEDIUM | 5 | A5-05 … A5-08, A5-13 |
 | LOW | 4 | A5-09 … A5-12 |
-| **Total** | **12** | |
+| **Total** | **13** | |
 
 ## Requested item — `dracon-sync repos bridge-fixture` (resolved)
 
@@ -42,11 +42,14 @@ unknown — use repos --deep"*.
               GitHub pack guard clear (measured this report); 2 GiB/push, not repo size
 ```
 
-The `❔ UNKNOWN` was only because the deep measurement had not yet run; it is now measured and
-clear. The `path_owned:untrusted_origin` warning is expected and benign under the AGENTS.md
-ownership rule (path-owned repos warn on a foreign `origin`; they do not gate commit/push) —
-`origin` here is the local state mirror `/home/dracon/.dracon/state/bridge-fixture-remote.git`
-while the real remotes are `github`/`gitlab`.
+The pack component of the hint was only unmeasured, and is now measured clear; a later
+non-deep run shows it cached (`GitHub pack guard clear (cached 711s ago)`). The `❔ UNKNOWN`
+that remains in the **status/activity** columns is *not* about the pack check at all — it is
+the activity classifier having no reading for a guard-blocked repo. The
+`path_owned:untrusted_origin` warning is expected and benign under the AGENTS.md ownership rule
+(path-owned repos warn on a foreign `origin`; they do not gate commit/push) — `origin` here is
+the local state mirror `/home/dracon/.dracon/state/bridge-fixture-remote.git` while the real
+remotes are `github`/`gitlab`.
 
 **The real, unreported blocker is different.** The repo is permanently un-committable:
 
@@ -334,6 +337,45 @@ consumer-changed verdict are indistinguishable from the log.
 **Fix.** Surface `verdict["reason"]` in the bail message (bounded and redacted, as the push
 path does), and include it in the incident ledger.
 
+### A5-13 — MEDIUM — the `repos` fleet view silently omits repos whose status inspection exceeds 8s
+
+**Evidence.** The report path uses a hardcoded 8-second budget
+(`src/report.rs:4029` `inspect_status(&repo, Duration::from_secs(8))`, and the same value as
+`PORCELAIN_BUDGET` at `src/report.rs:1356`), while the daemon's own scheduler allows 60s
+(`src/daemon.rs:269` `const STATUS_TASK_TIMEOUT_SECS: u64 = 60;`, used at `daemon.rs:8383`).
+The report's budget is therefore **7.5× stricter than the daemon's**.
+
+On timeout the repo is dropped from the table entirely —
+`src/report.rs:4029-4035` emits `status_failed` and `return None`. The failure *is* counted
+(`failures` in `--json`) and printed on stderr, but the repo contributes **no row to the
+table**, so the operator scanning the table sees a fleet that is one repo short with nothing
+marking which one is missing. Observed four consecutive times during this audit:
+
+```
+❌ /home/dracon/Dev/dracon-platform | status_failed: status inspection timed out;
+   owned Git process group cancelled
+❌ /home/dracon/Dev/dracon-strategy/ai-auto-writer | status_failed: status inspection timed
+   out; owned Git process group cancelled
+```
+
+The affected repo **moved between runs** (dracon-platform in runs 1–3, ai-auto-writer in
+run 4), so it is load-dependent rather than a property of one repo. The JSON confirms the
+omission exactly: the daemon reports **36 discovered repos** (`dracon-sync health`), while
+`dracon-sync repos --json` reports `repos: 35` with `ok: 26, active: 9, warn: 0, concern: 0`
+(the counters themselves sum correctly — 26+9+0+0 = 35 — so the R3-L09 contract holds) and
+`failures: 1`, which is the timed-out repo that has no row.
+
+**Impact.** The `repos` table is the operator's primary fleet view — the very command in the
+audit request. A large repo under load vanishes from it. That is the same "nearly invisible"
+failure class the project treats as dangerous elsewhere (AGENTS.md, canonical-checkouts
+section: *"their loss is nearly invisible … stayed gone for two days"*). The daemon may well
+be syncing that repo perfectly; the *view* simply cannot see it.
+
+**Fix.** Raise the report budget to the daemon's `STATUS_TASK_TIMEOUT_SECS`, make it a policy
+knob, and represent a timed-out repo as an explicit in-table row (e.g. `❔ UNKNOWN` +
+`status inspection timed out`) rather than dropping it, so the count in the header always
+equals the number of discovered repos.
+
 ## LOW
 
 ### A5-09 — LOW — AGENTS.md is stale after the 2026-10-19 operator-service migration
@@ -382,7 +424,7 @@ hint should prefer affirmative block evidence over an unmeasured pack check.
 | Gate | Command | Result |
 |---|---|---|
 | Release build | `cargo build --release --locked` | ✅ exit 0 |
-| Workspace tests | `cargo test --workspace --locked` | ⏳ see below |
+| Workspace tests | `cargo test --workspace --locked` | ✅ exit 0 — all suites green (warden 220, integration 18, storage_stream 2, doc-tests 0, plus the sync/system suites) |
 | Clippy | `cargo clippy --workspace --locked --all-targets -- -D warnings` | ✅ exit 0 |
 | Format | `cargo fmt --all --check` | ❌ **exit 1 — 138 diffs / 20 files** |
 | Dependencies | `cargo deny check` | ✅ `advisories ok, bans ok, licenses ok, sources ok` |
@@ -417,7 +459,9 @@ hint should prefer affirmative block evidence over an unmeasured pack check.
    daemon survives a reboot.
 5. **A5-06 + A5-07** — make `doctor.sh` and `install.sh` topology-aware.
 6. **A5-08** — surface the verdict `reason`.
-7. **A5-09 … A5-12** — documentation and alert-noise hygiene.
+7. **A5-13** — align the `repos` status budget with the daemon's 60s and render a timed-out
+   repo as an explicit row rather than dropping it.
+8. **A5-09 … A5-12** — documentation and alert-noise hygiene.
 
 ## Out of scope / not verified here
 
