@@ -612,30 +612,6 @@ A5-14 also repairs this for the never-pushed case, but the independence should b
 `ahead > 0` conjunct keeps the branch unreachable for a never-pushed repo — which is exactly
 the case this finding is about.
 
-### A5-38 — LOW — the guard's "cannot be closed further from userspace" residual is inaccurate; `pidfd` is available and permitted
-
-`dracon-system/docs/design/guard-auto-reap-2026-10-04.md:53-57`:
-
-> "The verify-then-kill window (microseconds) cannot be closed further from userspace;
-> kill-by-PID is inherently racy and the starttime check is the mitigation, not a cure."
-
-That last clause is wrong. On Linux 5.3+, `pidfd_open(2)` + `pidfd_send_signal(2)` make the
-signal immune to PID reuse — the kernel resolves the process at signal time, so a recycled
-PID cannot be hit. I verified both syscalls are permitted by the shipped unit's filter:
-`systemd-analyze syscall-filter @process` lists `pidfd_open`, `pidfd_send_signal` and `kill`,
-and `@system-service` includes `@process`.
-
-**In fairness to the code, the mitigation *is* in place.** `terminate_process`
-(`src/reap.rs:443`) checks only liveness, but its caller re-verifies the starttime
-immediately beforehand (`src/reap.rs:558` `if fields.starttime != candidate.starttime`),
-and `src/reap.rs:460` documents exactly that (*"caller re-verified starttime immediately
-before"*). The residual window is therefore microseconds, and the risk needs a PID recycled
-inside that window *and* the replacement to pass the same signature match. This is a
-hardening opportunity and a documentation inaccuracy — **not** a live defect.
-
-**Fix.** Open a pidfd at verify time and signal through it, keeping the starttime check as
-defence in depth; then correct the design doc's residual note.
-
 ## LOW
 
 ### A5-09 — LOW — AGENTS.md is stale after the 2026-10-19 operator-service migration
@@ -1179,6 +1155,30 @@ asset".
 **Fix.** Derive the LFS sensitive list from the same source of truth as warden's; require a
 magic-byte signature before an extension may promote a file to `ApprovedAsset`; drop
 content-agnostic extensions.
+
+### A5-38 — LOW — the guard's "cannot be closed further from userspace" residual is inaccurate; `pidfd` is available and permitted
+
+`dracon-system/docs/design/guard-auto-reap-2026-10-04.md:53-57`:
+
+> "The verify-then-kill window (microseconds) cannot be closed further from userspace;
+> kill-by-PID is inherently racy and the starttime check is the mitigation, not a cure."
+
+That last clause is wrong. On Linux 5.3+, `pidfd_open(2)` + `pidfd_send_signal(2)` make the
+signal immune to PID reuse — the kernel resolves the process at signal time, so a recycled
+PID cannot be hit. I verified both syscalls are permitted by the shipped unit's filter:
+`systemd-analyze syscall-filter @process` lists `pidfd_open`, `pidfd_send_signal` and `kill`,
+and `@system-service` includes `@process`.
+
+**In fairness to the code, the mitigation *is* in place.** `terminate_process`
+(`src/reap.rs:443`) checks only liveness, but its caller re-verifies the starttime
+immediately beforehand (`src/reap.rs:558` `if fields.starttime != candidate.starttime`),
+and `src/reap.rs:460` documents exactly that (*"caller re-verified starttime immediately
+before"*). The residual window is therefore microseconds, and the risk needs a PID recycled
+inside that window *and* the replacement to pass the same signature match. This is a
+hardening opportunity and a documentation inaccuracy — **not** a live defect.
+
+**Fix.** Open a pidfd at verify time and signal through it, keeping the starttime check as
+defence in depth; then correct the design doc's residual note.
 
 ### Checked in the delta and found CORRECT
 
