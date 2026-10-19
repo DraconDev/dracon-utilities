@@ -121,6 +121,50 @@ to 14:52 — so the unpublished pile grows without bound. This is a live credent
 guarded by exactly one local hook, and it needs an operator decision (rotate the credential;
 then the sanctioned-slimming rewrite or a fresh push of a sanitised `main`).
 
+### Re-verification at 19:07 (live state re-checked after this audit was written)
+
+The two live claims in this report were re-measured against the running daemon. Both still hold,
+and one of them produced a fresh instance of A5-13.
+
+```
+$ dracon-sync repos bridge-fixture --deep
+  1. ❔ UNKNOWN  /home/dracon/dracon/bridge-fixture
+     changes:   0 mod, 0 stg, 1 ut
+     ahead/behind: 0/0
+     push:      ✅ OK 8h
+     git size:  416 KiB (local history; own+nested, +? unknown)
+     activity:  ❔ UNKNOWN
+     state:     ❔ UNKNOWN
+     hint:      ⚠️ path-owned identity/origin warning: ✓ owned (path_owned:untrusted_origin);
+                GitHub pack guard clear (measured this report); 2 GiB/push, not repo size
+
+$ dracon-sync repos mcode-plugins
+  1. ✅ CLEAN  /home/dracon/Dev/mcode-plugins
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push:      ❌ FAIL 4h
+     git size:  15.2 MiB (local history; own+nested, +? unknown)
+     hint:      🛑 push-stuck (5 failures): git push returned non-zero (remotes: github, gitlab,
+                origin…) — run dracon-sync repair concerns --apply; GitHub pack guard clear
+                (cached 50s ago); 2 GiB/push, not repo size
+```
+
+- **`bridge-fixture` — unchanged.** The pack guard still reads *clear*, the repo is still
+  un-committable by the deliberate bridge refusal, and the status/activity columns are still
+  `❔ UNKNOWN` for the reason given above. The hint the operator pasted is therefore confirmed
+  to be a mis-summarised cause, not a live size problem.
+- **`mcode-plugins` — still failing, still growing.** The push is now `❌ FAIL 4h` and local
+  history has grown from the 2.4 MiB in the operator's original table to **15.2 MiB**, with the
+  remote still at **zero branches**. The `✅ CLEAN` status and `0/0` ahead/behind are unchanged,
+  which is A5-14 and A5-17 reproducing verbatim. The hint now carries the daemon's own
+  recommendation to run `repair concerns --apply` — which, as noted above, cannot succeed
+  against a deterministic guard refusal.
+- **New instance of A5-13.** The same `--deep` run emitted
+  `❌ /home/dracon/Dev/dracon-platform | status_failed: status inspection timed out; owned Git
+  process group cancelled` — the 8-second report budget again dropped a large repo out of the
+  fleet view while the daemon itself kept syncing it. A5-13 is not a rare edge case; it recurs on
+  this host under normal load.
+
 ## CRITICAL
 
 ### A5-01 — CRITICAL — a tracked file in ANY watched repo yields arbitrary code execution as the operator user
@@ -556,6 +600,10 @@ omission exactly: the daemon reports **36 discovered repos** (`dracon-sync healt
 `dracon-sync repos --json` reports `repos: 35` with `ok: 26, active: 9, warn: 0, concern: 0`
 (the counters themselves sum correctly — 26+9+0+0 = 35 — so the R3-L09 contract holds) and
 `failures: 1`, which is the timed-out repo that has no row.
+
+**Recurrence.** A fifth instance was observed at 19:07, again on `dracon-platform`, again while
+the daemon was otherwise healthy — see the re-verification transcript above. The omission is
+routine on this host, not a rare race.
 
 **Impact.** The `repos` table is the operator's primary fleet view — the very command in the
 audit request. A large repo under load vanishes from it. That is the same "nearly invisible"
