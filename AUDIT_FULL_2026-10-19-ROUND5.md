@@ -612,6 +612,30 @@ A5-14 also repairs this for the never-pushed case, but the independence should b
 `ahead > 0` conjunct keeps the branch unreachable for a never-pushed repo — which is exactly
 the case this finding is about.
 
+### A5-38 — LOW — the guard's "cannot be closed further from userspace" residual is inaccurate; `pidfd` is available and permitted
+
+`dracon-system/docs/design/guard-auto-reap-2026-10-04.md:53-57`:
+
+> "The verify-then-kill window (microseconds) cannot be closed further from userspace;
+> kill-by-PID is inherently racy and the starttime check is the mitigation, not a cure."
+
+That last clause is wrong. On Linux 5.3+, `pidfd_open(2)` + `pidfd_send_signal(2)` make the
+signal immune to PID reuse — the kernel resolves the process at signal time, so a recycled
+PID cannot be hit. I verified both syscalls are permitted by the shipped unit's filter:
+`systemd-analyze syscall-filter @process` lists `pidfd_open`, `pidfd_send_signal` and `kill`,
+and `@system-service` includes `@process`.
+
+**In fairness to the code, the mitigation *is* in place.** `terminate_process`
+(`src/reap.rs:443`) checks only liveness, but its caller re-verifies the starttime
+immediately beforehand (`src/reap.rs:558` `if fields.starttime != candidate.starttime`),
+and `src/reap.rs:460` documents exactly that (*"caller re-verified starttime immediately
+before"*). The residual window is therefore microseconds, and the risk needs a PID recycled
+inside that window *and* the replacement to pass the same signature match. This is a
+hardening opportunity and a documentation inaccuracy — **not** a live defect.
+
+**Fix.** Open a pidfd at verify time and signal through it, keeping the starttime check as
+defence in depth; then correct the design doc's residual note.
+
 ## LOW
 
 ### A5-09 — LOW — AGENTS.md is stale after the 2026-10-19 operator-service migration
@@ -728,17 +752,30 @@ run state"*, and the policy doc for `reap_orphans_on_pressure` (`src/policy.rs:1
 the same assumption in: *"parent-dead (reparented to init/systemd) … with NO age/CPU/state
 gates"*.
 
-**Live measurement on this host** — 109 tty-less processes are reparented to `systemd --user`
-and match the default signature list, including:
+**Live measurement on this host.** I replicated the scan exactly (`src/reap.rs:720-790`:
+parent `comm == "systemd"`, `tty_nr == 0`, non-empty cmdline, not in the exempt list, and a
+whole-cmdline signature match against the defaults
+`eve web,vite,playwright,chromium,bun run,bun test,npm run test,.mjs,litestream,stub-auth-api`):
+
+- **165** processes are tty-less and reparented to a `systemd` parent.
+- **28** of them would be SIGTERM/SIGKILLed by the pressure path — with no age, CPU or state
+  gate — including:
 
 ```
-14120   1224 ?  10053  node node_modules/vite/bin/vite.js dev --port 5173 --host 127.0.0.1
-973041  1224 ?   8455  node node_modules/vite/bin/vite.js dev --port 5178 --host 127.0.0.1
-1145842 1224 ? 158800  node …/pi-goal-list-loop-audit/scripts/goal-auditor-worker.mjs …
-1178395 1224 ? 158751  node …/pi-goal-list-loop-audit/scripts/goal-auditor-worker.mjs …
-1508407 1224 ?  13954  timeout 900 bun test --max-concurrency=1 --timeout=120000
-1218279 1224 ?    997  node server/index.mjs
+14120   node node_modules/vite/bin/vite.js dev --port 5173 --host 127.0.0.1
+973041  node node_modules/vite/bin/vite.js dev --port 5178 --host 127.0.0.1
+3126256 node node_modules/.bin/vite dev --port 5189 --host 127.0.0.1
+787545  timeout 10800 bun scripts/ingest.mjs --apply
+1145842 node …/pi-goal-list-loop-audit/scripts/goal-auditor-worker.mjs …
+1178395 node …/pi-goal-list-loop-audit/scripts/goal-auditor-worker.mjs …
+1219866 node /tmp/envprobe/old/goal-auditor-worker.mjs …
+2534150 node …/opencode-chrome-bridge/…            (the operator's own browser bridge)
+3277426 bun scripts/wave11-micro1-sync.mjs
+1510179 chromium --ozone-…   + 8 × chrome_crashpad  (the operator's own browser)
 ```
+
+(The count is a point-in-time snapshot and moves with operator activity. The two Chromium
+entries match the `chromium` signature — the operator's own browser is on the kill list.)
 
 **Impact.** Enabling `reap_orphans_on_pressure` would SIGTERM/SIGKILL the operator's own dev
 servers and in-flight audit workers under memory pressure — with no age, CPU or state gate to
