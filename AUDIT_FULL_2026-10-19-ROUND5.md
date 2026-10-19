@@ -1046,11 +1046,19 @@ Recorded so the coverage is auditable and the next round does not re-tread it:
 - The bucket-runner component's own JS test suites (`planner`, `publisher`, `storage`,
   `bindings`, `restore`, `consumer`, `e2e`, `adapters`, `routing`, `capabilities`) were not
   re-run in this round; only the Rust workspace gates were.
-- The 754-commit `dracon-sync` delta since the **CI pin** was **not** line-by-line reviewed.
-  The **release** delta since R4 (0.113.93 → 0.113.95, 183 commits) *was* reviewed by
-  component, and A5-01, A5-02, A5-27 and A5-28 come from it. The gap between the CI pin and
-  the current HEAD is the same code as the release delta plus unreleased work; a full
-  component audit of everything since the pin remains outstanding.
+- The **unreleased** range `dracon-sync-v0.113.95..HEAD` (762 commits, 58,308 source
+  insertions across 100 files) was reviewed **by component, not line by line**: the new
+  daemon scheduler/recovery/evidence modules, the new `git/inspection.rs`, the LFS
+  classification and policy modules, the push/recovery path, and the `bucket_runner_bridge`
+  (where A5-01/A5-02 live) were all read. What was **not** done is an exhaustive
+  function-by-function read of every one of the 100 files — the LFS/policy surface
+  (`src/lfs_classify.rs`, `src/lfs_policy.rs`, 763 new lines) and the push-resource/
+  stuck-routing surface are the areas where a full read is most likely to yield further
+  findings. A component-level audit of those two areas is the recommended next round.
+- `dracon-warden` has **no** unreleased commits (the tree is exactly at `v0.113.16`), and
+  `dracon-system`'s unreleased delta is 27 lines in 2 files — a correct zombie-exclusion fix
+  in `src/main.rs` that skips a zombie package-manager wrapper whose empty cmdline is a
+  legitimate terminal state, not an unreadable live argv. No defect found.
 - `dracon-warden` 0.113.16 and `dracon-system` 0.112.45 release deltas were covered by the
   mechanical gates only, not by source review.
 - **No credential value was printed, stored, or transmitted.** The category identification in
