@@ -68,3 +68,12 @@ rely on the remaining wall-clock polling deadline, the bulk-add/clear
 scenario now uses Vitest fake timers and vi.waitFor while retaining the real
 storage code and all assertions. The obsolete polling helper was removed.
 The final focused file passes all 54 tests. Svelte mount cleanup remains.
+
+The unbounded-worker final rerun timed out in content-script setup and the
+ffmpeg loudness test under severe host load; the repaired UI file passed.
+Bounded tabmon to two workers in vitest.config.ts for normal hooks as well
+as the verification run. This keeps the full assertions and test selection.
+GitLab accepted the 25-commit backlog at bb926e2b; later test hardening is
+fb53a493 and the worker configuration follows through ordinary daemon sync.
+Rust sync unit suites passed (144 library + 1356 binary tests); integration
+passed (10 tests) and storage-clean passed (14 tests, 3 operational ignores).
