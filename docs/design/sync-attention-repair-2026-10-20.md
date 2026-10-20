@@ -77,3 +77,9 @@ GitLab accepted the 25-commit backlog at bb926e2b; later test hardening is
 fb53a493 and the worker configuration follows through ordinary daemon sync.
 Rust sync unit suites passed (144 library + 1356 binary tests); integration
 passed (10 tests) and storage-clean passed (14 tests, 3 operational ignores).
+
+Final bounded-worker run: all 918 tests / 59 files passed (438 seconds under
+host pressure), including the virtual-clock UI scenario and ffmpeg tests.
+Final config commit: 1e7d9f7fd2. A fresh browser-extensions report shows
+AHEAD:3 with zero concerns, rather than the original stalled push failure.
+Db-gateway repair note commit 1bc8fd5 is clean and matches both mirror refs.
