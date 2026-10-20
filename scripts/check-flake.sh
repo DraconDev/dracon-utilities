@@ -184,7 +184,7 @@ let
     (needSync "RestartPreventExitStatus" "2 78")
     (needSync "Nice" "10")
     (needSync "MemoryHigh" "768M")
-    (needSync "TasksMax" "96")
+    (needSync "TasksMax" "512")
     (needSync "ProtectSystem" "strict")
     (needSync "ProtectHome" "read-only")
     (if builtins.length sync.ReadWritePaths != 4 then throw "dracon-sync ReadWritePaths must list exactly 4 roots (shipped-unit parity)" else null)

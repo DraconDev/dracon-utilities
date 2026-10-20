@@ -407,7 +407,7 @@
                 CPUQuota = "100%";
                 MemoryHigh = "768M";
                 MemoryMax = "2G";
-                TasksMax = "96";
+                TasksMax = "512";
                 NoNewPrivileges = true;
                 ProtectSystem = "strict";
                 ProtectHome = "read-only";
