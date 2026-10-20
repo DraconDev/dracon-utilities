@@ -36,3 +36,35 @@ plaintext sibling, or history rewrite.
 The live daemon is system-level dracon-sync-operator.service, UID 1000,
 active since October 19. The masked user dracon-sync.service is obsolete;
 its inactive status is not evidence the live daemon is down.
+
+## Verification and deployment
+
+Warden pre-push regression suite: 36 passed; specific receipt-boundary test:
+1 passed. Workspace release build, cargo deny check and clippy with warnings
+denied all passed. Release warden installed atomically with binary/hook backup
+at ~/.local/state/dracon-sync/deployments/20261020T133559Z-warden-fixture-receipt;
+setup-hooks --global installed the receipt. No service restart required.
+
+After stuck-unstuck and sync-now, db-gateway HEAD, origin/main and gitlab/main
+all equal 1d52ff491eea40ff8c5ef780d1795d6a6f884867; push-history records
+succeeded=true at 1792503399. Doomtap report now classifies OK (zero concerns).
+
+The browser-extension repair commit is bb926e2b1253f9e8bc1b5467d3f1047ada36ffd8.
+The actual pre-push gate passed all 918 tabmon tests, plus build and lint,
+and all 701 youtube-filter tests. GitHub accepted the previously queued
+25 commits; GitLab runs its gates independently.
+
+Db-gateway mirror-degraded notifications retained pre-repair daemon memory
+after the CLI push. A local upstream tracking-ref refresh was attempted
+under maintenance (remote branch untouched), then restored with ordinary
+fetch. Added a repository-local repair note as durable evidence; the daemon
+can commit and push it to demonstrate its own recovery.
+
+## Final test hardening under load
+
+One concurrent daemon push still reported a tabmon test refusal, and another
+push overwrote its fixed-name test log with a passing result. Rather than
+rely on the remaining wall-clock polling deadline, the bulk-add/clear
+scenario now uses Vitest fake timers and vi.waitFor while retaining the real
+storage code and all assertions. The obsolete polling helper was removed.
+The final focused file passes all 54 tests. Svelte mount cleanup remains.
