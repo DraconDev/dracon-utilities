@@ -95,3 +95,10 @@ workspace claim.
 Tabmon now allows 60 s for test bodies and setup hooks: the observed media
 check exceeded the previous 30 s and browser setup exceeded the default
 10 s under load. Assertions and test selection are unchanged.
+
+A further journal finding explains persistent failure accounting even after
+origin pushes: daemon attempts configured mirror `github` after reconciliation
+has removed that alias as an exact duplicate of origin. Added a documented
+per-repository exclude_remotes entry for only `github`; GitHub remains fully
+covered by origin and GitLab remains enabled. The existing conditional
+Codeberg exclusion is still appended by sync.rs, so this does not enable it.
