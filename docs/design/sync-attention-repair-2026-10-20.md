@@ -136,3 +136,14 @@ A normal sync-now pass committed the symlink itself (Git mode 120000) as
 `2fa97259322e4a3bb8985177d28e7d4b1a76345b`; no target files were copied or
 removed. The worktree is clean and HEAD, origin/main, github/main and gitlab/main
 all match that commit. This is state remediation; no new daemon code was deployed.
+
+## Correction: GitHub icon hidden by the duplicate-alias override
+
+The per-repository github exclusion added above was too broad for the report:
+report_effective_remotes removes that forge from REM even though origin still
+pushes to GitHub. Both actual forge branches were verified at
+53075faa335d38143b8278e5f1852b4f82d6c78c during the follow-up; neither repo
+was deleted or disconnected. Removed the exact override and its gitignore
+exception. The existing origin-is-GitHub handling in sync.rs already avoids
+redundant mirror pushes, so no per-repo exclusion is needed. The normal local
+configuration remains origin=GitHub and gitlab=GitLab.
