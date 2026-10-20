@@ -107,3 +107,22 @@ The final sync-now pass reports `push recovered` and succeeds. A subsequent
 normal guarded push publishes the last repair snapshot 6ee071ec02 to both
 mirrors; later clean-web agent commits are outside this repair and continue
 through normal daemon sync. No force, history rewrite or gate bypass.
+
+## Final remote verification
+
+Both GitHub origin/main and GitLab main were verified at the full repair
+snapshot `6ee071ec02c78f86b8f186853a6844ef90a80be1`. Each push passed the
+complete tabmon four-gate. GitHub's first manual SSH connection expired
+while hooks ran; retrying with the daemon-equivalent SSH keepalives passed.
+The final GitHub gate again passed all 918 tests (59 files).
+
+The system daemon remains active and the maintenance freeze is absent.
+Other agents continue creating clean-web changes after the repair snapshot;
+those are normal subsequent work, not evidence these repairs are unpushed.
+GitLab's local remote alias can be pruned during its existing per-remote
+backoff; direct URL verification confirms the forge branch independently.
+
+Validation limit: full workspace cargo test failed two index-batch timing
+fixtures; a focused retry also failed two timing cases. No green full-workspace
+claim is made. Release build, clippy -D warnings, cargo deny, the receipt
+boundary test and all 36 pre-push regressions passed.
