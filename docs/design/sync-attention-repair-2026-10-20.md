@@ -102,3 +102,8 @@ has removed that alias as an exact duplicate of origin. Added a documented
 per-repository exclude_remotes entry for only `github`; GitHub remains fully
 covered by origin and GitLab remains enabled. The existing conditional
 Codeberg exclusion is still appended by sync.rs, so this does not enable it.
+
+The final sync-now pass reports `push recovered` and succeeds. A subsequent
+normal guarded push publishes the last repair snapshot 6ee071ec02 to both
+mirrors; later clean-web agent commits are outside this repair and continue
+through normal daemon sync. No force, history rewrite or gate bypass.
