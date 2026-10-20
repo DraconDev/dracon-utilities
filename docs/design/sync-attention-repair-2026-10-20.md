@@ -83,3 +83,15 @@ host pressure), including the virtual-clock UI scenario and ffmpeg tests.
 Final config commit: 1e7d9f7fd2. A fresh browser-extensions report shows
 AHEAD:3 with zero concerns, rather than the original stalled push failure.
 Db-gateway repair note commit 1bc8fd5 is clean and matches both mirror refs.
+
+The workspace run completed all earlier crates, but warden's index-batch
+fixture exposed unrelated sub-second deadline failures (150 ms fixture
+budget, 2 s recovery budget) on the loaded host. A targeted index_batch_
+retry passed 12 and failed 2, with a different recovery assertion failing.
+The receipt regression and all 36 pre-push tests pass; release, clippy and
+dependency checks pass. This is a validation limitation, not a green full
+workspace claim.
+
+Tabmon now allows 60 s for test bodies and setup hooks: the observed media
+check exceeded the previous 30 s and browser setup exceeded the default
+10 s under load. Assertions and test selection are unchanged.
