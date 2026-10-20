@@ -157,11 +157,40 @@ glab api projects/DraconDev%2Fbridge-fixture/repository/tree?path=public/qualifi
    already-prepared worktree version so the *committed* blob no longer holds
    the literal — no exemption, no receipt, no history rewrite.
 
+4. **Separate, still-open incident — `browser-extensions-shared`** (appeared
+   2026-10-20 00:04, unrelated repo, not part of this pass): a *different*
+   hook class — the repo's own 4-gate pre-push (typecheck/build/test/lint)
+   fails on `extensions/standalones/tabmon/TEST`, so the push is refused
+   before the warden scan is even reached:
+
+   ```
+   ❌ Pre-push: 4-gate FAILED for:
+     - extensions/standalones/tabmon/TEST (see /tmp/pre-push-extensions_standalones_tabmon-TEST.log)
+   ```
+
+   The repo carries 7 unpushed commits and two uncommitted worktree
+   modifications. A live agent session is working in the repo, so this was
+   deliberately left alone: a fix belongs to whoever owns that worktree, and
+   the remedy is to make the tabmon test pass (or land the in-progress
+   change), not to bypass the gate.
+
 ## Boundaries honoured
 
 No history rewrite, no force-push, no `--force-with-lease`, no reset, no
 re-clone, no `systemctl stop`, no daemon/warden source change. The only
 mutations were: one fast-forward push of an existing commit to an existing
-empty mirror, one ordinary commit of an existing untracked file, and the
-deletion of one **local** remote-tracking ref (restored by the daemon's own
-push).
+empty mirror, one ordinary commit of an existing untracked file, the deletion
+of one **local** remote-tracking ref (restored by the daemon's own push), and
+one ordinary commit of a design note in `dracon-utilities` (which carries the
+standard `.plaintext` sibling, because the note quotes a secret shape verbatim
+as evidence — the same pattern the repo's own audit notes use).
+
+## Note on the `github` remote name
+
+After the daemon's remote reconciliation, `mcode-plugins` has two remotes:
+`origin` → `git@github.com:DraconDev/mcode-plugins.git` and
+`gitlab` → `git@gitlab.com:DraconDev/mcode-plugins.git`. The separate
+`github` remote name was removed as a duplicate of `origin` (both point at the
+same GitHub URL), so a push to "github" must be spelled with the URL:
+`git push git@github.com:DraconDev/mcode-plugins.git main` — that dry-run
+exits 0 ("Everything up-to-date"), as does `git push --dry-run gitlab main`.
