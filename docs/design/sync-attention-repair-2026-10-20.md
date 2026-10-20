@@ -126,3 +126,13 @@ Validation limit: full workspace cargo test failed two index-batch timing
 fixtures; a focused retry also failed two timing cases. No green full-workspace
 claim is made. Release build, clippy -D warnings, cargo deny, the receipt
 boundary test and all 36 pre-push regressions passed.
+
+## Polis follow-up: UNKNOWN on an untracked link
+
+The October 20 follow-up had one untracked directory symlink,
+`docs/audits/tmp-audit-verify` pointing to `/tmp/audit-capture`. The daemon
+logged empty classification on dirty status (0 modified, 0 staged, 1 untracked).
+A normal sync-now pass committed the symlink itself (Git mode 120000) as
+`2fa97259322e4a3bb8985177d28e7d4b1a76345b`; no target files were copied or
+removed. The worktree is clean and HEAD, origin/main, github/main and gitlab/main
+all match that commit. This is state remediation; no new daemon code was deployed.
