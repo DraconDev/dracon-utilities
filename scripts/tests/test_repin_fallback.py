@@ -112,5 +112,90 @@ class RewriteFallbackTest(unittest.TestCase):
                 self.assertIn(f'crateVersion "9.9.9-test" {var};', out)
 
 
+class RemoteSelection(unittest.TestCase):
+    """Which remote the pin is read from.
+
+    FIXED 2026-10-21: the remote used to be "the first remote that is not
+    called origin", decided by `git remote`'s alphabetical listing. For
+    dracon-system that was gitlab, so a repin pinned gitlab's main — a
+    revision the CI checkout (github.com) may not have at all, and one that
+    lagged what the daemon had already published to GitHub. The pin's
+    consumers (the CI checkout and the flake.lock input) both fetch from the
+    repository the CI names, so that repository decides.
+    """
+
+    def test_remote_repo_spellings(self):
+        for url, expected in [
+            (
+                "git@github.com:DraconDev/dracon-sync.git",
+                ("github.com", "DraconDev/dracon-sync"),
+            ),
+            (
+                "https://github.com/DraconDev/dracon-sync",
+                ("github.com", "DraconDev/dracon-sync"),
+            ),
+            (
+                "https://github.com/DraconDev/dracon-sync.git",
+                ("github.com", "DraconDev/dracon-sync"),
+            ),
+            (
+                "ssh://git@gitlab.com/DraconDev/dracon-sync.git",
+                ("gitlab.com", "DraconDev/dracon-sync"),
+            ),
+            (
+                "git@gitlab.com:DraconDev/dracon-sync.git",
+                ("gitlab.com", "DraconDev/dracon-sync"),
+            ),
+        ]:
+            with self.subTest(url=url):
+                self.assertEqual(repin.remote_repo(url), expected)
+
+    def test_same_path_on_two_forges_is_not_the_same_repository(self):
+        # GitHub and GitLab both host DraconDev/<same-repo>; a path-only
+        # comparison would accept either, which is exactly the defect this
+        # change fixes.
+        self.assertNotEqual(
+            repin.remote_repo("git@github.com:DraconDev/x.git"),
+            repin.remote_repo("git@gitlab.com:DraconDev/x.git"),
+        )
+
+    def test_ci_repository_is_read_from_the_workflow(self):
+        workflow = (ROOT / ".github/workflows/ci.yml").read_text()
+        for checkout, fragment in repin.TARGETS.values():
+            with self.subTest(checkout=checkout):
+                host, path = repin.ci_repository(workflow, fragment)
+                self.assertEqual(host, "github.com")
+                self.assertIn(fragment, path)
+
+    def test_first_remote_holds_the_ci_repository(self):
+        workflow = (ROOT / ".github/workflows/ci.yml").read_text()
+        for checkout, (_node, fragment) in repin.TARGETS.items():
+            with self.subTest(checkout=checkout):
+                repo_path = ROOT / checkout
+                if not (repo_path / ".git").exists():
+                    self.skipTest(f"{checkout} is not checked out here")
+                wanted = repin.ci_repository(workflow, fragment)
+                ordered = repin.ordered_remotes(repo_path, wanted)
+                self.assertTrue(ordered, "no remote found")
+                url = repin.run(
+                    ["git", "remote", "get-url", ordered[0]], cwd=repo_path
+                )
+                self.assertEqual(
+                    repin.remote_repo(url),
+                    wanted,
+                    f"{checkout}: the pin would be read from {url}, not the "
+                    "repository the CI checks out",
+                )
+
+    def test_missing_ci_repository_is_fatal(self):
+        # Pinning from a forge the CI does not use would break both the CI
+        # checkout and the flake input, so an absent remote must stop the
+        # repin rather than fall back to another one.
+        with self.assertRaises(SystemExit):
+            repin.ordered_remotes(
+                ROOT / "dracon-sync", ("github.com", "SomeoneElse/Not-A-Repo")
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

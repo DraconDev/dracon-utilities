@@ -60,14 +60,95 @@ def run(argv: list[str], cwd: Path | None = None) -> str:
     return subprocess.check_output(argv, cwd=cwd, text=True).strip()
 
 
-def remote_main(checkout: str) -> str:
-    """The 40-hex `main` of the nested repo's first non-origin remote."""
+def remote_repo(url: str) -> tuple[str, str]:
+    """(host, Owner/Repo) for a git remote URL, in any common spelling.
+
+    git@github.com:Owner/Repo.git   -> ("github.com", "Owner/Repo")
+    https://github.com/Owner/Repo   -> ("github.com", "Owner/Repo")
+    ssh://git@gitlab.com/Owner/Repo.git -> ("gitlab.com", "Owner/Repo")
+
+    The HOST is part of the answer: GitHub and GitLab both host
+    "DraconDev/<same-repo>", so a path-only comparison cannot tell the two
+    forges apart.
+    """
+    u = url.strip()
+    u = re.sub(r"\.git$", "", u, flags=re.IGNORECASE)
+    if "://" in u:
+        rest = u.split("://", 1)[1]
+        host, _, path = rest.partition("/")
+    elif ":" in u:
+        # scp-like: the host comes BEFORE the colon (git@host:Owner/Repo)
+        host, _, path = u.partition(":")
+    else:
+        host, path = "", u
+    if "@" in host:
+        host = host.split("@", 1)[1]
+    return host.lower(), path.strip("/")
+
+
+def ci_repository(workflow_text: str, fragment: str) -> tuple[str, str]:
+    """The (host, Owner/Repo) the CI checks out for one nested utility.
+
+    A GitHub Actions `repository: Owner/Repo` without a host means
+    github.com — that is the only forge the CI can check out from.
+    """
+    match = re.search(
+        r"repository:\s*(\S*" + re.escape(fragment) + r"\S*)", workflow_text
+    )
+    if not match:
+        raise SystemExit(f"ci.yml: no repository for {fragment}")
+    raw = match.group(1).strip()
+    if "/" in raw and "." in raw.split("/", 1)[0]:
+        host, path = raw.split("/", 1)
+        return host.lower(), path.strip("/")
+    return "github.com", raw.strip("/")
+
+
+def ordered_remotes(repo: Path, prefer: tuple[str, str] | None) -> list[str]:
+    """Remotes to try, the one holding the CI's own repository first.
+
+    FIXED 2026-10-21: the order used to be "the first remote that is not
+    called origin", which is decided by `git remote`'s alphabetical listing
+    and not by which forge the CI actually checks out. For dracon-system that
+    was gitlab, so a repin pinned gitlab's main — a revision that the CI
+    checkout (github.com) may not even have, and that lagged the commit the
+    daemon had already published to GitHub. The pin's consumers are the CI
+    checkout and the flake.lock input, and both fetch from the CI's
+    repository, so that repository decides which remote is authoritative.
+    """
+    remotes = [r for r in run(["git", "remote"], cwd=repo).split("\n") if r]
+    if not prefer:
+        return [r for r in remotes if r != "origin"] or remotes
+    wanted_host, wanted_path = prefer
+    matched = []
+    for name in remotes:
+        try:
+            url = run(["git", "remote", "get-url", name], cwd=repo)
+        except subprocess.CalledProcessError:
+            continue
+        host, path = remote_repo(url)
+        if host == wanted_host and path.lower() == wanted_path.lower():
+            matched.append(name)
+    if not matched:
+        raise SystemExit(
+            f"{repo.name}: no local remote holds the CI's repository "
+            f"({wanted_host}/{wanted_path}); add one before repinning — "
+            "pinning a revision from another forge would break the CI "
+            "checkout and the flake input, which both fetch from the CI's "
+            "repository"
+        )
+    return matched + [r for r in remotes if r not in matched]
+
+
+def remote_main(checkout: str, prefer: tuple[str, str] | None = None) -> str:
+    """The 40-hex `main` of the remote that holds the CI's repository."""
     repo = ROOT / checkout
-    remotes = run(["git", "remote"], cwd=repo).split("\n")
-    candidates = [r for r in remotes if r != "origin"] or remotes
-    for name in candidates:
-        run(["git", "fetch", name, "main"], cwd=repo)
-        return run(["git", "rev-parse", "FETCH_HEAD"], cwd=repo)
+    for name in ordered_remotes(repo, prefer):
+        try:
+            run(["git", "fetch", name, "main"], cwd=repo)
+            return run(["git", "rev-parse", "FETCH_HEAD"], cwd=repo)
+        except subprocess.CalledProcessError:
+            continue
     raise SystemExit(f"{checkout}: no usable remote")
 
 
@@ -145,7 +226,7 @@ def main() -> int:
             )
         ci_ref = refs.pop()
         try:
-            remote = remote_main(checkout)
+            remote = remote_main(checkout, ci_repository(workflow, fragment))
         except subprocess.CalledProcessError as error:
             raise SystemExit(f"{checkout}: cannot read remote main: {error}")
         agrees = locked == ci_ref

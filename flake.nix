@@ -172,7 +172,7 @@
         packages = {
           dracon-sync = pkgs.rustPlatform.buildRustPackage (commonArgs // {
             pname = "dracon-sync";
-            version = crateVersion "0.113.93" draconSyncSrc;
+            version = crateVersion "0.113.95" draconSyncSrc;
             buildAndTestSubdir = "dracon-sync";
             cargoBuildFeatures = [ ];
             # CHANGED 2026-10-03 (audit R4-M-13): doCheck is ON — the old
@@ -240,7 +240,7 @@
 
           dracon-system = pkgs.rustPlatform.buildRustPackage (commonArgs // {
             pname = "dracon-system";
-            version = crateVersion "0.112.44" draconSystemSrc;
+            version = crateVersion "0.112.45" draconSystemSrc;
             buildAndTestSubdir = "dracon-system";
             nativeCheckInputs = [ pkgs.git pkgs.procps ];
             # Storage-cleanup fixtures deliberately write under $HOME (the
@@ -278,7 +278,7 @@
 
           dracon-warden = pkgs.rustPlatform.buildRustPackage (commonArgs // {
             pname = "dracon-warden";
-            version = crateVersion "0.113.15" draconWardenSrc;
+            version = crateVersion "0.113.16" draconWardenSrc;
             buildAndTestSubdir = "dracon-warden";
             # Warden doesn't need openssl/libgit2/libssh2, but they're
             # harmless to include via the shared commonArgs.
