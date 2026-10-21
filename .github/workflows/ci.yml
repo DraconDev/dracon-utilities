@@ -218,6 +218,24 @@ jobs:
           ./dracon-sync/scripts/test_check_unit_deployment.sh
           ./dracon-system/scripts/test_check_unit_deployment.sh
 
+      - name: Task-budget parity regression suite
+        # ADDED 2026-10-21: the task-budget parity check and its suite live in
+        # the nested dracon-sync repo, and nothing compared the nested NixOS
+        # operator module's task budget with the shipped unit's — that is how
+        # 96 vs 512 survived unnoticed until the live service was inspected
+        # under load. A checker whose suite never run is worthless (same
+        # lesson as audit M9 above), so the suite is wired here. It is
+        # skipped while the pinned nested checkout predates the suite; the
+        # pin advances to a commit that carries it and the skip then
+        # disappears on its own.
+        shell: bash
+        run: |
+          if [ -x ./dracon-sync/scripts/test_check_task_budget_parity.sh ]; then
+            ./dracon-sync/scripts/test_check_task_budget_parity.sh
+          else
+            echo "::warning::pinned dracon-sync checkout predates the task-budget parity suite; skipped"
+          fi
+
       - name: Script dry-run (install.sh)
         # FIXED 2026-09-27 (audit F86, rework round 2): removing the
         # `|| true` was NOT enough. Under GitHub's default shell
