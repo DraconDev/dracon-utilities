@@ -41,6 +41,8 @@ echo "PASS: Nix flake checks passed (Home Manager output warning is intentional 
 # let unasserted properties re-drift invisibly) so Nix/HM drift fails CI.
 # The only deliberate exception is ExecStart (store path vs ~/.local/bin),
 # which is asserted by suffix instead of equality.
+# shellcheck disable=SC2016  # the nix expression is single-quoted on purpose:
+#                             # `${...}` is nix interpolation, not a shell expansion.
 service_check="$(nix eval --impure --raw --expr '
 let
   # A plain path imports ignored build output and private local files.
