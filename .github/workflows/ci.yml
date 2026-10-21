@@ -110,6 +110,15 @@ jobs:
           git config --global user.email "dracsharp@gmail.com"
           git config --global init.defaultBranch main
 
+      - name: Install the bucket-runner Node dependencies
+        # The daemon-worker qualification fixture drives the real Node
+        # runner, which imports @aws-sdk/client-s3. The dependency is
+        # declared in scripts/bucket-runner/package.json and locked in
+        # package-lock.json; node_modules is not tracked, so a runner has
+        # to install it before the suite can drive the runner.
+        working-directory: dracon-sync/scripts/bucket-runner
+        run: npm ci --no-audit --no-fund
+
       - name: Cache cargo registry
         uses: actions/cache@v4
         with:
@@ -382,6 +391,12 @@ jobs:
           git config --global user.name "DraconDev"
           git config --global user.email "dracsharp@gmail.com"
           git config --global init.defaultBranch main
+
+      - name: Install the bucket-runner Node dependencies
+        # Same reason as the Test job: the qualification fixture drives the
+        # real Node runner, and node_modules is not tracked.
+        working-directory: dracon-sync/scripts/bucket-runner
+        run: npm ci --no-audit --no-fund
 
       - name: Cache cargo registry
         uses: actions/cache@v4
