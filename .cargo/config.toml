@@ -1,5 +1,19 @@
 # dracon-sync tests use process-global mocks for git, gh, glab, HOME, and PATH.
 # Keep the Rust test harness serial so `cargo test --workspace --no-fail-fast`
 # is deterministic without requiring callers to remember `--test-threads=1`.
+#
+# ADDED 2026-10-21: the Git identity for test commits. Forty-four tests
+# create a temporary repository and commit in it; a commit needs an author,
+# and they took it from the operator's GLOBAL git configuration. On a
+# machine without one (a CI runner, a fresh container) every one of them
+# failed with "push to mirror failed" — the commit never happened. The
+# identity is supplied through the environment instead, which git honours
+# without any configuration file, so the suite no longer depends on whoever
+# runs it. Cargo does not override a variable that is already set in the
+# environment, so a test that sets its own identity still wins.
 [env]
 RUST_TEST_THREADS = "1"
+GIT_AUTHOR_NAME = "DraconDev"
+GIT_AUTHOR_EMAIL = "dracsharp@gmail.com"
+GIT_COMMITTER_NAME = "DraconDev"
+GIT_COMMITTER_EMAIL = "dracsharp@gmail.com"
