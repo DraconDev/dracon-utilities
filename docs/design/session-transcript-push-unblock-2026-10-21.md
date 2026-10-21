@@ -75,7 +75,8 @@ git add -- codex-session-01a15968-….md  # explicit path, never `git add .`
 git commit -F <message>
 ```
 
-Both remotes now carry the same commit:
+Both remotes carry the transcript commit (it is an ancestor of the current
+tip, which adds this design note):
 
 ```
 f57cca1f3c692281fc9b19e7eaf45cc38b7c1a4a  github  refs/heads/main
