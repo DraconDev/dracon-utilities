@@ -52,3 +52,42 @@ used that exact path.
 
 No memory caps, cache drops, swapoff, blanket process kills, credential
 cleanup, or changes to the operator's desktop browsers were applied.
+
+## RAM attribution follow-up, 02:00–02:05 BST
+
+The largest identified browser was not one of the fourteen Clean Web roots.
+It was PID 400399, a separate headless YouTube Filter Chrome using
+`/tmp/yff-fresh-profile`, CDP port 9555, running for about fourteen hours.
+Read-only `/json/list` inspection found 175 page targets, including 174
+YouTube pages. A later sample found 178 pages: accumulation was continuing.
+Its tree contained 184 processes. A proportional measurement of 182 surviving
+processes found 883 MiB PSS and 16,082 MiB SwapPss, about 16.6 GiB combined;
+this avoids the inflated 22.5 GiB sum of per-process RSS and VmSwap.
+Closing this specific test browser was separately proposed for approval.
+
+The broader process snapshot had 414 Chrome/Chromium processes, 38 Vite/WXT
+processes, 43 test/typecheck processes and 29 actual Pi agent processes.
+Approximate summed swapped footprints were Chrome 24.2 GiB, Vite/WXT
+11.5 GiB, agent-category processes 9.9 GiB and tests/typechecks 5.0 GiB.
+These are process accounting estimates, not proportional physical RAM totals.
+Deathrun alone had eighteen Vite-related processes at the snapshot; music
+had six. Several dev servers were 18–52 hours old, including orphaned ones.
+
+Zram explains much of the occupied physical RAM: `zramctl` measured 58.6 GiB
+of logical swapped data compressed into 16.7 GiB actual RAM. The 64 GiB disk
+swapfile held only about 1.4 GiB at that sample. `/etc/nixos/configuration.nix`
+intentionally configures zstd zram with memoryPercent=200 and priority=5.
+That is a logical swap capacity, not a reservation of twice the machine's
+RAM. Nevertheless the compressed pool currently consumes over half its RAM,
+leaving little for active working sets and causing repeated reclaim/faults.
+No live swap configuration was changed; swapoff during this pressure would
+be unsafe. The immediate causes to remove are leaked targets and excessive
+concurrent workloads, rather than blindly retuning the existing swap policy.
+
+The YouTube Filter CDP driver opened targets but its `close()` only closed
+the WebSocket. It now tracks targets created by that connection, awaits their
+closure, and leaves pre-existing targets alone. Receipt scripts call cleanup
+in finally blocks, including failure paths. Completed CDP request timers are
+also cleared. Two targeted ownership regressions, workspace typecheck and
+Node syntax checks pass. No live target was closed during verification.
+The entire browser suite was not rerun while the host was thrashing.
