@@ -417,16 +417,33 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install cargo-deny
-        uses: EmbarkStudios/cargo-deny-action@v2
+      - name: Move the repo toolchain aside for the deny container
+        # FIXED 2026-10-21: the cargo-deny action runs cargo-deny inside a
+        # container whose image ships exactly ONE toolchain
+        # (1.85.0-x86_64-unknown-linux-musl). The repo's rust-toolchain.toml
+        # says channel = "stable", and rustup inside that container resolves
+        # the file's channel against the container's musl host:
+        # "stable-x86_64-unknown-linux-musl" is not installed, so the job
+        # died with "override toolchain ... is not installed" — for every
+        # run since the image moved to musl. The toolchain file is only a
+        # DEFAULT: with it out of the way the container uses the toolchain
+        # its own image ships, which is the one cargo-deny needs. The file
+        # is restored immediately after, including when the check fails.
+        run: mv rust-toolchain.toml rust-toolchain.toml.deny-off
 
       - name: Check all deny policies
-        # FIXED 2026-09-27 (audit F83): only advisories/licenses/bans ran,
-        # so deny.toml's `[sources] unknown-git = "deny"` /
-        # `unknown-registry = "deny"` policy was never enforced — and
-        # AGENTS.md's test discipline is plain `cargo deny check`.
-        # Verified locally: "advisories ok, bans ok, licenses ok, sources ok".
-        run: cargo deny check
+        # The action runs `cargo deny --all-features check` inside its
+        # container, which is where cargo-deny actually exists. The previous
+        # wiring ran the check on the RUNNER, where the container's install
+        # never lands — that step could only have failed with "cargo-deny:
+        # command not found"; the container's own failure hid it. deny.toml's
+        # [sources] unknown-git / unknown-registry policy is enforced by the
+        # same `check` subcommand (audit F83, 2026-09-27).
+        uses: EmbarkStudios/cargo-deny-action@v2
+
+      - name: Restore the repo toolchain
+        if: always()
+        run: mv rust-toolchain.toml.deny-off rust-toolchain.toml
 
       # NOTE (2026-09-27, audit decision D1): `scripts/verify-spec.sh`
       # IS wired in — see "Verify the documented spec contract" above.
