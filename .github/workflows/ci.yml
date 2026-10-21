@@ -223,6 +223,22 @@ jobs:
       - name: Install shellcheck
         run: sudo apt-get install -y shellcheck
 
+      - name: Configure the Git identity for the test suite
+        # The spec contract runs the workspace test suite, which commits in
+        # temporary repositories and needs an author. A global config (not
+        # environment variables) so a test's own local identity or `-c`
+        # override still wins.
+        run: |
+          git config --global user.name "DraconDev"
+          git config --global user.email "dracsharp@gmail.com"
+          git config --global init.defaultBranch main
+
+      - name: Install the bucket-runner Node dependencies
+        # The qualification fixture drives the real Node runner; the
+        # dependency is declared and locked, node_modules is not tracked.
+        working-directory: dracon-sync/scripts/bucket-runner
+        run: npm ci --no-audit --no-fund
+
       - name: Shellcheck
         # FIXED 2026-09-27 (audit F86): the glob only covered root
         # scripts/*.sh, so the per-crate scripts AGENTS.md references
