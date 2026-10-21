@@ -2,18 +2,14 @@
 # Keep the Rust test harness serial so `cargo test --workspace --no-fail-fast`
 # is deterministic without requiring callers to remember `--test-threads=1`.
 #
-# ADDED 2026-10-21: the Git identity for test commits. Forty-four tests
-# create a temporary repository and commit in it; a commit needs an author,
-# and they took it from the operator's GLOBAL git configuration. On a
-# machine without one (a CI runner, a fresh container) every one of them
-# failed with "push to mirror failed" — the commit never happened. The
-# identity is supplied through the environment instead, which git honours
-# without any configuration file, so the suite no longer depends on whoever
-# runs it. Cargo does not override a variable that is already set in the
-# environment, so a test that sets its own identity still wins.
+# NOT set here: the Git identity for test commits. An environment variable
+# (GIT_AUTHOR_NAME and friends) outranks BOTH a local `git config user.name`
+# and a `-c user.name=…` override, so several tests that deliberately commit
+# under a simulated identity — the warden's poisoned-author push test, the
+# mailmap test, the ownership test — would commit as the injected identity
+# instead of the one they set up, and would fail. A GLOBAL git config file
+# has the right precedence: a test's local config or `-c` override wins,
+# and a fresh temporary repository still finds an author. CI installs that
+# global config in a step; a developer's machine already has one.
 [env]
 RUST_TEST_THREADS = "1"
-GIT_AUTHOR_NAME = "DraconDev"
-GIT_AUTHOR_EMAIL = "dracsharp@gmail.com"
-GIT_COMMITTER_NAME = "DraconDev"
-GIT_COMMITTER_EMAIL = "dracsharp@gmail.com"
