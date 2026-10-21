@@ -91,3 +91,39 @@ in finally blocks, including failure paths. Completed CDP request timers are
 also cleared. Two targeted ownership regressions, workspace typecheck and
 Node syntax checks pass. No live target was closed during verification.
 The entire browser suite was not rerun while the host was thrashing.
+
+## Authorized recovery, 02:14–02:16 BST
+
+The operator then instructed "got fix it", authorizing the proposed closure.
+Thirteen surviving inventoried Clean Web temporary browser roots and the
+separate YouTube Filter browser were re-verified by PID starttime and exact
+profile argument, then sent SIGTERM through pidfds. All fourteen exited;
+the leaking CDP endpoint on port 9555 stopped responding. No escalation or
+profile deletion was needed. The old fourteenth Clean Web candidate had
+already exited before this action.
+
+Six orphaned Deathrun test Vite servers were also closed. Each had a dead
+launcher (reparented to the user manager), no controlling terminal, a
+loopback-only ephemeral strict port, age over one hour, and low lifetime CPU.
+At closure, established connections were absent and starttime, parent and
+unchanged CPU counters were verified twice. Established workspace servers
+and active test/build/agent processes were retained. Closure receipts are
+`/tmp/dracon-performance-browser-closure-20261021.json` and
+`/tmp/dracon-performance-server-closure-20261021.json`.
+
+Available RAM initially rose from 374 MiB to 3.1 GiB; swap use fell from
+57 GiB to 34 GiB immediately and then to 27 GiB as working sets warmed.
+The zram pool fell to 7.4 GiB actual RAM by 02:16. Memory PSI full over ten
+seconds fell from 61.6% to 4.9%, and I/O full fell to 0.14% at 02:15.
+Both guard and sync services stayed active. Active CPU-heavy work continued;
+no global memory caps, swap tuning or desktop browser closure was applied.
+
+At 02:17 two additional disposable Clean Web browser roots were found outside
+the original inventory. Both had exited launchers and exact temporary test
+profiles, with ages 84 and 23 minutes; both received verified pidfd SIGTERM.
+The follow-up receipt is
+`/tmp/dracon-performance-browser-followup-20261021.json`. Total browser roots
+closed: sixteen. Root memory availability was 2.8 GiB, swap use 27 GiB,
+memory full PSI avg10 6.18%, and I/O full PSI avg10 0.41%. Active jobs still
+create measurable pressure; these results demonstrate relief, not a guarantee
+against renewed overcommit from future concurrent work.
