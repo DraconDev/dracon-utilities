@@ -97,6 +97,19 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Configure the Git identity for the test suite
+        # The suite creates temporary repositories and commits in them; a
+        # commit needs an author. The identity came from the developer's
+        # GLOBAL git configuration, which a CI runner does not have, so
+        # every test that committed in a fresh repository failed. A global
+        # config (not an environment variable) is the right shape: a test
+        # that sets a LOCAL identity, or passes `-c user.name=…`, must
+        # still win, and an environment variable outranks both.
+        run: |
+          git config --global user.name "DraconDev"
+          git config --global user.email "dracsharp@gmail.com"
+          git config --global init.defaultBranch main
+
       - name: Cache cargo registry
         uses: actions/cache@v4
         with:
@@ -361,6 +374,14 @@ jobs:
         uses: dtolnay/rust-toolchain@1.89.0
         with:
           components: clippy
+
+      - name: Configure the Git identity for the test suite
+        # Same shape as the Test job: the suite commits in temporary
+        # repositories and needs an author.
+        run: |
+          git config --global user.name "DraconDev"
+          git config --global user.email "dracsharp@gmail.com"
+          git config --global init.defaultBranch main
 
       - name: Cache cargo registry
         uses: actions/cache@v4

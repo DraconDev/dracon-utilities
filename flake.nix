@@ -138,6 +138,24 @@
           };
           nativeBuildInputs = nativeBuildDeps;
           buildInputs = buildDeps;
+          # The test suite creates temporary repositories and commits in
+          # them; a commit needs an author, and the Nix sandbox has no
+          # global git configuration. A global config FILE is the right
+          # shape: a test that sets a LOCAL identity, or passes
+          # `-c user.name=…`, still wins, while an environment variable
+          # would outrank both and silently rewrite the identity the test
+          # set up. The same configuration the CI jobs install.
+          preBuild = ''
+            mkdir -p "$TMPDIR/gitconfig"
+            cat > "$TMPDIR/gitconfig/config" <<'EOF'
+            [user]
+                name = DraconDev
+                email = dracsharp@gmail.com
+            [init]
+                defaultBranch = main
+            EOF
+            export GIT_CONFIG_GLOBAL="$TMPDIR/gitconfig/config"
+          '';
         };
 
         # FIXED 2026-09-27 (audit F85): the three package versions were
