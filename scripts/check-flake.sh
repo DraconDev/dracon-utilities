@@ -102,9 +102,9 @@ let
       assigns = assignmentOf name;
       where = indexOf name;
     in
-      if builtins.length assigns != 1 then throw "the rendered guard policy must assign ${name} exactly once (a duplicate key is invalid TOML)" else null
-      || if !(builtins.elem "${name} = ${toString value}" assigns) then throw "the rendered guard policy must carry ${name} = ${toString value} (the value the NixOS module declares)" else null
-      || if where < guardTableIndex then throw "the rendered guard policy must place ${name} inside the [guard] table" else null;
+      (if builtins.length assigns != 1 then throw "the rendered guard policy must assign ${name} exactly once (a duplicate key is invalid TOML)" else null)
+      || (if !(builtins.elem "${name} = ${toString value}" assigns) then throw "the rendered guard policy must carry ${name} = ${toString value} (the value the NixOS module declares)" else null)
+      || (if where < guardTableIndex then throw "the rendered guard policy must place ${name} inside the [guard] table" else null);
   need = path: if !(builtins.elem path guardPaths) then throw "dracon-system-guard ReadWritePaths must contain ${path} (shipped-unit parity)" else null;
   needSync = name: value: if sync.${name} != value then throw "dracon-sync ${name} must be ${builtins.toString value} (shipped-unit parity)" else null;
   needGuard = name: value: if guard.${name} != value then throw "dracon-system-guard ${name} must be ${builtins.toString value} (shipped-unit parity)" else null;
