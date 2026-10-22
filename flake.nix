@@ -394,17 +394,20 @@
               # The knobs belong to the [guard] TABLE. Appending them at the
               # end of the file would drop them into whatever table happens
               # to be last, so they are placed directly under the header.
-              parts = lib.splitList (line: lib.trim line == "[guard]") stripped;
+              headerIndex = lib.findFirstIndex (line: lib.trim line == "[guard]") (-1) stripped;
               moduleLines = [
                 "# --- values declared by the NixOS operator module ---"
                 "# (services.dracon.system.policy). They MUST match the crate's"
                 "# policy defaults; scripts/check-guard-knob-parity.sh asserts it."
               ] ++ lib.mapAttrsToList (name: value: "${name} = ${toString value}") cfg.system.policy;
               placed =
-                if builtins.length parts == 2 then
-                  (builtins.head parts) ++ [ "[guard]" ] ++ moduleLines ++ (builtins.elemAt parts 1)
+                if headerIndex < 0 then
+                  throw "the pinned dracon-system example policy has no [guard] table — the NixOS module cannot place the guard's policy knobs"
                 else
-                  throw "the pinned dracon-system example policy has no [guard] table — the NixOS module cannot place the guard's policy knobs";
+                  lib.take headerIndex stripped
+                  ++ [ "[guard]" ]
+                  ++ moduleLines
+                  ++ lib.drop (headerIndex + 1) stripped;
             in
               builtins.concatStringsSep "\n" placed + "\n"
           );
