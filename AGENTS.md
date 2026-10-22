@@ -202,7 +202,11 @@ This is **normal daemon behavior**, not a bug. The "untracked"
 status in `git status` during this window is the working tree
 state, not a daemon refusal to commit. If a file is untracked
 for **> 2 minutes**, investigate:
-1. `journalctl --user -u dracon-sync.service --since "2m ago"`
+1. `journalctl -u dracon-sync-operator.service --since "2m ago"`
+   (CORRECTED 2026-10-22: the live daemon is the system-level unit
+   `dracon-sync-operator.service`; the user-level `dracon-sync.service`
+   is masked and `journalctl --user -u dracon-sync.service` is EMPTY —
+   the daemon's stdout/stderr go to the system journal.)
 2. Check `git status` and the per-repo `.gitignore`
 3. Check the global config: `untracked_exclude_patterns` (should be `[]`)
 4. Check the per-repo `.dracon/dracon-sync.toml` for
@@ -443,7 +447,20 @@ convergence scope only. Full procedure:
 - `dracon-sync health` — check daemon health and repository health
 - `dracon-sync repair concerns` — inspect known concerns (dry-run)
 - `dracon-sync repair concerns --apply` — apply a fix for a known concern
-- `systemctl --user status dracon-sync.service` — daemon health
+- `dracon-sync repair stuck-list` — list repos permanently stuck on push
+- `dracon-sync repair stuck-unstuck <name>` — clear the stuck-push ledger
+  for one repo after its cause is fixed (the daemon PAUSES auto-push
+  while a repo is in the ledger, so fixing the cause alone is not
+  enough — the ledger entry must also be cleared)
+- `systemctl status dracon-sync-operator.service` — daemon health
+  (CORRECTED 2026-10-22: the live daemon is the SYSTEM-level unit
+  `dracon-sync-operator.service`, not a user unit. The user-level
+  `dracon-sync.service` is MASKED (symlinked to `/dev/null` since
+  2026-10-19) — `systemctl --user status dracon-sync.service` reports
+  "masked" and is NOT a health check. Use `systemctl status
+  dracon-sync-operator.service` and `journalctl -u
+  dracon-sync-operator.service`; the `--user` journal is empty because
+  the daemon logs to the system journal.)
 - `dracon-sync pause` / `dracon-sync resume` — freeze/unfreeze sync
   (daemon keeps RUNNING, skips cycles; 1h hard TTL + 30m watchdog auto-clear)
 - `dracon-sync maintenance -- <cmd...>` — pause → run command → ALWAYS
