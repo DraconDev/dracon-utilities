@@ -149,27 +149,42 @@ NOT auto-staged. This is the hard exclusion threshold.
 
 ### Push timeouts
 
-`push_op_timeout_secs = 900` — an OPERATOR bump, not the daemon's
+`push_op_timeout_secs = 3600` — an OPERATOR bump, not the daemon's
 code default (FIXED 2026-08-09, audit MEDIUM: this section previously
 claimed it "matches the daemon's own code default"; it does not).
 History: 60 (pre-2026-06-17) -> 300 (2026-06-17, which DID match the
 daemon's code default) -> 900 (2026-06-23, after a 50-commit/5000+-
 file gitlab push kept timing out at 300s; see
 `~/.dracon/utilities/sync/dracon-sync.toml` comments for the full
-rationale). The daemon's code default REMAINS 300
+rationale) -> 3600 (2026-10-22, operator bump after the
+dracon-strategy gitlab push repeatedly failed against a ~1 GiB payload
+whose Warden pre-push hook scan dominated the wall clock; the paired
+`repo_sync_timeout_secs` moved 960 -> 3630 to keep the
+`push_op_timeout_secs + 30s` invariant the daemon enforces).
+The daemon's code default REMAINS 300
 (`default_push_op_timeout_secs` in `dracon-sync/src/policy.rs`), so a
 fresh deployment without the config override gets 300s — operators
-tuning from this file must not treat 900 as the baseline. The 900
+tuning from this file must not treat 3600 as the baseline. The 3600
 gives a generous safety margin over the v0.112.10 measured
 >60s push time for a 23-file PNG-heavy commit. Per-remote timeouts
-(e.g. 60s for github, 900s for gitlab/codeberg) would be more
+(e.g. 60s for github, 3600s for gitlab/codeberg) would be more
 precise but require a daemon code change to add the field to
 `RemoteConfig`; deferred to a follow-up daemon release. The
-global 900s is wasteful for github (which never takes more
+global 3600s is wasteful for github (which never takes more
 than a few seconds) but harmless — the daemon times out via
 process kill, not via waiting. See
 `docs/design/push-timeout-fix-2026-06-17.md` for the full
 data, rationale, and runbook.
+
+> **NOTE 2026-10-22**: a large push's wall clock is dominated by the
+> machine-global Warden `pre-push` hook (`~/.config/git/hooks/pre-push`),
+> which re-scans every commit in the pushed range. Measured on
+> dracon-strategy: 93s with the fleet at load ~65, versus **15m 0.5s**
+> with the fleet at load ~146 and 38 GiB of swap in flight. The hook
+> itself was never the defect — **host memory pressure is**. When a
+> push times out and the raw `git push --dry-run --no-verify` succeeds
+> in seconds, suspect resource pressure before suspecting the network.
+
 
 ### Debounce window (untracked files)
 
