@@ -68,7 +68,7 @@ let
         config._module.args.pkgs = pkgs;
         config.services.dracon.system.enable = true;
         config.services.dracon.sync.enable = true;
-        # Exercise the guard's policy render: the module must be able to
+        # Exercise the guard policy render: the module must be able to
         # materialise the policy file it declares the knobs in.
         config.services.dracon.system.managePolicy = true;
       }
@@ -83,7 +83,8 @@ let
   services = evaluated.config.systemd.user.services;
   timers = evaluated.config.systemd.user.timers;
   files = evaluated.config.home.file;
-  # The guard's policy: the module DECLARES the knobs in
+  guardPaths = guard.ReadWritePaths;
+  # The guard policy: the module DECLARES the knobs in
   # services.dracon.system.policy and can materialise them into a policy
   # file. The rendered file must carry each declared knob EXACTLY once and
   # inside the [guard] table — a duplicate key is invalid TOML and the
@@ -166,6 +167,18 @@ let
     (if !(builtins.pathExists files.".dracon/sync-notify/dracon-sync-watchdog.sh".source) then throw "sync watchdog script source must exist in the pinned input (R3-H1)" else null)
     (if !(builtins.pathExists files.".dracon/sync-notify/dracon-freeze-watchdog.sh".source) then throw "freeze watchdog script source must exist in the pinned input (R3-H1)" else null)
     (if !(builtins.pathExists files.".dracon/system-notify/dracon-system-guard-watchdog.sh".source) then throw "guard watchdog script source must exist in the pinned input (R3-H1)" else null)
+    # The guard's policy knobs: the NixOS module DECLARES them and can
+    # materialise them into the guard's policy file. The rendered file must
+    # carry each declared knob exactly once, with the declared value, inside
+    # the [guard] table.
+    (if !(files ? ".dracon/utilities/system/dracon-system.toml") then throw "the NixOS module must be able to materialise the guard's policy file" else null)
+    (if !(builtins.pathExists policyFile.source) then throw "the rendered guard policy must exist in the store" else null)
+    (if guardTableIndex < 0 then throw "the rendered guard policy must carry a [guard] table" else null)
+    (needPolicyKnob "tmp_large_entry_bytes" declaredPolicy.tmp_large_entry_bytes)
+    (needPolicyKnob "tmp_large_min_age_hours" declaredPolicy.tmp_large_min_age_hours)
+    (needPolicyKnob "tmp_scratch_warn_gib" declaredPolicy.tmp_scratch_warn_gib)
+    (needPolicyKnob "cleanup_command_timeout_secs" declaredPolicy.cleanup_command_timeout_secs)
+    (needPolicyKnob "forgotten_orphan_footprint_mb" declaredPolicy.forgotten_orphan_footprint_mb)
     # R3-L25: every REMAINING shipped-unit property (the H1/H2 subset
     # above stays; this closes the gap so no property can re-drift
     # invisibly). ExecStart is store-path by design — suffix only.
