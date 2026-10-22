@@ -698,6 +698,15 @@
               source = "${draconSystemSrc}/scripts/dracon-system-guard-watchdog.sh";
               executable = true;
             };
+            # The guard's policy file. OFF by default: the policy is the
+            # OPERATOR's own file, and a module that overwrote it silently
+            # would be the drift class this repo's parity checks exist to
+            # catch. Enable it to have the module materialise the policy
+            # from services.dracon.system.policy (the pinned example plus the
+            # module's own knob values).
+            home.file.".dracon/utilities/system/dracon-system.toml" = mkIf (cfg.system.enable && cfg.system.managePolicy) {
+              source = guardPolicy;
+            };
           };
         };
     };
