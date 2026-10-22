@@ -27,12 +27,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
-          ref: 2a66e481b0b52826664a0258728f09706515b81d
+          ref: baa1be0b12f53f5a09f4696956199d219cd77000
           path: dracon-sync
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-system-disk-process-guard-doctor
-          ref: 695f99fcb2f86d5caa3d51f08cc4cb4775245129
+          ref: a6036aa02cec749a83f97019982a088820a9d868
           path: dracon-system
       - uses: actions/checkout@v4
         with:
@@ -80,12 +80,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
-          ref: 2a66e481b0b52826664a0258728f09706515b81d
+          ref: baa1be0b12f53f5a09f4696956199d219cd77000
           path: dracon-sync
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-system-disk-process-guard-doctor
-          ref: 695f99fcb2f86d5caa3d51f08cc4cb4775245129
+          ref: a6036aa02cec749a83f97019982a088820a9d868
           path: dracon-system
       - uses: actions/checkout@v4
         with:
@@ -151,12 +151,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
-          ref: 2a66e481b0b52826664a0258728f09706515b81d
+          ref: baa1be0b12f53f5a09f4696956199d219cd77000
           path: dracon-sync
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-system-disk-process-guard-doctor
-          ref: 695f99fcb2f86d5caa3d51f08cc4cb4775245129
+          ref: a6036aa02cec749a83f97019982a088820a9d868
           path: dracon-system
       - uses: actions/checkout@v4
         with:
@@ -207,12 +207,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
-          ref: 2a66e481b0b52826664a0258728f09706515b81d
+          ref: baa1be0b12f53f5a09f4696956199d219cd77000
           path: dracon-sync
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-system-disk-process-guard-doctor
-          ref: 695f99fcb2f86d5caa3d51f08cc4cb4775245129
+          ref: a6036aa02cec749a83f97019982a088820a9d868
           path: dracon-system
       - uses: actions/checkout@v4
         with:
@@ -361,12 +361,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
-          ref: 2a66e481b0b52826664a0258728f09706515b81d
+          ref: baa1be0b12f53f5a09f4696956199d219cd77000
           path: dracon-sync
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-system-disk-process-guard-doctor
-          ref: 695f99fcb2f86d5caa3d51f08cc4cb4775245129
+          ref: a6036aa02cec749a83f97019982a088820a9d868
           path: dracon-system
       - uses: actions/checkout@v4
         with:
@@ -452,12 +452,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
-          ref: 2a66e481b0b52826664a0258728f09706515b81d
+          ref: baa1be0b12f53f5a09f4696956199d219cd77000
           path: dracon-sync
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-system-disk-process-guard-doctor
-          ref: 695f99fcb2f86d5caa3d51f08cc4cb4775245129
+          ref: a6036aa02cec749a83f97019982a088820a9d868
           path: dracon-system
       - uses: actions/checkout@v4
         with:
@@ -516,12 +516,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-sync-background-auto-commit-multi-remote
-          ref: 2a66e481b0b52826664a0258728f09706515b81d
+          ref: baa1be0b12f53f5a09f4696956199d219cd77000
           path: dracon-sync
       - uses: actions/checkout@v4
         with:
           repository: DraconDev/dracon-system-disk-process-guard-doctor
-          ref: 695f99fcb2f86d5caa3d51f08cc4cb4775245129
+          ref: a6036aa02cec749a83f97019982a088820a9d868
           path: dracon-system
       - uses: actions/checkout@v4
         with:
