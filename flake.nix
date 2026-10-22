@@ -394,7 +394,7 @@
               # The knobs belong to the [guard] TABLE. Appending them at the
               # end of the file would drop them into whatever table happens
               # to be last, so they are placed directly under the header.
-              headerIndex = lib.findFirstIndex (line: lib.trim line == "[guard]") (-1) stripped;
+              headerIndex = lib.lists.findFirstIndex (line: lib.trim line == "[guard]") (-1) stripped;
               moduleLines = [
                 "# --- values declared by the NixOS operator module ---"
                 "# (services.dracon.system.policy). They MUST match the crate's"
