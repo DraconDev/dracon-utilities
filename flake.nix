@@ -386,7 +386,7 @@
                   (name: builtins.match "^[ ]*${name}[ ]*=" line != null)
                   overriddenKeys;
               keptLines = builtins.filter (line: if isOverridden line then false else true) exampleLines;
-              rendered = builtins.mapAttrsToList (name: value: "${name} = ${toString value};") cfg.system.policy;
+              rendered = lib.mapAttrsToList (name: value: "${name} = ${toString value};") cfg.system.policy;
             in
               builtins.concatStringsSep "\n" (keptLines ++ [
                 ""
