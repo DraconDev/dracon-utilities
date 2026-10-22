@@ -386,9 +386,12 @@
               # to start on a malformed policy (EX_CONFIG). The example
               # carries these knobs commented out, but the render must not
               # depend on how the pinned example happens to be spelled.
+              # NOTE: `builtins.match` matches the WHOLE string, so the
+              # pattern has to cover the rest of the line ("=.*$"). A
+              # pattern that stops at the "=" would never match anything.
               isOverridden = line:
                 builtins.any
-                  (name: builtins.match "^[ ]*${name}[ ]*=" line != null)
+                  (name: builtins.match "^[ ]*${name}[ ]*=.*$" line != null)
                   overriddenKeys;
               stripped = lib.filter (line: if isOverridden line then false else true) exampleLines;
               # The knobs belong to the [guard] TABLE. Appending them at the

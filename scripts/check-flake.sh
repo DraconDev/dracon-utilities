@@ -96,7 +96,7 @@ let
   guardTableIndex = lib.lists.findFirstIndex (l: l == "[guard]") (-1) policyLines;
   assignmentOf = name: lib.filter (l: if builtins.match "^[ ]*${name}[ ]*=[ ]*[0-9]+[ ]*$" l != null then true else false) policyLines;
   indexOf = name:
-    lib.lists.findFirstIndex (l: if builtins.match "^[ ]*${name}[ ]*=" l != null then true else false) (-1) policyLines;
+    lib.lists.findFirstIndex (l: if builtins.match "^[ ]*${name}[ ]*=.*$" l != null then true else false) (-1) policyLines;
   needPolicyKnob = name: value:
     let
       assigns = assignmentOf name;
