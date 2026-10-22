@@ -167,8 +167,8 @@ let
     (if !(builtins.pathExists files.".dracon/sync-notify/dracon-sync-watchdog.sh".source) then throw "sync watchdog script source must exist in the pinned input (R3-H1)" else null)
     (if !(builtins.pathExists files.".dracon/sync-notify/dracon-freeze-watchdog.sh".source) then throw "freeze watchdog script source must exist in the pinned input (R3-H1)" else null)
     (if !(builtins.pathExists files.".dracon/system-notify/dracon-system-guard-watchdog.sh".source) then throw "guard watchdog script source must exist in the pinned input (R3-H1)" else null)
-    # The guard's policy knobs: the NixOS module DECLARES them and can
-    # materialise them into the guard's policy file. The rendered file must
+    # The guard policy knobs: the NixOS module DECLARES them and can
+    # materialise them into the guard policy file. The rendered file must
     # carry each declared knob exactly once, with the declared value, inside
     # the [guard] table.
     (if !(files ? ".dracon/utilities/system/dracon-system.toml") then throw "the NixOS module must be able to materialise the guard's policy file" else null)
