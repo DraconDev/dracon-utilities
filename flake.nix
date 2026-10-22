@@ -363,6 +363,38 @@
         let
           cfg = config.services.dracon;
           draconPkgs = self.packages.${pkgs.system};
+          # The guard's POLICY, rendered from the pinned source's example
+          # policy plus the knob values this module declares.
+          #
+          # The example documents every knob and carries the five this goal
+          # added COMMENTED OUT, so appending real assignments adds them
+          # without duplicating a key. Any UNCOMMENTED assignment for a key
+          # this module writes is dropped first: a duplicate key is invalid
+          # TOML, and the guard refuses to start on a malformed policy
+          # (EX_CONFIG), so the render must not depend on how the pinned
+          # example happens to be spelled today.
+          #
+          # `builtins.toFile` puts the result straight into the store, so
+          # the rendered content can also be READ back at evaluation time —
+          # which is what scripts/check-flake.sh asserts.
+          guardPolicy = builtins.toFile "dracon-system-policy.toml" (
+            let
+              exampleLines = builtins.split "\n" (builtins.readFile "${draconSystemSrc}/dracon-system.example.toml");
+              overriddenKeys = builtins.attrNames cfg.system.policy;
+              isOverridden = line:
+                builtins.any
+                  (name: builtins.match "^[ ]*${name}[ ]*=" line != null)
+                  overriddenKeys;
+              keptLines = builtins.filter (line: if isOverridden line then false else true) exampleLines;
+              rendered = builtins.mapAttrsToList (name: value: "${name} = ${toString value};") cfg.system.policy;
+            in
+              builtins.concatStringsSep "\n" (keptLines ++ [
+                ""
+                "# --- values declared by the NixOS operator module ---"
+                "# (services.dracon.system.policy). These MUST match the crate's"
+                "# policy defaults; scripts/check-guard-knob-parity.sh asserts it."
+              ] ++ rendered) + "\n"
+          );
         in {
           options.services.dracon = {
             sync.enable = mkEnableOption "dracon-sync daemon (git sync automation)";
@@ -380,6 +412,38 @@
               type = types.package;
               default = draconPkgs.dracon-system;
               description = "dracon-system package to use";
+            };
+            # The guard's POLICY knobs, declared by the NixOS operator module.
+            #
+            # The policy FILE is the operator's own
+            # (~/.dracon/utilities/system/dracon-system.toml). The module
+            # declares the knob values a Nix install is guaranteed to get,
+            # and it does NOT write the operator's file unless
+            # `system.managePolicy` is enabled: a module that silently
+            # overwrote that file would be the very drift class this repo's
+            # parity checks exist to catch.
+            #
+            # The values below are the crate's own defaults, which is exactly
+            # what a Nix install runs when no policy file exists — so the
+            # declaration is truthful whether or not the file is managed.
+            # The key names are the TOML knob names VERBATIM, so a grep-based
+            # parity check can compare this source with the crate's defaults
+            # and the live policy without a translation table.
+            system.policy = mkOption {
+              type = types.attrsOf types.ints.unsigned;
+              default = {
+                tmp_large_entry_bytes = 1073741824;
+                tmp_large_min_age_hours = 2;
+                tmp_scratch_warn_gib = 20;
+                cleanup_command_timeout_secs = 300;
+                forgotten_orphan_footprint_mb = 2048;
+              };
+              description = "dracon-system guard policy knobs (TOML key names, crate defaults)";
+            };
+            system.managePolicy = mkOption {
+              type = types.bool;
+              default = false;
+              description = "Write the guard's policy file from services.dracon.system.policy; overwrites the operator's own file";
             };
             # No warden.package: with no warden service, the binary comes from
             # the dracon-warden package directly (nix build .#dracon-warden).
