@@ -381,19 +381,32 @@
             let
               exampleLines = lib.splitString "\n" (builtins.readFile "${draconSystemSrc}/dracon-system.example.toml");
               overriddenKeys = builtins.attrNames cfg.system.policy;
+              # An UNCOMMENTED assignment for a key this module writes would
+              # become a DUPLICATE key — invalid TOML, and the guard refuses
+              # to start on a malformed policy (EX_CONFIG). The example
+              # carries these knobs commented out, but the render must not
+              # depend on how the pinned example happens to be spelled.
               isOverridden = line:
                 builtins.any
                   (name: builtins.match "^[ ]*${name}[ ]*=" line != null)
                   overriddenKeys;
-              keptLines = builtins.filter (line: if isOverridden line then false else true) exampleLines;
-              rendered = lib.mapAttrsToList (name: value: "${name} = ${toString value}") cfg.system.policy;
-            in
-              builtins.concatStringsSep "\n" (keptLines ++ [
-                ""
+              stripped = lib.filter (line: if isOverridden line then false else true) exampleLines;
+              # The knobs belong to the [guard] TABLE. Appending them at the
+              # end of the file would drop them into whatever table happens
+              # to be last, so they are placed directly under the header.
+              parts = lib.splitList (line: lib.trim line == "[guard]") stripped;
+              moduleLines = [
                 "# --- values declared by the NixOS operator module ---"
-                "# (services.dracon.system.policy). These MUST match the crate's"
+                "# (services.dracon.system.policy). They MUST match the crate's"
                 "# policy defaults; scripts/check-guard-knob-parity.sh asserts it."
-              ] ++ rendered) + "\n"
+              ] ++ lib.mapAttrsToList (name: value: "${name} = ${toString value}") cfg.system.policy;
+              placed =
+                if builtins.length parts == 2 then
+                  (builtins.head parts) ++ [ "[guard]" ] ++ moduleLines ++ (builtins.elemAt parts 1)
+                else
+                  throw "the pinned dracon-system example policy has no [guard] table — the NixOS module cannot place the guard's policy knobs";
+            in
+              builtins.concatStringsSep "\n" placed + "\n"
           );
         in {
           options.services.dracon = {
