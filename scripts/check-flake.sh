@@ -68,6 +68,9 @@ let
         config._module.args.pkgs = pkgs;
         config.services.dracon.system.enable = true;
         config.services.dracon.sync.enable = true;
+        # Exercise the guard's policy render: the module must be able to
+        # materialise the policy file it declares the knobs in.
+        config.services.dracon.system.managePolicy = true;
       }
     ];
   };
@@ -80,7 +83,27 @@ let
   services = evaluated.config.systemd.user.services;
   timers = evaluated.config.systemd.user.timers;
   files = evaluated.config.home.file;
-  guardPaths = guard.ReadWritePaths;
+  # The guard's policy: the module DECLARES the knobs in
+  # services.dracon.system.policy and can materialise them into a policy
+  # file. The rendered file must carry each declared knob EXACTLY once and
+  # inside the [guard] table — a duplicate key is invalid TOML and the
+  # guard refuses to start on a malformed policy (EX_CONFIG).
+  declaredPolicy = evaluated.config.services.dracon.system.policy;
+  policyFile = files.".dracon/utilities/system/dracon-system.toml";
+  policyText = builtins.readFile policyFile.source;
+  policyLines = lib.splitString "\n" policyText;
+  guardTableIndex = lib.lists.findFirstIndex (l: l == "[guard]") (-1) policyLines;
+  assignmentOf = name: lib.filter (l: if builtins.match "^[ ]*${name}[ ]*=[ ]*[0-9]+[ ]*$" l != null then true else false) policyLines;
+  indexOf = name:
+    lib.lists.findFirstIndex (l: if builtins.match "^[ ]*${name}[ ]*=" l != null then true else false) (-1) policyLines;
+  needPolicyKnob = name: value:
+    let
+      assigns = assignmentOf name;
+      where = indexOf name;
+    in
+      if builtins.length assigns != 1 then throw "the rendered guard policy must assign ${name} exactly once (a duplicate key is invalid TOML)" else null
+      || if !(builtins.elem "${name} = ${toString value}" assigns) then throw "the rendered guard policy must carry ${name} = ${toString value} (the value the NixOS module declares)" else null
+      || if where < guardTableIndex then throw "the rendered guard policy must place ${name} inside the [guard] table" else null;
   need = path: if !(builtins.elem path guardPaths) then throw "dracon-system-guard ReadWritePaths must contain ${path} (shipped-unit parity)" else null;
   needSync = name: value: if sync.${name} != value then throw "dracon-sync ${name} must be ${builtins.toString value} (shipped-unit parity)" else null;
   needGuard = name: value: if guard.${name} != value then throw "dracon-system-guard ${name} must be ${builtins.toString value} (shipped-unit parity)" else null;
