@@ -171,7 +171,7 @@ let
     # materialise them into the guard policy file. The rendered file must
     # carry each declared knob exactly once, with the declared value, inside
     # the [guard] table.
-    (if !(files ? ".dracon/utilities/system/dracon-system.toml") then throw "the NixOS module must be able to materialise the guard's policy file" else null)
+    (if !(files ? ".dracon/utilities/system/dracon-system.toml") then throw "the NixOS module must be able to materialise the guard policy file" else null)
     (if !(builtins.pathExists policyFile.source) then throw "the rendered guard policy must exist in the store" else null)
     (if guardTableIndex < 0 then throw "the rendered guard policy must carry a [guard] table" else null)
     (needPolicyKnob "tmp_large_entry_bytes" declaredPolicy.tmp_large_entry_bytes)
