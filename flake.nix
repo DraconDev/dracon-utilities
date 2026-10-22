@@ -379,7 +379,7 @@
           # which is what scripts/check-flake.sh asserts.
           guardPolicy = builtins.toFile "dracon-system-policy.toml" (
             let
-              exampleLines = builtins.split "\n" (builtins.readFile "${draconSystemSrc}/dracon-system.example.toml");
+              exampleLines = lib.splitString "\n" (builtins.readFile "${draconSystemSrc}/dracon-system.example.toml");
               overriddenKeys = builtins.attrNames cfg.system.policy;
               isOverridden = line:
                 builtins.any
