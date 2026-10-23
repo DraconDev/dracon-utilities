@@ -456,6 +456,7 @@
                 tmp_scratch_warn_gib = 20;
                 cleanup_command_timeout_secs = 300;
                 forgotten_orphan_footprint_mb = 2048;
+                forgotten_orphan_tree_footprint_mb = 1024;
               };
               description = "dracon-system guard policy knobs (TOML key names, crate defaults)";
             };
