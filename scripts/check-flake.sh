@@ -179,6 +179,7 @@ let
     (needPolicyKnob "tmp_scratch_warn_gib" declaredPolicy.tmp_scratch_warn_gib)
     (needPolicyKnob "cleanup_command_timeout_secs" declaredPolicy.cleanup_command_timeout_secs)
     (needPolicyKnob "forgotten_orphan_footprint_mb" declaredPolicy.forgotten_orphan_footprint_mb)
+    (needPolicyKnob "forgotten_orphan_tree_footprint_mb" declaredPolicy.forgotten_orphan_tree_footprint_mb)
     # R3-L25: every REMAINING shipped-unit property (the H1/H2 subset
     # above stays; this closes the gap so no property can re-drift
     # invisibly). ExecStart is store-path by design — suffix only.
