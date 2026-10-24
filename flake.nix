@@ -548,7 +548,7 @@
             # ~/.local/bin). Drift here previously shipped
             # ReadWritePaths without '-' prefixes (systemd refuses to
             # start when an entry is absent) and without the
-            # nix-profile/quarantine/cold roots, no ExecReload,
+            # nix-profile/stash/cold roots, no ExecReload,
             # no CAP_SYS_NICE, and no sandbox.
             # scripts/check-flake.sh asserts the security-relevant
             # properties below; update it with any intentional change.
@@ -585,7 +585,7 @@
                 # '-' prefixes mirror the shipped unit: systemd refuses to
                 # start when a non-prefixed entry is absent, so optional
                 # roots must not block startup (verified live, 2026-10-01).
-                ReadWritePaths = [ "%h/.dracon" "%h/.local/state/dracon" "%h/.local/share" "-%h/Dev" "-%h/.local/share/Trash" "-%h/.cargo" "-%h/.cache" "-%h/.npm" "-%h/.local/state/nix" "/tmp" "-/mnt/data/quarantine" "-/mnt/data/cold" ];
+                ReadWritePaths = [ "%h/.dracon" "%h/.local/state/dracon" "%h/.local/share" "-%h/Dev" "-%h/.local/share/Trash" "-%h/.cargo" "-%h/.cache" "-%h/.npm" "-%h/.local/state/nix" "/tmp" "-/mnt/data/stash" "-/mnt/data/cold" ];
                 PrivateTmp = false;
                 PrivateDevices = true;
                 ProtectKernelTunables = true;

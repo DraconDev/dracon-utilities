@@ -126,7 +126,7 @@ let
     (need "-%h/.cache")
     (need "-%h/.npm")
     (need "-%h/.local/state/nix")
-    (need "-/mnt/data/quarantine")
+    (need "-/mnt/data/stash")
     (need "-/mnt/data/cold")
     (if builtins.match ".*/bin/sh -c .*kill -HUP.*" guard.ExecReload == null then throw "dracon-system-guard ExecReload must be the SIGHUP reload (shipped-unit parity)" else null)
     (needGuard "MemoryDenyWriteExecute" true)
