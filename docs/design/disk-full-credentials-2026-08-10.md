@@ -204,3 +204,37 @@ is ever stopped or disabled — the gap that left the system unmonitored
 on Aug 9–10. See
 `dracon-system/release-notes-v0.112.36.md` and the AGENTS.md section
 "Guard service resilience & memory limiting (2026-08-10)".
+
+## 8. What the credential guard costs (2026-10-24)
+
+The guard in section 5 is a SUBSTRING match on a filename. Measured on
+this host on 2026-10-24, that kept **55 top-level trash entries holding
+11 GiB** — and they grew every time the CI trashed something:
+
+| kept entry | size | why it matched |
+|---|---|---|
+| `dracon-micro-fallback.v7yI5R` | 3.9 GiB | `android-chrome-192x192.png`, `chrome.D0jI9L_h.css` |
+| `jr-s4-mut`, `jr-s5-mut`, `jr-s5-bite`, `jr-s67-mut`, `jr-s67-bite` | 865 MiB each | `…-chrome.md`, `artifact-secret-scan-….test.ts`, `…-token-….test.ts` |
+| `books` (the operator's own manuscript) | 1.8 GiB | `01-the-archivists-secret.md`, `02-borrowed-credentials.md` |
+
+The entry COUNT (55) reads like a rounding error. The size does not.
+
+Two changes, and only one of them touches behaviour:
+
+1. **The cost is now reported.** The purge says how much the kept entries
+   hold and names the biggest three. A guard that keeps something must
+   never hide what keeping it costs — the same rule the forgotten-orphan
+   pass learned the hard way on 2026-10-24 (it used to skip a tree in
+   silence, so "weighed and left alone" looked exactly like "not there").
+2. **The heuristic is unchanged, deliberately.** Narrowing a substring
+   match to something narrower — "the file IS a credential store" rather
+   than "the file mentions the word" — would reclaim the 11 GiB, but it
+   is a SAFETY mechanism and the trade-off is the operator's to make, not
+   the agent's. A test now pins the known false positives, so any future
+   narrowing has to be a deliberate edit rather than an accident in a
+   refactor.
+
+The genuine matches in section 5 are unaffected: `Login Data`,
+`id_ed25519.key`, `backup.age`, `.git-credentials`, `.npmrc`,
+`hosts.yml` and the rest still match, and the guarded
+credential-bearing paths in section 4 are still never cleanup candidates.
