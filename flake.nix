@@ -449,7 +449,11 @@
             # parity check can compare this source with the crate's defaults
             # and the live policy without a translation table.
             system.policy = mkOption {
-              type = types.attrsOf types.ints.unsigned;
+              # The knobs are typed by their TOML VALUE: most are unsigned
+              # integers, but a few are booleans (the guard's on/off
+              # switches). The type is the union, so a boolean knob can be
+              # declared here without being rejected by the evaluator.
+              type = types.attrsOf (types.oneOf [ types.ints.unsigned types.bool ]);
               default = {
                 tmp_large_entry_bytes = 1073741824;
                 tmp_large_min_age_hours = 2;
