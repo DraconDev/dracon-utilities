@@ -91,7 +91,7 @@ Pre-2026-08 audits live in `docs/archive/audits-2026-07/`; root holds only
 | `committer-stalls-2026-10-01.md` | Classifier spawn-gate bug: 20k+ rapid failures plus multi-hour quiet stalls |
 | `loop-oversubscription-2026-10-04.md` | 20 agent loops on 16 cores — oversubscription + pressure blindness |
 | `sync-wedge-filter-hang-2026-10-04.md` | `filter-process` hang pinning tasks 7.5h as daemon children |
-| `quarantine-treadmill-2026-10-04.md` | Quarantine became the disk filler itself (192G / 49 entries) |
+| `stash-treadmill-2026-10-04.md` | Stash became the disk filler itself (192G / 49 entries) |
 | `parent-bloat-quarantine-analysis-2026-09-26.md` | Corrected bloat targeting: `web/music/libs` history, not the games |
 | `sync-convergence-remediation-proposal-2026-09-25.md` | Proposal-only convergence remediation (daemon deliberately frozen; sealed evidence in `audit/sync-convergence-2026-09-25/`) |
 | `commit-activity-audit.md` | Generated commit-activity snapshot — classifies low activity, never manufactures commits |

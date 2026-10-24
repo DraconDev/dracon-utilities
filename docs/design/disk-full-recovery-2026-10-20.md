@@ -138,20 +138,20 @@ signal; a 200 from a pooled connection is not.
 | Item | Reclaimed | Note |
 |---|---|---|
 | Codex `app-server-daemon` releases | 4.2 GiB | 10 superseded versions kept; only `current` (0.163.0) is live |
-| Pi session retention quarantine | 11.0 GiB | 1017 policy-expired sessions (>30 d) |
+| Pi session retention stash | 11.0 GiB | 1017 policy-expired sessions (>30 d) |
 | `crates/ai-api-sdk/target` | 553 MiB | genuinely disposable build output |
 
 ### Session retention was never running
 
 `pi-session-retention` existed in `~/Dev/pi-plugins/extensions/` and its
 purge timer was installed and firing, but the extension was **not** in
-Pi's package list — so the 30-day policy never ran and the quarantine
+Pi's package list — so the 30-day policy never ran and the stash
 stayed empty. The timer was purging nothing.
 
 `pi install ~/Dev/pi-plugins/extensions/pi-session-retention` registers
 it, so the policy now runs on each Pi startup. The purge timer alone was
 never sufficient: it only expires runs that the extension has already
-quarantined.
+stashd.
 
 Remaining 30-day-old sessions are **forks of retained parents** and are
 protected by design (`protectedByParent: 100`).
@@ -160,7 +160,7 @@ protected by design (`protectedByParent: 100`).
 
 | Path | Size | Why kept |
 |---|---|---|
-| `web/music/out/` (129 GiB audio) | 129 GiB | live publish tree; the music rebuild was actively writing it. `out/.stale-orphans` and `out/audio/.quarantine` are the music pipeline's own quarantine convention, not junk. |
+| `web/music/out/` (129 GiB audio) | 129 GiB | live publish tree; the music rebuild was actively writing it. `out/.stale-orphans` and `out/audio/.stash` are the music pipeline's own stash convention, not junk. |
 | `dracon-platform/.git/modules` | 26 GiB | submodule gitdirs with real published history |
 | `dracon-utilities/target` | 55 GiB | `protected_paths` in the policy; the repo that ships the guard |
 | `~/dracon/backups/*.bundle` | ~14 GiB | pre-slim rollback bundles; the sanctioned-slimming procedure requires a verified bundle to exist |
