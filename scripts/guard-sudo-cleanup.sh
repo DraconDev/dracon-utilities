@@ -53,6 +53,68 @@ echo "   restored $restored process(es) to nice 0"
 echo "   still at nice 5: $(ps -eo ni= | awk '$1 == 5' | wc -l) total across the host"
 
 echo
+echo "== 1b. restoring the OOM score the guard stranded =="
+# The guard's OOM steering writes oom_score_adj=250 onto a process that is
+# holding too much memory, so the kernel prefers killing something else. A
+# CHILD forked while its parent was biased INHERITED that value, and the
+# guard only restores the processes it has a record of — so those children
+# stay pinned at 250, which makes them MORE likely to be an OOM victim than
+# a process at the default 0.
+#
+# On this host that set includes the operator's own Chrome session: the
+# browser inherited 250 from a parent the guard had biased, and the guard
+# will not touch it again, because Chrome is on the exempt list — exemption
+# forbids mutation, and it cannot forbid an inherited value it never set.
+# With memory this tight (2% available, PSI critical) that is worth undoing
+# deliberately rather than leaving to chance.
+#
+# The processes the guard is steering RIGHT NOW are left alone: the ledger
+# says which ones those are, and it owns them.
+TARGET_HOME="$(getent passwd "$TARGET_USER" 2>/dev/null | cut -d: -f6 || true)"
+LEDGER="${TARGET_HOME:-/home/$TARGET_USER}/.dracon/guard-mitigations.json"
+tracked=" "
+if [ -r "$LEDGER" ]; then
+    tracked=$(python3 - "$LEDGER" <<'PY' || echo " "
+import json
+import sys
+
+try:
+    with open(sys.argv[1], encoding="utf-8") as handle:
+        ledger = json.load(handle)
+except Exception:
+    print(" ")
+    raise SystemExit(0)
+pids = sorted(
+    {
+        record["pid"]
+        for record in ledger.get("records", [])
+        if record.get("original_oom_adj") is not None
+    }
+)
+print(" " + " ".join(str(pid) for pid in pids) + " ")
+PY
+)
+fi
+oom_reset=0
+oom_skipped=0
+for pid in $(ps -eo pid=,user= | awk -v u="$TARGET_USER" '$2 == u {print $1}'); do
+    adj_file="/proc/$pid/oom_score_adj"
+    [ -r "$adj_file" ] || continue
+    adj=$(cat "$adj_file" 2>/dev/null || echo "")
+    [ "$adj" = "250" ] || continue
+    case "$tracked" in
+        *" $pid "*) oom_skipped=$((oom_skipped + 1)); continue ;;
+    esac
+    if echo 0 >"$adj_file" 2>/dev/null; then
+        oom_reset=$((oom_reset + 1))
+    fi
+done
+echo "   restored $oom_reset process(es) from oom_score_adj 250 to 0"
+if [ "$oom_skipped" -gt 0 ]; then
+    echo "   left $oom_skipped alone: the guard is steering them right now"
+fi
+
+echo
 echo "== 2. clearing the root-owned coredumps =="
 # 494 entries, 4.1 GB, all written by systemd-coredump as root. The ten
 # newest are kept, in case a crash still needs looking at.
