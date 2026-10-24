@@ -457,6 +457,7 @@
                 cleanup_command_timeout_secs = 300;
                 forgotten_orphan_footprint_mb = 2048;
                 forgotten_orphan_tree_footprint_mb = 256;
+                reclaim_reaped_browser_profiles = true;
               };
               description = "dracon-system guard policy knobs (TOML key names, crate defaults)";
             };
