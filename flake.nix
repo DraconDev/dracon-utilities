@@ -585,7 +585,7 @@
                 # '-' prefixes mirror the shipped unit: systemd refuses to
                 # start when a non-prefixed entry is absent, so optional
                 # roots must not block startup (verified live, 2026-10-01).
-                ReadWritePaths = [ "%h/.dracon" "%h/.local/state/dracon" "%h/.local/share" "-%h/Dev" "-%h/.local/share/Trash" "-%h/.cargo" "-%h/.cache" "-%h/.npm" "-%h/.local/state/nix" "/tmp" "-/mnt/data/stash" "-/mnt/data/quarantine" "-/mnt/data/cold" ];
+                ReadWritePaths = [ "%h/.dracon" "%h/.local/state/dracon" "%h/.local/share" "-%h/Dev" "-%h/.local/share/Trash" "-%h/.cargo" "-%h/.cache" "-%h/.npm" "-%h/.local/state/nix" "/tmp" "-/mnt/data/stash" "-/mnt/data/cold" ];
                 PrivateTmp = false;
                 PrivateDevices = true;
                 ProtectKernelTunables = true;
