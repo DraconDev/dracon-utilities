@@ -33,14 +33,24 @@ echo "== 1. restoring the priority the guard stranded =="
 # RAISE it again, so everything it ever touched is still degraded. On this
 # host that is 197 processes, including the operator's entire Chrome tree
 # (65 processes) — the browser has been running at nice 5 ever since.
+#
+# FIXED 2026-10-24 (the first run of this script restored exactly ONE
+# process): the filter asked for `id -un`, and under `sudo` that is ROOT —
+# so it selected root's ksmd and none of the operator's 197. The processes
+# to restore are the ones owned by the user who INVOKED sudo, which is
+# what $SUDO_USER carries.
+TARGET_USER="${SUDO_USER:-$(id -un)}"
+if [ "$(id -un)" != "$TARGET_USER" ]; then
+    echo "   (invoked via sudo as '$TARGET_USER'; restoring that user's processes, not root's)"
+fi
 restored=0
-for pid in $(ps -eo pid=,ni=,user= | awk '$2 == 5 && $3 == "'"$(id -un)"'" {print $1}'); do
+for pid in $(ps -eo pid=,ni=,user= | awk -v u="$TARGET_USER" '$2 == 5 && $3 == u {print $1}'); do
     if renice -n 0 -p "$pid" >/dev/null 2>&1; then
         restored=$((restored + 1))
     fi
 done
 echo "   restored $restored process(es) to nice 0"
-echo "   still at nice 5: $(ps -eo ni= | awk '$1 == 5' | wc -l) (one is root's ksmd)"
+echo "   still at nice 5: $(ps -eo ni= | awk '$1 == 5' | wc -l) total across the host"
 
 echo
 echo "== 2. clearing the root-owned coredumps =="
