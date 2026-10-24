@@ -151,7 +151,7 @@ stayed empty. The timer was purging nothing.
 `pi install ~/Dev/pi-plugins/extensions/pi-session-retention` registers
 it, so the policy now runs on each Pi startup. The purge timer alone was
 never sufficient: it only expires runs that the extension has already
-stashd.
+stashed.
 
 Remaining 30-day-old sessions are **forks of retained parents** and are
 protected by design (`protectedByParent: 100`).

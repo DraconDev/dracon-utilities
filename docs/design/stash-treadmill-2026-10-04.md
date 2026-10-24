@@ -12,7 +12,7 @@ routing went live (2026-10-01 namespace fix). Swap was healthy (14G of
 ## Root cause: the treadmill
 
 Agent loops rebuild `target/` within hours of a stash move, and the
-guard (action tier, `clean_stash_first = true`) stashs the
+guard (action tier, `clean_stash_first = true`) stashes the
 rebuild as a brand-new generation that sits for the full 30-day TTL:
 
 - `terhub/target`: 9 generations in 3 days
