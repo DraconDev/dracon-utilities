@@ -185,3 +185,27 @@ unresolved conflict labelled idle. Existing destructive opt-ins need explicit
 content/ownership handling, not ignored fields. Bounded no-follow private message
 IO is approved so another editor's COMMIT_EDITMSG is not overwritten. If the
 bounded slice ends incomplete, report gaps honestly; no deployment/completion.
+
+## Timeout assessment and bounded recovery
+
+Worker6cb3b8f5 timed out after30minutes, NOT successful completion. Partial
+source had been auto-committed but was never frozen, built as a matching helper,
+validated or deployed. Parent inspected staged_epoch.rs/build.rs/storage verifier
+and ran one bounded locked cargo check:10compile errors and1warning, retained at
+checks/epoch-integration-partial/timeout-assessment-check.log. Missing Staging and
+run_index_git are substantive unfinished isolated-index work, not permission for
+stubs. Three errors were TokioGitCommand ownership mismatches; parent added
+policy::TokioGitCommand::into_tokio preserving sealed prompt env and used it in
+those three calls. Parent also added truthful StagedPending CLI reporting to
+resolve the non-exhaustive arm. These partial mechanical corrections were not
+relabelled a passing check.
+
+Recovery worker **b2a57e80-af8e-4626-a698-f1268829b71c** now owns dracon-sync
+source for <=20further toolcalls, focused on the actual missing private-index
+staging/conditional-install functions and remaining ordinary mutator wiring.
+This is a bounded assessed continuation, not a blind replay. No competing parent
+build. Parent explicitly flagged that a returned epoch must bind the proven
+private candidate WHILE actual lock is owned, not bless a later live recapture.
+Also flagged post-commit lock/error semantics and distinguishing ordinary
+unbound storage from a REQUIRED binding disappearing. Source is still unfinished
+and not qualified; matching helper build waits for a real frozen checkpoint.
