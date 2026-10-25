@@ -856,6 +856,51 @@ worktree layout was eliminated for all 10 game/hegemon submodules of
   merge-correctness proof — override-wins semantics still need
   per-field behavioral tests.
 
+### Releasing one crate while a sibling crate is mid-rewrite (2026-10-25)
+
+The four gates above run over the WHOLE workspace, so a sibling crate
+under active rewrite blocks the release of an unrelated crate. On
+2026-10-25 `dracon-sync`'s staged-epoch rewrite had 30 genuine test
+failures and 24 clippy dead-code errors at HEAD, which blocked the
+`dracon-system` v0.112.50 release even though `dracon-system` does not
+depend on `dracon-sync` at all (its only non-workspace dep is the
+published `dracon-system-lib = 94.2.7`).
+
+**The gate is never weakened, skipped or narrowed.** The release is cut
+from a FROZEN workspace snapshot whose sibling crates are pinned to their
+last KNOWN-GREEN revision — what CI already does, since
+`.github/workflows/ci.yml` checks out each nested repo at an explicit
+commit. The gate then runs in full, unmodified, on a coherent committed
+tree, and the published artifact is byte-identical either way.
+
+Procedure that produced v0.112.50 (2026-10-25):
+
+1. Clone the parent workspace AND each nested repo into a scratch tree,
+   with the scratch tree on its OWN `CARGO_TARGET_DIR` — sharing the
+   live target dir would overwrite the live `target/debug/dracon-sync`
+   helper and break the operator's in-flight epoch identity checks.
+2. Pin the sibling crate to its last green revision. For v0.112.50 that
+   was `dracon-sync` @ `5cf3391` (its HEAD when the v0.112.49 gate
+   passed), NOT the epoch-era parent `e1026ec` — that revision carries
+   17 clippy dead-code errors of its own.
+3. Copy the gitignored assets a clone loses: `dracon-sync`'s
+   `scripts/bucket-runner/node_modules` (`@aws-sdk/client-s3`), without
+   which 3 bucket-qualification tests fail with `ERR_MODULE_NOT_FOUND`.
+4. Run all four gates in the snapshot. All four must pass before
+   anything is published.
+5. Publish from the snapshot, then make the release commit, tag, push and
+   GitHub release in the LIVE nested repo: a clone carries no repo-local
+   git config, so the warden pre-commit hook refuses the commit in the
+   clone ("Warden filter not configured in local git config"). Diff the
+   two trees first — only the new `release-notes-vX.Y.Z.md` should differ.
+6. Push the mirror tag to `gitlab` too, and confirm the live daemon
+   still runs the released version.
+
+A load-induced flake in a sibling crate is a RETRY, not a gate change:
+the first v0.112.50 cut attempt failed on
+`git::tests::test_push_to_named_remote_ssh_fails_https_fallback` with the
+host load average above 51; the retry passed with the gate unchanged.
+
 ## Recent audit-driven changes
 
 ### 2026-07-19 — post-v0.112.20 audit baseline (`AUDIT_FULL_2026-07-18-POSTFIX.md`, audit B8)
