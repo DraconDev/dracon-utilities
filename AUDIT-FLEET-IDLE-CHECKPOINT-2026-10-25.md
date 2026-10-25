@@ -47,16 +47,24 @@ acquisition cannot be bounded by Tokio timeout. Also cancellation test did not
 observe actual PID/descendant termination and flags/sparse/split tests were thin.
 Do not interpret initial passing counts as reviewer approval.
 
-Follow-up worker **b7b7b1bc-73d7-4ac8-8d08-341811cffcfe** is sole source writer
-in dracon-sync. Approved change: capture becomes a read-only observation through
+Follow-up worker **b7b7b1bc-73d7-4ac8-8d08-341811cffcfe** has finished.
+Parent inspected source and raw seven-test passing output and archived report,
+logs and exact source hashes in checks/staged-intent-review-fixes. The two old
+lock regressions also passed per retained report. Non-Unix regression exists but
+was not executed on Linux. Independent re-review is running as
+**abe9811e-b1ac-4c11-b2c0-f3b59e229d8f**, read-only; assess before integration.
+No staging/commit integration or final qualification yet; dead-code warnings
+remain unsuppressed. Implemented design change: capture is a read-only observation through
 one owned cancellable `git ls-files --stage --debug --sparse -z` process, binding
 entries and flags from the same index read, with HEAD before/after. No synchronous
 real-index lock in capture, no spawn_blocking timeout fiction. A later atomic
 commit boundary MUST revalidate exact identities; this observation is not
 commit authorization. Generic unsupported-platform lock acquisition must refuse
 BEFORE creating a file. Additional flag/sparse/split/cancellation tests requested.
-One bounded targeted test attempt, no repeated build timeouts on thrashing host.
-Assess native completion; then independently re-review before integration.
+One bounded targeted test attempt finished after4m04compilation and26.42s tests;
+seven passed with no failures, including actual PID and shared-runner descendant
+termination. Do not confuse those observations with final atomic commit safety.
+Assess the independent re-review before integration.
 
 The source-proven net-HEAD classification pruning seam remains distinct from
 Doomtap's actual latest precommit screenshot refusal. Prepared enrollment was
