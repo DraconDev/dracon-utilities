@@ -134,6 +134,50 @@ Non-zero matches → review the list (names only) before deleting; matches that
 are test fixtures/module caches (e.g. `go/pkg/mod/.../token.go`) are benign,
 matches under repo trees are not.
 
+### 5.1 Narrowed 2026-10-25 (operator decision)
+
+The scan above is the **historical** one. It is a loose substring match, and
+the guard implements it as: one matching file **anywhere inside** a deleted
+item keeps that **whole** item.
+
+Measured cost on this host (2026-10-25): **112 deleted items, 28.0 GiB**,
+never purged, while the disk filled at over 100 GiB/h. The matches were
+mostly incidental:
+
+| Deleted item | Size | What matched |
+|---|---|---|
+| `dg-verify` | 5.0 GiB | a Rust artefact `…-trust_token.o` |
+| `dracon-micro-fallback.v7yI5R` | 3.7 GiB | build artefacts |
+| `dg-diff-check` | 3.6 GiB | build artefacts |
+| `books` | 1.8 GiB | the chapter `02-borrowed-credentials.md` |
+
+A second, larger cause: the scan stopped at **depth 8** while the trash
+reached depth 15. A directory sitting *at* the cap kept its whole top-level
+entry — 3,977 such subtrees, and 42,029 files never examined at all.
+
+**The rule is now narrow**: a name is credential-like when the file *is* a
+credential file by its own name —
+
+- by extension: `.env`, `.pem`, `.key`, `.age`, `.p12`, `.pfx`, `.keystore`,
+  `.jks`, `.ppk`, `.asc`, `.gpg`, `.kdbx`, `.netrc`, `.npmrc`;
+- by whole name: `.git-credentials`, `hosts.yml`, `credentials`,
+  `credentials.json`, `credentials.xml`, `service_account.json`, `id_rsa`,
+  `id_dsa`, `id_ecdsa`, `id_ed25519`, `htpasswd`, `shadow`, `password-store`,
+  `Login Data`;
+- by a name whose whole stem is a credential word (`secrets.yaml`,
+  `client_secret.json`) or whose **first** component is one
+  (`credentials_backup`).
+
+A word in the *middle* of a name does not qualify: `02-borrowed-credentials`
+is a chapter, `trust_token.o` is an object file, `chrome.css` is a web asset.
+The scan depth rose to 16, which covers the measured maximum (15) with a
+level of margin; a tree deeper than the cap still fails closed and is kept.
+
+**Trade-off, stated plainly:** a trashed file named `my-api-key.txt` or
+`token_backup.txt` is no longer protected by NAME alone. The file names the
+guard still protects by name are the ones that are credential files in
+themselves.
+
 ## 6. Cleanup rules learned
 
 1. **Guard against live builds before `rm -rf target/`**: check
