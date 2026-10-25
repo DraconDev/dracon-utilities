@@ -155,3 +155,20 @@ Parent should not edit dracon-sync source while that writer is active. Warden
 and browser/parent-meta work is separate. Helpers alone still do not satisfy
 staged-intent reconciliation; task2.1 remains open, as do all deployment,
 original product-gate and all-current-watched clean+idle acceptance gates.
+
+Storage/executable follow-up approved to that worker: add immutable-tree
+verification-only CLI/API preserving authenticated authority; never call the old
+lock-taking/libgit2 commit preparer inside the new epoch lock or silently drop
+storage/signing. Potentially blocking validation must run in an owned bounded
+helper process. Unit-test current_exe is a Rust harness, installed CLI is old;
+no fallback may treat either as the new verifier. A deterministic build.rs/source
+closure digest plus protocol/tree handshake was approved (all relevant Rust
+source, manifest/lock, target/features, relative sorted names), not merely a hash
+of two files. Minimal build-dependency on already-used sha2 permitted without
+weakening locked/deny checks. This is stale-helper detection, not malicious binary
+attestation; actual executable receipts are still required. Production defaults
+to its qualified executable; cfg(test)-only absolute helper override must use the
+same real verifier, never a success stub. Parent will do ONE jobs2 locked helper
+build after worker says source is frozen, then tests use that exact binary. No
+source edits during matching build. Helper gets child-only Tokio worker cap2;
+parent will not start competing builds while that source writer is active.
