@@ -13,3 +13,17 @@
 # global config in a step; a developer's machine already has one.
 [env]
 RUST_TEST_THREADS = "1"
+# ADDED 2026-10-25: the staged-epoch path verifies a candidate tree by
+# spawning a HELPER binary (`storage verify-configured-tree`), and under test
+# it refuses to guess one: it requires DRACON_EPOCH_TEST_HELPER to point at a
+# binary whose compiled source identity matches the code under test. Without
+# it, 47 of dracon-sync's own tests fail with "matching revision-qualified
+# epoch test helper is required".
+#
+# The helper must be built from the SAME source content, or the identity
+# check refuses it. Pointing it at this workspace's own bin target does that
+# automatically: `cargo test --workspace` builds the bin and the test binary
+# from one source tree in one invocation, so both carry the same
+# DRACON_EPOCH_SOURCE_ID (build.rs hashes the sources, not the git revision).
+# A helper built by hand goes stale the moment the next commit lands.
+DRACON_EPOCH_TEST_HELPER = { value = "target/debug/dracon-sync", relative = true }
