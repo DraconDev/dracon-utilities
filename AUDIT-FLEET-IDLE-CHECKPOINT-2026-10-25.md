@@ -172,3 +172,16 @@ same real verifier, never a success stub. Parent will do ONE jobs2 locked helper
 build after worker says source is frozen, then tests use that exact binary. No
 source edits during matching build. Helper gets child-only Tokio worker cap2;
 parent will not start competing builds while that source writer is active.
+
+Latest worker decision: ordinary native add can overwrite foreign same-path
+staging even before a fresh follow-up epoch, and existing hygiene/reset paths
+can erase later actual-index intent. Parent approved the necessary alternate-
+index staging rewrite, not permanent ordinary-path refusal or silent disabling
+of build_artifact_cleanup. All add/rm/gitlink/hygiene mutations must use a private
+captured-baseline index and conditionally install exact proven deltas under the
+actual owned lock. On mismatch preserve actual staging and any otherwise-lost
+private staged version with durable diagnostics; no stale restore/reset or
+unresolved conflict labelled idle. Existing destructive opt-ins need explicit
+content/ownership handling, not ignored fields. Bounded no-follow private message
+IO is approved so another editor's COMMIT_EDITMSG is not overwritten. If the
+bounded slice ends incomplete, report gaps honestly; no deployment/completion.
