@@ -97,3 +97,61 @@ failed/refused outcomes, pass full workspace/release/all-target Clippy/deny and
 original affected product gates, verify installed execution, then capture all37
 clean+idle plus every intended advertised ref. None of that is waived by these
 component results or the background task finishing.
+
+## Latest continuation: actual integration is now the priority
+
+The re-review of the two P1 fixes found no remaining issue in that observation
+building block, explicitly not atomic commit safety. Native batched mktree tree
+materialization was then implemented; worker's first8/10 run timed out in two
+tests because ChildStdin shutdown did not deliver EOF. The explicit stdin drop
+was fixed afterward. Parent independently reran FINAL source:10/10 passed;
+checks/tree-materialization/parent-after-eof-fix.log. Independent current-source
+review65853eb1 found no issue in the materializer or Warden runtime seam; no
+committed-range or whole-assembly approval. Production integration still open.
+
+Warden source now uses a real two-worker runtime constructor (same async dispatch,
+blocking filter worker retained). One constructor test passed. An isolated OLD
+installed filter-process with no request measured18threads. Service has TasksMax
+512 and cumulative pids.events max104; a prior browser snapshot install failed
+Go newosproc errno11 having4threads despite scripts-concurrency1 and existing
+hook native-thread caps2. Amplification is proven; unique attribution at the
+failure timestamp is NOT. No new Warden binary/hooks installed. Full previous
+252 tests predate this runtime change; not a new full-suite pass. See Warden
+docs/design/bounded-cli-runtime-2026-10-25.md and its raw receipts.
+
+Fixed the demonstrated `repos <name> --json` text-output bug: selected JSON detail
+now reaches the ordinary JSON envelope, retaining not-found/ambiguous semantics.
+An actual-binary hermetic integration test passed; the improved test clears all
+inherited Git injection variables in its child commands (no global mutation).
+Logs checks/report-json-detail{,-hermetic}.log. This is not yet deployed.
+
+Read-only fresh index-format audit across ALL37 BASELINE-COHORT repositories:
+zero query/parse failures, zero unsupported flags/sparse entries/unmerged stages.
+See parent AUDIT-FLEET-INDEX-FLAGS-2026-10-25.md. This is not final current discovery
+or idle acceptance and cannot justify omitting later-discovered repositories.
+
+Browser historical snapshot cb2117... failed auto-form-filler imports spelled
+@drakon instead of its actual @dracon dependency; current canonical source no
+longer has those imports, so parent did not duplicate or regress the other
+editor's fix. The next captured push epoch8bf8... was running; later outcomes
+still need inspection, not inference from its publishing label. Historical
+Tabmon TEST failure remains to assess against current source. No product gate
+assertion was weakened and no manual recovery push occurred.
+
+**Active implementation worker6cb3b8f5-d12a-4569-a7b5-389bc4a58562** is sole
+writer in dracon-sync. Its task is actual staged-epoch production integration
+using docs/design/staged-epoch-integration-2026-10-25.md, not another unconsumed
+helper. Preserve JSON detail/inspection changes. Parent approved a storage
+verification-only immutable-tree entrypoint preserving real bindings, repo ID,
+authenticated metadata/provenance/readback; execute potentially blocking
+verification through a bounded qualified helper, not spawn_blocking timeout.
+Old storage preparer cannot be called under the epoch lock because it acquires
+its own CommitLock and rereads live index. No fabricated enrollment or unguarded
+fallback is allowed. A read-only verifier cannot take/remove caller locks or
+turn an asserted ownership bool into authority. Await the worker, assess exact
+implementation/tests/gaps, then independently review BEFORE qualification.
+
+Parent should not edit dracon-sync source while that writer is active. Warden
+and browser/parent-meta work is separate. Helpers alone still do not satisfy
+staged-intent reconciliation; task2.1 remains open, as do all deployment,
+original product-gate and all-current-watched clean+idle acceptance gates.
