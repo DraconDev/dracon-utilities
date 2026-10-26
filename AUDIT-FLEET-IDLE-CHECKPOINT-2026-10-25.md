@@ -15,8 +15,10 @@ The identified v6 intermediate assembly passed all four required workspace gates
 with zero source drift and an unchanged pinned helper; source/artifact identities,
 raw exits and log hashes are under checks/epoch-integration-partial/unmerged-entry-v6-*.
 This is NOT final qualification, deployment, loaded execution or idle-fleet proof.
-Normal version/release bump, artifact cleanup, large-untracked hygiene and the
-other explicit implementation/runtime/product-gate prerequisites remain open.
+Artifact cleanup, large-untracked hygiene and the other explicit implementation/
+runtime/product-gate prerequisites remain open. CORRECTION: version/release bump
+was already a no-op before this repair, not a new integration regression; see
+checks/epoch-integration-partial/preexisting-version-noop-assessment.md.
 No installation/config migration or real-repository manual commit/push occurred
 in this continuation. The earlier37 count is a baseline observation, not a fixed
 inventory cap: final acceptance still requires EVERY freshly watched repo idle.
