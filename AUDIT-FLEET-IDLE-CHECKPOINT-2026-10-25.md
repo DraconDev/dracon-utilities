@@ -1,6 +1,24 @@
 # Fleet idle repair checkpoint — active, not accepted
 
-## Latest continuation: durable v2 coherent intermediate assembly; review pending, NOT deployed
+## Latest continuation: review corrections, targeted green; recheck pending, NOT deployed
+
+Authoritative state: nested fleet-idle CURRENT.md and
+checks/epoch-integration-partial/hygiene-review-green-v1-assessment.json.
+Independent review BLOCKED v2 on committed symlink retirement and significant-
+whitespace normalization. Both were reproduced as real failing regressions
+(0pass/2fail), then corrected; current targeted hygiene24pass/0fail and strict
+all-target Clippy pass. Full v2 four-gate proof is HISTORICAL after these edits.
+Regular-file committed mode/path/OID and exact rule spelling are now required;
+leading literal whitespace is escaped against Warden normalization.
+
+Independent read-only recheck is pending, owned run05c0febe-e572-42bd-90f8-3a8934349efa.
+A separate queued-writer/exchange/rollback concern is UNPROVEN and requires
+actual qualification, not an assumption about Linux name-lookup behavior.
+No install, live migration or final acceptance. Full current gates, original
+products, loaded behavior, broader filesystem/interleaving controls and every-
+watched clean/idle autonomous-publication observation remain open.
+
+## Historical durable v2 coherent intermediate assembly, NOT deployed
 
 Authoritative state: nested fleet-idle CURRENT.md and
 checks/epoch-integration-partial/hygiene-durable-v2-receipt.json. Durable typed
