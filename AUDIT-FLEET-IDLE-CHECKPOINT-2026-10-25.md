@@ -1,6 +1,31 @@
 # Fleet idle repair checkpoint — active, not accepted
 
-## Latest continuation: hygiene restored (v12 assembly), not final/deployed
+## Latest continuation: safety v2, targeted only; NOT final/deployed
+
+Follow `dracon-sync/evidence/fleet-idle-convergence-2026-10-25/CURRENT.md`
+and checks/epoch-integration-partial/hygiene-safety-v2-assessment.json. A subsequent
+review exposed correctness gaps that v12's broad passing tests did not cover:
+newer canonical ignore content could be recaptured and overwritten, recovery
+records used an unobserved prefix, and deletion eligibility waived too much.
+Those preservation boundaries now have actual foreign-content, active-writer,
+symlink/hardlink, literal-path and explicit policy guards. Current targeted tests
+(hygiene13, excluded48, staged epochs) and strict all-target Clippy pass. The
+lease control now measures actual nonblocking open within the ORIGINAL finite
+budget instead of assuming zombie state proves physical release. Earlier failed
+observations remain retained. No full current assembly or deployment is claimed.
+
+Large-only admission, correct auto-stage/private-asset scoping, truthful follow-up
+and durable ignore retry intent remain unfinished; do not infer completeness
+from focused positives. Full source qualification, original gates, installed/
+loaded receipt and every watched repository clean/idle remain mandatory.
+
+The operator separately approved de-indexing exactly nine Doomtap QA captures.
+Exact-name ignore rules preserve the unchanged74-name curated comparison test;
+canonical SHA256s remain identical. Read-only follow-up observes those nine no
+longer tracked and the same HEAD advertised by GitHub/GitLab. Other QA paths stay
+tracked. No manual commit/push was used; this is not final fleet/runtime proof.
+
+## Historical hygiene v12 assembly, not final/deployed
 
 Current authoritative checkpoint:
 `dracon-sync/evidence/fleet-idle-convergence-2026-10-25/CURRENT.md`.
