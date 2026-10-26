@@ -1,5 +1,28 @@
 # Fleet idle repair checkpoint — active, not accepted
 
+## Latest continuation: unmerged-entry v6, not final/deployed
+
+Authoritative current checkpoint:
+`dracon-sync/evidence/fleet-idle-convergence-2026-10-25/CURRENT.md`.
+Entry capture now integrates verified stale-unmerged selection through a private
+candidate, exact original-index retention and bounded independent payload spool.
+Actual production-path controls preserve partial staging, unknown concurrent
+index/ref/worktree changes and meaningful hooks; repeated uncertain refusals do
+not allocate recovery spools. Linux held-FD hash cancellation observes actual
+owned descendant termination; a producer FD stays on the same canonical inode.
+
+The identified v6 intermediate assembly passed all four required workspace gates
+with zero source drift and an unchanged pinned helper; source/artifact identities,
+raw exits and log hashes are under checks/epoch-integration-partial/unmerged-entry-v6-*.
+This is NOT final qualification, deployment, loaded execution or idle-fleet proof.
+Normal version/release bump, artifact cleanup, large-untracked hygiene and the
+other explicit implementation/runtime/product-gate prerequisites remain open.
+No installation/config migration or real-repository manual commit/push occurred
+in this continuation. The earlier37 count is a baseline observation, not a fixed
+inventory cap: final acceptance still requires EVERY freshly watched repo idle.
+
+## Historical checkpoint before later integration work
+
 Active goal: `.pi-glla/goals/20261025090441-ya0tp4.md`.
 Baseline task1 is complete; implementation2/2.1 and necessary gate repairs3/3.1
 remain in progress. No new qualified deployment or whole-goal completion claim.
