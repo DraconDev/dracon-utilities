@@ -1,6 +1,28 @@
 # Fleet idle repair checkpoint — active, not accepted
 
-## Latest continuation: review corrections, targeted green; recheck pending, NOT deployed
+## Latest continuation: actual syscall preservation P1; NOT deployed
+
+Read nested fleet-idle CURRENT.md FIRST. Retirement symlink/whitespace fixes were
+independently closed; this is NOT broad safety approval. The actual helper's
+exchange/rollback now FAILS deterministic real syscall qualification:
+checks/epoch-integration-partial/exchange-syscalls-v1.json, pass:false/exit1.
+A newer accepted canonical writable FD is relocated into private storage during
+rollback, so future bytes miss the canonical path. Baseline succeeds and actual
+kernel lease break + both renameat2 boundaries/inode identities are recorded.
+The index is preserved but worktree FD continuity fails. Only owned disposable
+processes/fixtures were traced; no live deployment or producer stop.
+
+Independent design review also says BLOCK. In-place updates with before-images
+are not yet implemented/qualified and cannot silently trade whole canonical
+metadata/security visibility for recoverable partial writes. An owned-rule
+metadata/Git-local alternative changes new-rule publication/setup semantics and
+needs operator confirmation before adoption. Existing .gitignore publication
+instead needs a qualified protocol. No unsafe fallback, guard weakening or
+scope waiver is authorized. All reviews settled/read; no owned wait remains.
+Full current qualification, original gates, installed/loaded rehearsal and final
+entire watched-fleet clean/idle/publication proof remain unfinished.
+
+## Historical review corrections, targeted green, NOT deployed
 
 Authoritative state: nested fleet-idle CURRENT.md and
 checks/epoch-integration-partial/hygiene-review-green-v1-assessment.json.
