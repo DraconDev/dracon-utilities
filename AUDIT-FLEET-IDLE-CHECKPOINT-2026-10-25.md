@@ -1,6 +1,28 @@
 # Fleet idle repair checkpoint — active, not accepted
 
-## Latest continuation: safety v2, targeted only; NOT final/deployed
+## Latest continuation: admission v3, targeted only; NOT final/deployed
+
+Current authoritative evidence:
+`dracon-sync/evidence/fleet-idle-convergence-2026-10-25/CURRENT.md` and
+checks/epoch-integration-partial/hygiene-admission-v3-assessment.json.
+Large-only cycles now enter the production path without an unrelated stage
+candidate. Ignore planning no longer scans/adopts every untracked path; current
+opt-outs and private-asset partition scope remain binding. A successful canonical
+ignore write reports local follow-up, not NothingToDo. Legacy ignore recovery is
+recognized by concern/archive/settlement paths; actual late displaced FD writes
+remain visible without overwriting canonical or staged content.
+
+Observed targeted outcomes: hygiene16, excluded49, staged-epoch9 and bootstrap1,
+all zero failures; strict all-target workspace Clippy passes. Earlier compiler
+failure remains retained. No full final four-gate assembly or deployment claim.
+The durable post-commit artifact-ignore retry gap remains OPEN; inspected design
+constraints and required controls are in
+checks/epoch-integration-partial/hygiene-durable-retry-open.md. Original gates,
+loaded execution, independent rehearsal and every-watched clean/idle acceptance
+are still unfinished. Goal tasks2/3/4 remain in progress, not implicitly complete
+because task5 is the next unchecked top-level item.
+
+## Historical safety v2, targeted only; NOT final/deployed
 
 Follow `dracon-sync/evidence/fleet-idle-convergence-2026-10-25/CURRENT.md`
 and checks/epoch-integration-partial/hygiene-safety-v2-assessment.json. A subsequent
