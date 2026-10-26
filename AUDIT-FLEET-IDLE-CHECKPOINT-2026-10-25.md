@@ -1,6 +1,42 @@
 # Fleet idle repair checkpoint — active, not accepted
 
-## Latest continuation: actual syscall preservation P1; NOT deployed
+## Latest continuation: P1 fixed + qualified; browser gates repaired; fleet NOT idle
+
+Read nested fleet-idle CURRENT.md FIRST.
+
+OPERATOR DECISION: keep .gitignore publication and existing guarantees. The
+reproduced rollback defect is therefore fixed in place, not routed around.
+
+Fix: ONE finalizing RENAME_EXCHANGE plus bilateral post-exchange fingerprint
+proof; a mismatch reports uncertainty and never exchanges again. Deleting
+rollback alone was proven INSUFFICIENT — a queued old-inode writer then resolved
+onto the new canonical file. Settlement states private-desired-payload-retained
+vs canonical-exchange-settled; the archive stamp probe still surfaces later
+access to the displaced inode. Absent-path NOREPLACE unchanged.
+
+Qualified: 4 workspace gates exit 0, 12 excluded-recovery tests pass (new
+regression included), and the RELEASE binary passes the actual ptrace syscall
+qualification. Receipt: checks/epoch-integration-partial/norollback-qualified-v3-receipt.json.
+
+NOT deployed: the running daemon is a different older binary; the independent
+review run TIMED OUT with no verdict (not approval). Still open: installed/loaded
+rehearsal, cancellation/ENOSPC/restart/unsupported-FS matrix, concurrent
+canonical-leaf replacement, zero-batch migration, full-fleet proof.
+
+BROWSER REPO: three real gate causes were fixed and committed — hardcoded
+port 8731 colliding with an unrelated server, a timestamp that dropped the
+clock so same-day answers had identical badges, and a version test pinned to a
+stale release. The ACTUAL pre-push hook at HEAD now passes all four gates. It
+still cannot publish: GitHub is skipped by the documented 2 GiB pack guard and
+retries fail with EAGAIN under host memory exhaustion (27/30 GiB, 22 GiB swap).
+
+FLEET: live-fleet-observation-v2/observation.json = 37 inspected, 31 clean.
+Open: db-gateway QUEUED, browser-extensions-shared PUBLISHING,
+dracon-platform WORKING, dracon-sync UNKNOWN (transient), doomtap BLOCKED
+(staged qa screenshots belong to another goal's audit), junk-runner BLOCKED
+(foreign staged set). Final acceptance remains BLOCKED.
+
+## Historical: actual syscall preservation P1
 
 Read nested fleet-idle CURRENT.md FIRST. Retirement symlink/whitespace fixes were
 independently closed; this is NOT broad safety approval. The actual helper's
