@@ -1,6 +1,25 @@
 # Fleet idle repair checkpoint — active, not accepted
 
-## Latest continuation: admission v3, targeted only; NOT final/deployed
+## Latest continuation: durable v2 coherent intermediate assembly; review pending, NOT deployed
+
+Authoritative state: nested fleet-idle CURRENT.md and
+checks/epoch-integration-partial/hygiene-durable-v2-receipt.json. Durable typed
+artifact intent is now persisted before index installation and survives process
+exit; exact cached-tree provenance restores only the owned deletion grant.
+Fresh ignore rendering preserves newer canonical edits; actual committed Git
+content and artifact absence, not a marker/helper exit, retire the intent.
+Metadata retry does not block its own staged commit. Pending/failed inspection
+remain visible in scheduling, report and current health.
+
+All four original workspace gates pass with zero source drift, including the
+new module; raw logs/exits and artifact hashes retained. Independent read-only
+review is PENDING (owned run93b97751-a9c5-4116-b065-e073e39e48ee). No install,
+service/config migration, zero-batch change, manual real-repo commit/push or
+stopped producer. Broader interleaving/unsupported-FS controls, original product
+gates, installed/loaded rehearsal and entire watched-fleet clean/idle proof
+remain unfinished; no final acceptance or deployment verdict is claimed.
+
+## Historical admission v3, targeted only; NOT final/deployed
 
 Current authoritative evidence:
 `dracon-sync/evidence/fleet-idle-convergence-2026-10-25/CURRENT.md` and
