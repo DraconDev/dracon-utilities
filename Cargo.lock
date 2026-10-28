@@ -933,6 +933,7 @@ dependencies = [
  "dirs",
  "ed25519-dalek",
  "globset",
+ "libc",
  "log",
  "once_cell",
  "proptest",
