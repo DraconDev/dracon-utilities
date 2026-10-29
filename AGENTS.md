@@ -401,11 +401,15 @@ The no-rewrite policy below is now enforced, not just documented:
    dracon-sync's gitlab auto-create protects `main` on creation.
 3. **GitHub**: all public repos protected; private repos can't be
    (free tier) — the warden hooks are the mitigation there.
-4. **Auto-gc**: the daemon runs `git gc --prune=now` when a repo's
-   dangling garbage exceeds `auto_gc_garbage_threshold_bytes`
-   (default 2 GiB, 0 disables) — self-heals the tmp_pack_* bloat
-   class that inflated hegemon to 4.9 GiB and dracon-platform to
-   37 GiB.
+4. **Auto-gc**: the daemon runs plain `git gc` (retaining Git's
+   two-week prune grace) when a repo's dangling garbage exceeds
+   `auto_gc_garbage_threshold_bytes` (default 2 GiB, 0 disables),
+   or its loose-object bytes exceed `auto_gc_loose_threshold_bytes`
+   (default 64 MiB, 0 disables that trigger). The latter repacks
+   reachable loose objects that can otherwise inflate provider
+   high-water measurements; repeated runs require new loose-byte
+   growth and are rate-limited. This self-heals both interrupted-push
+   tmp_pack_* bloat and repeated large-file loose-object churn.
 
 Details: `docs/design/incident-amend-race-and-trust-2026-07-25.md`
 ("Whack-a-mole audit" section).
