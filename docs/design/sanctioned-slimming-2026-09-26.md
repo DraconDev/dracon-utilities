@@ -350,3 +350,97 @@ unless the operator explicitly reclassifies them.
       src/lib`, so the directory binds to every command in the sentence.
       A gate reporting "no files matched" is a defect in the gate's own
       wording, not evidence about the code.
+- **2026-10-30 — polis (`pi-session-*.html` — third execution, and the
+  first driven by a repo blocked *at its own* nested budget rather
+  than the platform one).**
+  - why: `polis` commits were impossible. Its own `pre-commit` bucket
+    guard failed closed with `BUCKET_STRATEGY_HIGH_WATER`,
+    `projectedBytes=2345216557 >= highWaterBytes=2344615936`
+    (over by 600,621 B). That is polis's own nested growth budget in
+    `web/games/wip/polis/web/config/bucket-strategy.json` (1.68 GiB
+    measured + growth = 2.18 GiB), not the platform's 5.5 GiB — so the
+    repo could not be committed to at all while sitting under its own
+    limit. Object store was 2.77 GB; reachable pack 2,184,647,774 B.
+  - excised: the entire `pi-session-*.html` class, 3 paths /
+    **25 unique blobs / 1,656.5 MB**. These are pi session dumps — an
+    AGENTS.md-excluded class — that had been committed before
+    `.gitignore:259` (`pi-session-*.html`) existed. They were already
+    history-only (0 of them tracked in `HEAD`), and Warden had
+    encrypted them in place, so what lived in history was ciphertext of
+    an excluded artifact. Nothing shipped was touched: the rewritten
+    tip's tree SHA is **byte-identical** to the pre-slim tip
+    (`cbab7de036ecdc7afbd2e6f5853d2d370247f75c` both sides).
+  - measurable result: reachable pack **2,184,647,774 B (2.03 GiB) →
+    876,021,960 B (0.816 GiB)**, a 59.9% reduction. Guard on the live
+    checkout afterwards: `ok: true`, `code: OK`,
+    `projectedBytes: 918,504,169` vs `effectiveLimitBytes:
+    2,344,615,936`, `remainingBytes: 1,426,111,767`,
+    `forwardOnly.ok: true`.
+  - preservation, proven rather than asserted: every one of the
+    6,939 non-bloat object paths present before the rewrite is present
+    after it (`comm -23` over the two `rev-list --objects main` path
+    sets returns 0 lines), the commit count moved only 16126 → 16106,
+    and the tip tree SHA is unchanged. Since the excised paths were
+    absent from `HEAD`, the rewrite could not alter any current content.
+  - old tip:   4127c384b1abf423e919986c233d218a9d36ff08 (all three
+    remotes agreed before the cutover)
+  - rewrite tip: 0570a34b0d802bb80a71fa6d1712e84ec78779ef (all three
+    remotes verified equal immediately after; the daemon has since
+    added commits on top, so live main is now that slimmed lineage)
+  - bundle: `~/dracon/backups/polis-pre-slim-20261030.bundle`
+    (2,183,238,398 B; `git bundle verify` → "The bundle records a
+    complete history", and its `refs/heads/main` IS the cutover old tip
+    `4127c384b1` — the hellhunter/dracon-platform entries both warn
+    about taking the bundle too early; this one was taken after the tip
+    was pushed, so the bundle can restore the exact cutover point).
+  - cutover: compare-and-swap `git update-ref` on the local branch plus
+    `git push --force-with-lease=refs/heads/main:<old> --no-verify` to
+    `github`, `gitlab` and `origin`, inside one `dracon-sync
+    maintenance --` window with `DRACON_ALLOW_REWRITE=1`. **GitLab
+    `main` was unprotected for the window and re-protected immediately
+    after** (see the drift note below).
+  - step 5 (gitignore) was already satisfied — `.gitignore:259` carries
+    `pi-session-*.html`, verified with `git check-ignore --no-index`
+    on both a historical name and a synthetic one. That rule is *why*
+    the class stopped growing; it was inert only for the already-tracked
+    blobs, which is exactly the class this procedure removes.
+  - clones / worktrees: the only clone is the live submodule checkout.
+    The scratch rewrite was disposable and has been deleted. `git
+    worktree prune` was not needed (0 linked worktrees).
+  - findings during execution, all new to the procedure:
+    - **the guard cannot verify a rewritten tip outside the platform
+      tree.** `findPlatformRoot` walks the *lexical* parent chain for
+      `web/config/bucket-strategy.json`, and the shared inventory lives
+      at the outermost platform root
+      (`web/docs/bucket-migration-inventory.json`). A scratch clone in
+      `~/dracon/conv-work/` therefore fails with
+      `BUCKET_STRATEGY_INVENTORY_MISSING`, and passing `--inventory`
+      explicitly is not a workaround: the inventory's
+      `repositories[].namespace` entries are validated against the
+      *policy* resolved from the scratch root, which is polis's nested
+      policy, so 13 records fail `outside configured policy
+      namespaces` (`BUCKET_STRATEGY_INVALID_INVENTORY`). The workable
+      shape is a disposable platform-*shaped* root (copy
+      `web/config/bucket-strategy.json` +
+      `web/docs/bucket-migration-inventory.json`, and place the rewrite
+      at the same relative path, `web/games/wip/polis`). Step 3 should
+      say so; "run the guard against the scratch tip" is not
+      executable as written for a nested repo.
+    - **the guard reports `GUARD_UNMEASURABLE` when the clone has no
+      remotes**, because the pushable-branch measurement needs a target
+      remote. filter-repo deletes `origin` ("Why is my origin removed?"),
+      so re-adding the remotes is a prerequisite for measuring, not an
+      optional tidy-up. `GUARD_UNMEASURABLE` reads like a size problem
+      and is actually a missing-remote problem.
+    - **GitLab's `unprotect_access_levels` drift, revisited.** The
+      original rule had `unprotect_access_levels: []`; re-creating it
+      via `POST /protected_branches` yields
+      `[{access_level: 40}]`, exactly as the dracon-platform entry
+      recorded. Push and merge stayed at Maintainer/40 with
+      `allow_force_push: false` as intended, but Maintainers can now
+      also unprotect `main`. Still needs the one-time UI fix; the
+      procedure's step 4 remains not perfectly reversible on GitLab.
+    - **the platform `pre-commit` guard also runs for polis commits and
+      passes**, so the nested budget is genuinely the only binding
+      constraint. Measured after the rewrite:
+      `projectedBytes 919,639,181`, `atOrAboveLimit: false`.
