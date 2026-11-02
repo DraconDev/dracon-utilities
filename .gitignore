@@ -139,3 +139,8 @@ web/games/wip/football-forever/docs/audit/
 dracon-sync/
 dracon-system/
 dracon-warden/
+# --- OPERATOR DECISION 2026-11-02 ---
+# Session HTML export exceeds warden's 64 MiB clean limit, so every sync
+# round fails trying to stage it. Ignored (stays on disk); the audit it
+# sourced is delivered and recorded in dracon-sync's tasklist doc.
+pi-session-2026-10-26T20-22-42-144Z_01a179e1-2ae0-713e-893c-7046dc476ee2.html
