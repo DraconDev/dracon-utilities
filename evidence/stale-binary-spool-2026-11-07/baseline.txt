@@ -1,7 +1,0 @@
-=== BASELINE 2026-11-07T13:09:11+00:00 ===
--- df --output=avail / --
-104721788
--- spool dirs --
-28
--- spool bytes (KiB) --
-0	total
