@@ -1,0 +1,26 @@
+capture_at=2026-11-11T20:42:40Z
+
+=== A4/A3 pre-cleanup baselines: the ACTUAL journal lines, verbatim ===
+$ journalctl --since "2026-11-11 09:00:00" --until "2026-11-11 14:30:00" | grep "GiB available"
+Nov 11 09:42:44 nixos dracon-system[1240657]: [2026-11-11T09:42:44.335483043+00:00] Warn: disk/rapid-fill - Disk growing at 189.1 GiB/h (100% used); 6.9 GiB available, estimated 0.0 hours until full if growth continues — inspect recent writes with dracon-system storage
+Nov 11 10:16:02 nixos dracon-system[1240657]: [2026-11-11T10:16:02.213307102+00:00] Warn: disk/trend-warning - Disk predicted to fill in 0.6 hours at 15.0 GiB/h (100% used, 8.4 GiB available) — the rate is below the rapid-fill threshold, so the disk will be full before it looks dangerous
+Nov 11 11:40:53 nixos dracon-system[1240657]: [2026-11-11T11:40:53.033502976+00:00] Warn: disk/rapid-fill - Disk growing at 78.9 GiB/h (91% used); 82.3 GiB available, estimated 1.0 hours until full if growth continues — inspect recent writes with dracon-system storage
+Nov 11 12:27:47 nixos dracon-system[1240657]: [2026-11-11T12:27:47.297789854+00:00] Warn: disk/trend-warning - Disk predicted to fill in 12.2 hours at 6.9 GiB/h (91% used, 84.0 GiB available) — the rate is below the rapid-fill threshold, so the disk will be full before it looks dangerous
+Nov 11 13:00:15 nixos dracon-system[1240657]: [2026-11-11T13:00:15.788273448+00:00] Warn: disk/trend-warning - Disk predicted to fill in 5.7 hours at 14.5 GiB/h (91% used, 82.9 GiB available) — the rate is below the rapid-fill threshold, so the disk will be full before it looks dangerous
+Nov 11 13:51:18 nixos dracon-system[1240657]: [2026-11-11T13:51:18.593604281+00:00] Warn: disk/trend-warning - Disk predicted to fill in 4.6 hours at 17.9 GiB/h (91% used, 82.2 GiB available) — the rate is below the rapid-fill threshold, so the disk will be full before it looks dangerous
+Nov 11 14:26:39 nixos dracon-system[1240657]: [2026-11-11T14:26:39.093637692+00:00] Warn: disk/rapid-fill - Disk growing at 76.6 GiB/h (91% used); 80.0 GiB available, estimated 1.0 hours until full if growth continues — inspect recent writes with dracon-system storage
+
+=== the /tmp figure: pre and post, both from the same metric ===
+$ journalctl --since "2026-11-11 10:20:00" --until "2026-11-11 11:00:00" | grep "held by the age floor"
+Nov 11 10:23:17 nixos dracon-system[1240657]: 🧹 Tmp: 72.7 GiB held by the age floor across 4279 entries — 1.0 hours of writes at 72.0 GiB/h
+Nov 11 10:23:17 nixos dracon-system[1240657]: ⚠️ Tmp: 72.7 GiB of scratch is held by the age floor (warn threshold 20 GiB) — lower tmp_min_age_hours, or tmp_large_min_age_hours for the size-aware floor
+Nov 11 10:52:58 nixos dracon-system[1240657]: 🧹 Tmp: 2.1 GiB held by the age floor across 3424 entries — 0.9 hours of writes at 2.4 GiB/h
+
+=== where the doc's 3.5/8.1 GiB literals really came from (NOT free space) ===
+$ journalctl --until "2026-11-11 00:00:00" | grep -E "Tmp: (3.5|8.1) GiB"
+Nov 09 06:54:49 nixos dracon-system[1240657]: 🧹 Tmp: 3.5 GiB held by the age floor across 3354 entries — the fill rate cannot be measured yet, so the held-back scratch has no deadline
+Nov 09 21:32:46 nixos dracon-system[1240657]: 🧹 Tmp: 3.5 GiB held by the age floor across 4577 entries — the fill rate cannot be measured yet, so the held-back scratch has no deadline
+Nov 10 10:07:40 nixos dracon-system[1240657]: 🧹 Tmp: 8.1 GiB held by the age floor across 4123 entries — 0.2 hours of writes at 35.6 GiB/h
+
+$ journalctl --since "2026-11-11 00:00:00" | grep -cE "(3.5|8.1) GiB available"
+0

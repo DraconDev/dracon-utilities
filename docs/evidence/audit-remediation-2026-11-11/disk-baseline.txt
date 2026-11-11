@@ -1,0 +1,17 @@
+capture_at=2026-11-11T20:43:09Z
+
+=== post-cleanup disk, measured now (reproducible command) ===
+$ df -h /
+/dev/nvme0n1p2  907G  633G  228G  74% /
+$ du -sh /tmp   # current, NOT the audit-time value
+19G	/tmp
+
+=== the same-key /tmp comparison, both sides from the guard journal ===
+  (age-floor-held scratch; NOT du total, NOT root free space)
+  10:23:17  72.7 GiB held by the age floor across 4279 entries
+  10:52:58   2.1 GiB held by the age floor across 3424 entries
+
+=== root free space, pre and post, from the guard journal ===
+  09:42:44  100% used;  6.9 GiB available   <- pre-cleanup floor
+  10:16:02  100% used,   8.4 GiB available   <- pre-cleanup
+  11:40:53   91% used;  82.3 GiB available   <- post-cleanup
