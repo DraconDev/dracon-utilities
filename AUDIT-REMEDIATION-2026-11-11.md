@@ -401,20 +401,22 @@ total, so it is paired with the same key from the same monitor rather than with
 `du`:
 
 ```
-$ journalctl --since "2026-11-11 10:20:00" --until "2026-11-11 11:00:00"     | grep "held by the age floor"
+$ journalctl --since "2026-11-11 10:20:00" --until "2026-11-11 11:00:00" \
+    | grep "held by the age floor"
 10:23:17 … 🧹 Tmp: 72.7 GiB held by the age floor across 4279 entries …
 10:52:58 … 🧹 Tmp:  2.1 GiB held by the age floor across 3424 entries …
 ```
 
 That is a `72.7 → 2.1 GiB` drop in held scratch across the cleanup window. The
-`du` side is separate and is what the doc's `6.0G /tmp` line records (`16:50:18Z`);
-by `2026-11-11T20:43:09Z` a fresh `du -sh /tmp` reads `19G`, because other agents
-have been building since. Both numbers are reproducible from the commands stated
-here; they are simply not the same measurement, and the earlier draft implied
-they were. The
-ENOSPC symptoms that were blocking the daemon (`No space left on device (os error
-28)` in scheduler evidence, `sha1 file …` during private staging) have not
-recurred.
+`du` side is separate and is what the doc's `6.0G /tmp` line records
+(`16:50:18Z`); by `2026-11-11T20:43:09Z` a fresh `du -sh /tmp` reads `19G`,
+because other agents have been building since. Both numbers are reproducible from
+the commands stated here; they are simply not the same measurement, and the
+earlier draft implied they were.
+
+The ENOSPC symptoms that were blocking the daemon (`No space left on device` /
+`os error 28` in scheduler evidence, `sha1 file …` during private staging) have
+not recurred.
 
 ## A5 — running daemon vs committed fix: **FALSE as previously reported**
 
