@@ -566,6 +566,46 @@ tracking ref is always somewhat behind. At `16:50:33Z` its `github` ref read
 repo the daemon publishes continuously, not a permanently poisoned ref: a single
 `git fetch github` closed it in 0.35 s, and the ref now equals the real tip.
 
+**Live re-proof of the A2 fix on the auditor's own counter-example repo**
+(`2026-11-11T17:24:45Z`,
+`docs/evidence/audit-remediation-2026-11-11/a2-live-proof.txt`). The auditor's
+objection was that `capture-anime-girls` was reporting 233 inflated commits
+under the fixed daemon. Re-probed:
+
+```
+$ git -C /home/dracon/Dev/dracon-platform/web/games/wip/capture-anime-girls \
+    rev-parse HEAD refs/remotes/origin/main refs/remotes/gitlab/main
+f7a06c33a6a8b63885e43634951a655e2eb04965      # HEAD
+f7a06c33a6a8b63885e43634951a655e2eb04965      # origin/main  (converged)
+f7a06c33a6a8b63885e43634951a655e2eb04965      # gitlab/main  (was d191dde3)
+$ git -C … rev-list --count refs/remotes/gitlab/main..HEAD
+0
+$ git -C … ls-remote gitlab refs/heads/main
+f7a06c33a6a8b63885e43634951a655e2eb04965	refs/heads/main
+$ git -C … reflog show refs/remotes/gitlab/main | head -4
+f7a06c33 refs/remotes/gitlab/main@{0}: fetch gitlab: fast-forward
+5564ed4e refs/remotes/gitlab/main@{1}: fetch gitlab: fast-forward
+f146157f refs/remotes/gitlab/main@{2}: fetch gitlab: fast-forward   # the repair
+8c9692f6 refs/remotes/gitlab/main@{3}: fetch gitlab: fast-forward   # d191dde3 -> here
+```
+
+That reflog is the proof the objection asked for: the ref the auditor measured at
+`d191dde3` has since been walked forward **by repeated `fetch gitlab` entries
+under the fixed daemon**, one per cycle, with `origin/main` converged the whole
+time — exactly the shape the pre-fix early return made unreachable. The inflation
+that repeated every ~20 s is gone: `233 commits ahead` appears 69 times in the
+16:00:00–16:24:46 window (pre-fix) and **0 times** after 16:28.
+
+Two transient SKEW rows did appear mid-churn at `17:25` and are worth naming
+because they look like the A2 bug and are not: `dracon-platform` `github`
+`c7ad5a2641` vs real `bb900dc5ed`, and `endless-td` `github` `a98013936f` vs real
+`d802e5696f`. Both are lag between a push and the next cycle's fetch, and both
+were confirmed as lag by fetching and testing ancestry — after the fetch,
+`endless-td`'s `github/main` and `origin/main` had both moved to `d802e5696f`
+while `HEAD` stayed 2 commits ahead of *both* names, i.e. genuinely unpushed work
+rather than a poisoned ref. Re-running the census once the churn settled returns
+`skews: 0 of 114 refs across 38 repos` (`a2-live-proof.txt`).
+
 Class-by-class, with the exact evidence:
 
 | class | state at end of goal |

@@ -1,0 +1,29 @@
+capture_at=2026-11-11T17:24:45Z
+
+## the auditor's live counter-evidence repo, re-probed (objective B)
+$ git -C $r rev-parse HEAD refs/remotes/origin/main refs/remotes/gitlab/main
+f7a06c33a6a8b63885e43634951a655e2eb04965
+f7a06c33a6a8b63885e43634951a655e2eb04965
+f7a06c33a6a8b63885e43634951a655e2eb04965
+$ git -C $r rev-list --count refs/remotes/gitlab/main..HEAD
+0
+$ git -C $r ls-remote gitlab refs/heads/main
+f7a06c33a6a8b63885e43634951a655e2eb04965	refs/heads/main
+$ git -C $r reflog show refs/remotes/gitlab/main | head -4
+f7a06c33 refs/remotes/gitlab/main@{0}: fetch gitlab: fast-forward
+5564ed4e refs/remotes/gitlab/main@{1}: fetch gitlab: fast-forward
+f146157f refs/remotes/gitlab/main@{2}: fetch gitlab: fast-forward
+8c9692f6 refs/remotes/gitlab/main@{3}: fetch gitlab: fast-forward
+
+## journal: the inflation the auditor quoted (233 commits ahead)
+pre-fix 16:00:00..16:24:46 -> 69
+post-fix 16:28:00..now  -> 0
+
+## skew census across all 38 watched repos (ref vs real ls-remote tip)
+
+## skew census re-run after the churn settled (all 38 repos, ref vs real ls-remote tip)
+checked 114 mirror refs across 38 repos: skews=0
+
+## the 2 transient skews seen mid-churn at 17:25 were lag, not poison:
+  dracon-platform github c7ad5a2641 -> bb900dc5ed (origin already bb900dc5ed; fetched forward, count 2 -> 2 as new commits landed)
+  endless-td github a98013936f -> d802e5696f (origin also d802e5696f; fetch moved github/main to d802e5696f; HEAD ba168894d genuinely 2 commits ahead of BOTH)
