@@ -488,7 +488,7 @@ State from the daemon's own report, captured at `2026-11-11T16:53:39Z`
 
 ```
 $ dracon-sync repos --json
-repos 38, ok 35, pending 0, warn 0, concern 0
+repos 38, ok 35, active 3, warn 0, concern 0, pending 0, failures 1
 $ python3 -c "…sorted({r['frozen_secs'] for r in d['rows']})…"
 frozen_secs distinct: [None]        # None = daemon running, not frozen
 ```
