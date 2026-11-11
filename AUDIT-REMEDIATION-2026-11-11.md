@@ -250,9 +250,9 @@ origin
 exist — so it can only ever move `refs/remotes/origin/main`. The post-install
 `refs/remotes/github/main` fast-forwards therefore came from
 `refresh_stale_upstream_ref`, i.e. from the code under audit, on the binary the
-daemon is executing. That is the discriminator the `strings` probe cannot give. And the same repair-and-nothing-repeats behaviour shows in the
-per-repo table in section B, where every repo's tracking refs equal their real
-`ls-remote` tips at capture time.
+daemon is executing. That is the discriminator the `strings` probe cannot give,
+and the per-repo table in section B shows the same repair holding: every repo's
+tracking refs equal their real `ls-remote` tips at capture time.
 
 ## A3 — epoch-spool reclamation: OVERSTATED
 
@@ -270,9 +270,10 @@ backlog that the reclaim pass never touched**, because that pass covered only th
 two big repos.
 
 Exact, re-runnable command (also used for the per-repo spool column in section
-B), with its output stamped `2026-11-11T16:50:18Z`
-(`docs/evidence/audit-remediation-2026-11-11/spool-census.sh` +
-`spool-census.txt`):
+B). Its output is captured twice in the evidence dir: an earlier run at 16:35
+(`spool-census.txt`) and the run whose numbers are quoted below, stamped
+`2026-11-11T16:50:18Z` (`final-capture.txt`); the script is
+`docs/evidence/audit-remediation-2026-11-11/spool-census.sh`:
 
 ```
 $ for r in $(python3 -c "import json;print('\n'.join(r['repo'] for r in
@@ -301,10 +302,11 @@ reasoning is intact (e.g. `epoch spool … preserved; not provably redundant`,
 `no settled+closing marker`, `producer endpoint carries unknown payload`).
 **Nothing further was deleted during this audit** — the reclaim rule used
 earlier (published-ref reachability plus a published-tree index) preserved
-anything not provably redundant. The backlog also *grows*: it was 4981 spools /
-969.1 MiB at the old capture and 5141 / 992.3 MiB by `16:50`, i.e. the
-reclamation bought time, not a solution, and re-running it is an operator action
-rather than something to execute blind while the fleet is live.
+anything not provably redundant. The backlog also *grows*: the census recorded
+5111 spools / 987.7 MiB for `/home/dracon/.dracon` at 16:35 and 5141 / 992.3 MiB
+by 16:50, i.e. ~30 new spool dirs in 15 minutes. Reclamation bought time, not a
+solution, and re-running it is an operator action rather than something to
+execute blind while the fleet is live.
 
 ## A4 — /tmp disk recovery: VERIFIED
 
@@ -786,8 +788,8 @@ weakened, and no spool was deleted during this audit.
    release/install path that refuses to overwrite the path while the service is
    active. Not implemented here: it changes daemon lifecycle behaviour and needs
    its own audited contract.
-2. **`/home/dracon/.dracon` carried 4981 spools / 969.1 MiB when this audit
-   started and 5141 / 992.3 MiB by `16:50`** — the earlier reclaim pass never
+2. **`/home/dracon/.dracon` carried 5111 spools / 987.7 MiB when measured at
+   16:35 and 5141 / 992.3 MiB by `16:50`** — the earlier reclaim pass never
    covered that root, and the backlog grows faster than it is reclaimed. Re-running
    the redundancy reclaimer over that root is the natural next action; it was not
    done blind against a live root.
