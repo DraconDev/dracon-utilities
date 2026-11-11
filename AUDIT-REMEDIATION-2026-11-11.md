@@ -275,7 +275,9 @@ A binary built at `2026-11-10 13:13:36` cannot contain source committed at
 
 Note on probing: `strings <binary> | grep list_remotes` returns 1 for both the
 old and new binaries, because `daemon.rs` already called `list_remotes` before
-the fix. That probe is **not** discriminating; the date evidence above is.
+the fix (raw output in A2). That probe is **not** discriminating; the date
+evidence above is, and the discriminating evidence for the fix is the live
+mirror repair + reflog in A2.
 
 **5b. Installing the corrected artifact broke the RUNNING daemon.**
 
@@ -338,13 +340,38 @@ $ sha256sum /proc/1358107/exe ; sha256sum ~/.local/bin/dracon-sync
 `0` `no longer executing` failures since the restart (the last one is
 `14:39:53`, before it), and commits resumed landing in the following minutes.
 
-Post-restart proof that mirror refs stay honest under the fix:
+**5c. Second reload — the A2 fix (the numbers that stand at end of goal).**
+The A2 repair meant rebuilding again from the corrected `HEAD` (`c0ce1642`),
+so the artifact changed a second time. Same procedure, with the install and the
+`SIGTERM` issued back-to-back to keep the `(deleted)` window short:
 
 ```
-$ cd /home/dracon/Dev/browser-extensions-shared
-$ git rev-parse --short github/main          f6ca17cc9e
-$ git ls-remote github refs/heads/main       f6ca17cc9ee0
+$ D=$(systemctl show dracon-sync-operator.service -p MainPID --value)   # 1358107
+$ sha256sum /proc/$D/exe                                                  -> 458b4660…a051af
+$ install -m 0755 /home/dracon/dracon/build/target-audit-2026-11-11/release/dracon-sync \
+      ~/.local/bin/dracon-sync
+$ kill -TERM $D
 ```
+
+Verified at `2026-11-11T16:50:17Z` (`final-capture.txt`):
+
+```
+$ systemctl show dracon-sync-operator.service -p MainPID --value  -> 268859
+$ sha256sum /proc/268859/exe ~/.local/bin/dracon-sync \
+            /home/dracon/dracon/build/target-audit-2026-11-11/release/dracon-sync
+379d448da69f6bb3722d44e4a561b9e919c8c45928e8f7b893669a2c15029205  /proc/268859/exe
+379d448da69f6bb3722d44e4a561b9e919c8c45928e8f7b893669a2c15029205  /home/dracon/.local/bin/dracon-sync
+379d448da69f6bb3722d44e4a561b9e919c8c45928e8f7b893669a2c15029205  /home/dracon/dracon/build/target-audit-2026-11-11/release/dracon-sync
+$ readlink /proc/268859/exe
+/home/dracon/.local/bin/dracon-sync          (no "(deleted)")
+$ systemctl show … -p ActiveEnterTimestamp --value
+Wed 2026-11-11 16:24:46 GMT
+```
+
+**Contract 2 answer: equal.** Loaded binary sha256 (`/proc/268859/exe`) ==
+installed == rebuilt artifact == `379d448d…029205` at end of goal, and the
+artifact was built from a clean tree at `HEAD = c0ce1642` whose `src/sync.rs` is
+byte-identical to the reviewed fix (`docs/evidence/…/sync-head.rs`).
 
 ## B — fleet sweep (38 watched repos): per-repo table
 
