@@ -232,8 +232,25 @@ c079823322 refs/remotes/github/main@{2026-11-11 16:40:48 +0000}: fetch github: f
 
 The `15:38:11`, `15:54:00`, `16:00:07` and `16:13:57` entries predate the fixed
 binary (installed 16:24:46); the `16:39:07`, `16:40:48` and `16:51:56` entries
-were produced after it and therefore by the fixed daemon itself (`16:50:41` is
-the one manual fetch noted in section B). And the same repair-and-nothing-repeats behaviour shows in the
+were produced after it, and `16:50:41` is the one manual fetch noted in section B.
+
+Which code path could have produced the post-install ones? Only two `git fetch`
+sites exist in the daemon, and the other one cannot touch a mirror name:
+
+```
+$ grep -rn '"fetch"' src/ | grep -v "^src/sync.rs:1[0-9][0-9][0-9][0-9]"
+src/daemon.rs:1501:        &["fetch", "--prune", &remote, &refspec],     # refresh_publish_upstream
+src/sync.rs:6296:            &["fetch", name],                          # refresh_stale_upstream_ref
+$ git -C /home/dracon/Dev/browser-extensions-shared config branch.main.remote
+origin
+```
+
+`refresh_publish_upstream` derives `remote` from `branch.<b>.remote` (here
+`origin`) and returns early when the branch remote is `origin` and SSH mirrors
+exist — so it can only ever move `refs/remotes/origin/main`. The post-install
+`refs/remotes/github/main` fast-forwards therefore came from
+`refresh_stale_upstream_ref`, i.e. from the code under audit, on the binary the
+daemon is executing. That is the discriminator the `strings` probe cannot give. And the same repair-and-nothing-repeats behaviour shows in the
 per-repo table in section B, where every repo's tracking refs equal their real
 `ls-remote` tips at capture time.
 
