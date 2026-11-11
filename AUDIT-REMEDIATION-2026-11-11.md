@@ -130,9 +130,27 @@ test sync::tests::test_refresh_stale_upstream_ref_repairs_every_mirror_name ... 
 test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 1660 filtered out
 ```
 
-**Raw probe of the binary the daemon is actually executing** (contract 3). The
-symbol is present in both binaries, so it is *not* the discriminating evidence —
-what discriminates is behaviour, quoted after it:
+First, the source shape at current `HEAD` (the multi-remote loop, and the per-name
+decision that replaced the early return):
+
+```
+$ cd /home/dracon/Dev/dracon-utilities/dracon-sync
+$ git show HEAD:src/sync.rs | grep -n "list_remotes(repo)"
+6270:    for candidate in super::git::multi_remote::list_remotes(repo) {
+$ git show HEAD:src/sync.rs | grep -n "let stale: Vec<String> = names"
+6281:    let stale: Vec<String> = names
+$ git show HEAD:src/sync.rs | sed -n '6292,6306p'
+        return; // every name already agrees with HEAD — zero network cost
+    ...
+    for name in &stale {
+        let _ = super::git::run_git_with_timeout_env_progress(
+            repo, &["fetch", name], 30, "upstream-refresh", ...
+```
+
+Then a raw `strings` probe of the binary the daemon is **actually executing**
+(`/proc/268859/exe`), against the pre-audit binary for contrast. The symbol exists
+in both, so it is *not* the discriminating evidence — behaviour, quoted right
+after, is:
 
 ```
 $ D=$(systemctl show dracon-sync-operator.service -p MainPID --value); echo $D
