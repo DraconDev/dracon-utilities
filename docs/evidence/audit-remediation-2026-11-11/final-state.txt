@@ -1,0 +1,55 @@
+### capture start 2026-11-11T16:34:13Z
+
+## [C2] loaded vs rebuilt artifact
+$ systemctl show dracon-sync-operator.service -p MainPID --value
+268859
+$ sha256sum /proc/268859/exe /home/dracon/.local/bin/dracon-sync /home/dracon/dracon/build/target-audit-2026-11-11/release/dracon-sync
+379d448da69f6bb3722d44e4a561b9e919c8c45928e8f7b893669a2c15029205  /proc/268859/exe
+379d448da69f6bb3722d44e4a561b9e919c8c45928e8f7b893669a2c15029205  /home/dracon/.local/bin/dracon-sync
+379d448da69f6bb3722d44e4a561b9e919c8c45928e8f7b893669a2c15029205  /home/dracon/dracon/build/target-audit-2026-11-11/release/dracon-sync
+$ readlink /proc/268859/exe
+/home/dracon/.local/bin/dracon-sync
+$ systemctl show dracon-sync-operator.service -p ActiveEnterTimestamp --value
+Wed 2026-11-11 16:24:46 GMT
+
+## [C3] strings probe of the EXECUTING binary
+$ strings /proc/268859/exe | grep -c list_remotes
+1
+$ strings /proc/268859/exe | grep multi_remote12list_remotes
+_RNvNtNtCsaDOpQRXmWQz_11dracon_sync3git12multi_remote12list_remotes
+$ strings /home/dracon/dracon/build/dracon-sync.pre-audit-2026-11-11.bak | grep multi_remote12list_remotes
+_RNvNtNtCsjSeFhZRzQFl_11dracon_sync3git12multi_remote12list_remotes
+
+## [C5] stuck ledger
+$ dracon-sync repair stuck-list
+✅ no stuck repos
+$ echo exit=$?
+
+## [C8] disk
+$ df -h /   (2026-11-11T16:34:14Z)
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/nvme0n1p2  907G  779G   82G  91% /
+
+## [C8] memory headroom
+$ awk '/MemTotal/{t=$2}/MemAvailable/{a=$2}END{print "MemTotal_kB="t, "MemAvailable_kB="a, "headroom_pct="a/t*100}' /proc/meminfo   (2026-11-11T16:34:14Z)
+MemTotal_kB=31914628 MemAvailable_kB=3550996 headroom_pct=11.13
+$ free -m
+               total        used        free      shared  buff/cache   available
+Mem:           31166       27699        1549          88        3888        3467
+
+## [C8] epoch spool counts (exact commands)
+$ for r in <repos>; do n=$(ls -d "$r/.git/dracon-staging-"* 2>/dev/null | wc -l); k=$(du -sk "$r/.git/dracon-staging-"* 2>/dev/null | awk '{s+=$1} END{print s+0}'); printf '%-54s %5d %8.1f MiB\n' "$r" "$n" "$k/1024"; done   (2026-11-11T16:34:14Z)
+/home/dracon/.dracon                                    5109    987.5 MiB
+/home/dracon/Dev/browser-extensions-shared               436   1149.8 MiB
+/home/dracon/Dev/dracon-platform                         454    849.3 MiB
+/home/dracon/Dev/dracon-strategy/ai-auto-writer          105   1542.2 MiB
+/home/dracon/Dev/tiles-tui-file-manager                   50    624.9 MiB
+
+## [C7] freeze status
+$ test -f /home/dracon/.dracon/dracon-sync.freeze && cat ... || echo absent   (2026-11-11T16:34:16Z)
+(absent — no freeze marker)
+$ grep -E 'FROZEN_BY_US|HEALTHY_STREAK|BAD_STREAK' /home/dracon/.dracon/memory/memory-guard.state
+HEALTHY_STREAK=0
+BAD_STREAK=0
+FROZEN_BY_US=0
+### capture end 2026-11-11T16:34:16Z
