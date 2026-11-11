@@ -326,8 +326,8 @@ The real root floor for 2026-11-11 was `6.9 GiB available at 100% used`, and it
 recovered to `82.3 GiB at 91%` after the cleanup. The A3 verdict does not change,
 but the number behind it is now the one the journal actually contains. What this
 audit cannot do is re-derive the *spool* half of the claim: the earlier pass's
-own counts (3059/3292 spools down to a few hundred)
-were reported before any capture was written to disk, and no artifact here
+own counts (3059/3292 spools down to a few hundred) were reported before any
+capture was written to disk, and no artifact here
 contains them, so they are taken on trust and flagged as such rather than quoted
 as verified numbers.
 
