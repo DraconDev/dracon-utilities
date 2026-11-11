@@ -408,10 +408,10 @@ figure in A4 now comes from one of three reproducible sources and nothing else:
 | `72.7 → 2.1 GiB` held scratch | `journalctl … \| grep "held by the age floor"` | `10:23:17` → `10:52:58` |
 | `19G` (`du -sh /tmp`, later) | `du -sh /tmp` | `20:43:09Z` |
 
-All seven are transcribed verbatim in
-`docs/evidence/audit-remediation-2026-11-11/disk-baseline.txt` and
-`baseline-correct.txt`, so a reader can re-run each one instead of trusting a
-prose figure.
+All seven are transcribed in
+`docs/evidence/audit-remediation-2026-11-11/disk-baseline.txt`,
+`baseline-correct.txt` and `du-tmp-16-50.txt`, so a reader can re-run each one
+instead of trusting a prose figure.
 
 **The `/tmp` before/after pair is only meaningful within one metric.** The
 `72.7 GiB` figure is the guard's *age-floor-held scratch* reading, not a `du`
