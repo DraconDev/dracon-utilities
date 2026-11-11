@@ -104,9 +104,9 @@ Nov 11 16:13:25 … ⏫ … scaling push timeout 900s → 5400s      (repeats ev
    costs one local `rev-parse` and no network, so the "common case is free"
    property is preserved without the early return.
 2. The regression test now reproduces the *real* shape instead of sidestepping
-   it. Before, it rewound **both** `origin/main` and `github/main`
-   (`src/sync.rs:12397-12398` at `b76168cc`), which kept the early return from
-   firing — a test that could not fail. It now leaves `origin/main == HEAD`
+   it. As shipped in `d2f2e72b` it rewound **both** `origin/main` and
+   `github/main`, which kept the early return from firing — a test that could
+   not fail. It now leaves `origin/main == HEAD`
    (`assert_eq!(upstream, head, "precondition: the configured upstream must
    already be converged")`) and rewinds only the mirror.
 
@@ -610,12 +610,25 @@ The guard unfroze itself at 16:26:30 and did not re-freeze before the capture.
 
 1. **Code fix in `dracon-sync/src/sync.rs`, `refresh_stale_upstream_ref`** — the
    early return on a converged upstream is gone; staleness is decided per remote
-   name and only stale names are fetched. Committed as `b76168cc`
-   (`1 file(s) in src/sync.rs DELTA:+32/-14`), which the daemon pushed to all
-   three remotes. **Rollback:** `git revert b76168cc`.
+   name and only stale names are fetched. Committed as `b7e67dcd`
+   (`1 file(s) in src/sync.rs DELTA:+34/-21`), pushed by the daemon to all three
+   remotes. **Rollback:** `git revert b7e67dcd`.
 2. **Regression test made discriminating** — `test_refresh_stale_upstream_ref_repairs_every_mirror_name`
    now leaves `origin/main == HEAD` and rewinds only the mirror, matching the
-   live shape; proven to fail against the pre-fix code (A2). Same commit.
+   live shape; proven to fail against the pre-fix code (A2). Committed as
+   `b76168cc` (`DELTA:+32/-14`). **Rollback:** `git revert b76168cc`.
+2b. **Transparency: the discriminating experiment left commits in the shared
+   history.** Running the test against the *un-fixed* implementation means the
+   un-fix existed in the working tree for ~90 s while the daemon was auto-committing
+   everything. It captured three transient states — `6cdadf81`, `208638b0`,
+   `05318d7a` (`TEMPORARY un-fix for the discriminating-test experiment`) — and
+   then `4987c138`, `c0ce1642` removed them again. `HEAD` contains no trace of
+   that code (`grep -c "TEMPORARY un-fix"` → 0) and the shipped binary was rebuilt
+   from the clean `HEAD`, but the intermediate commits are public. Removing them
+   would require a history rewrite, which this audit's boundaries forbid, so they
+   stay. Anyone reading the history should treat 208638b0/05318d7a as an
+   experiment, not as intended behaviour.
+
 3. Rebuilt dracon-sync from `HEAD` in a dedicated target dir
    `/home/dracon/dracon/build/target-audit-2026-11-11` — deliberately not the
    live repo's `target/`, so no build artifact lands where the daemon commits.
