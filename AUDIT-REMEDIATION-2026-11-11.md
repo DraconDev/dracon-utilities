@@ -1021,6 +1021,19 @@ $ journalctl -u dracon-sync-operator.service --since "2026-11-11 16:24:46" | gre
    to close a 16-vs-5 churn gap the daemon had not yet caught up with. That is
    the same operation the fixed code performs; **rollback** value recorded in B.
 
+9. **Corrected a misattributed baseline in A3/A4 (this round).** The earlier
+   draft's "root went from 3.5–8.1 GiB free before the cleanup" was wrong: those
+   two literals are `Tmp: … held by the age floor` scratch metrics from
+   2026-11-09/10, not free-space readings, and 2026-11-11 contains zero
+   occurrences of either value as "available". The real pre-cleanup floor was
+   `6.9 GiB available at 100% used` (09:42:44), recovering to `82.3 GiB at 91%`
+   (11:40:53). The 72.7 GiB `/tmp` figure is likewise the guard's held-scratch
+   metric and is now paired with the same metric (72.7 → 2.1 GiB), not with a
+   `du` total. All seven byte figures in A4 are now in a source-command table and
+   transcribed in `disk-baseline.txt`, `baseline-correct.txt` and
+   `du-tmp-16-50.txt`. **Rollback:** none needed — this is a documentation
+   correction, and the A3/A4 verdicts themselves are unchanged.
+
 No history was rewritten, no force-push was performed, no hook was bypassed or
 weakened, and no spool was deleted during this audit.
 
