@@ -1,6 +1,6 @@
 # AUDIT — 2026-11-11 remediation verification + fleet sweep
 
-Date: 2026-11-11 (13:48–14:45)
+Date: 2026-11-11 (13:48–16:55)
 Scope: the four remediations landed earlier in this session (warden binary-lane
 receipts, dracon-sync stale-mirror refresh, epoch-spool reclamation, /tmp disk
 recovery), plus a read-only sweep of the watched fleet for the same classes.
@@ -10,11 +10,14 @@ produced it. Nothing was accepted on the strength of a prior summary.
 Verdicts: VERIFIED = claim holds as stated. OVERSTATED = holds in part, with a
 material gap. FALSE = does not hold.
 
-Headline finding: **the running daemon was executing a pre-fix binary, and an
-install swapped the executable underneath it, which broke every epoch staging
-self-re-exec.** That is now fixed and verified live (A5 below). Six watched
-repos also carried stale mirror tracking refs — the exact defect class the sync
-fix addresses — and were repaired.
+Headline finding: **the sync fix did not work as shipped.** Its mirror-repair
+loop sat behind an early return that fires whenever the configured upstream is
+converged — the common production shape — so a mirror-only stale ref was never
+repaired. That is proven live (A2), fixed in `src/sync.rs`, covered by a
+regression test that fails against the old implementation, rebuilt, installed
+and verified on the running daemon. The second finding was operational: the
+daemon was executing a pre-fix binary, and installing a corrected one under it
+broke every epoch staging self-re-exec until the process was restarted (A5).
 
 ---
 
@@ -186,38 +189,42 @@ understates the structure of the backlog: **spools regenerate continuously and
 `/home/dracon/.dracon` carries its own 4981-spool backlog** that was never
 touched, because the reclaim pass covered only the two big repos.
 
-```
-$ ls -d <repo>/.git/dracon-staging-* | wc -l ; du -sk ... | awk
-  /home/dracon/Dev/browser-extensions-shared            358 spools     981.0 MiB
-  /home/dracon/Dev/dracon-platform                      454 spools     849.3 MiB
-  /home/dracon/Dev/dracon-strategy                       2 spools       4.2 MiB
-  /home/dracon/Dev/dracon-strategy/ai-auto-video          8 spools     371.2 MiB
-  /home/dracon/Dev/dracon-strategy/ai-auto-writer       100 spools    1473.2 MiB
-  /home/dracon/Dev/dracon-utilities                      24 spools       1.7 MiB
-  /home/dracon/Dev/dracon-utilities/dracon-warden         1 spools       0.2 MiB
-  /home/dracon/Dev/pi-plugins                             2 spools       0.1 MiB
-  /home/dracon/Dev/pi-plugins/pi-goal-list-loop-audit     1 spools       0.3 MiB
-  /home/dracon/Dev/terhub                                 3 spools       0.1 MiB
-  /home/dracon/Dev/tiles-tui-file-manager                50 spools     624.9 MiB
-  /home/dracon/.dracon                                 4981 spools     969.1 MiB
-```
-
-Nested gitdirs, same class:
+Exact, re-runnable command (also used for the per-repo spool column in section
+B), with its output stamped `2026-11-11T16:50:18Z`
+(`docs/evidence/audit-remediation-2026-11-11/spool-census.sh` +
+`spool-census.txt`):
 
 ```
-  web-games-capture-anime-girls  12    web-games-deathrun   3
-  web-games-doomtap               9    web-games-endless-td 39
-  web-games-junk-runner         274
+$ for r in $(python3 -c "import json;print('\n'.join(r['repo'] for r in
+    json.load(open('repos-final.json'))['rows']))"); do
+    gd=$(git -C "$r" rev-parse --path-format=absolute --git-dir 2>/dev/null) || gd="$r/.git"
+    n=$(ls -d "$gd"/dracon-staging-* 2>/dev/null | wc -l)
+    k=$(du -sk "$gd"/dracon-staging-* 2>/dev/null | awk '{s+=$1} END {print s+0}')
+    printf '%-56s %5d %8.1f MiB\n' "$r" "$n" "$(awk -v k="$k" 'BEGIN{print k/1024}')"
+  done
+/home/dracon/Dev/browser-extensions-shared              452   1189.1 MiB
+/home/dracon/.dracon                                   5141    992.3 MiB
+/home/dracon/Dev/dracon-platform                        454    849.3 MiB
+/home/dracon/Dev/dracon-strategy/ai-auto-writer         105   1542.2 MiB
+/home/dracon/Dev/tiles-tui-file-manager                  50    624.9 MiB
+/home/dracon/Dev/dracon-platform/web/games/wip/junk-runner  276  149.6 MiB
+  … plus 13 more repos with 1–29 spools each; the complete list, including
+    every nested submodule gitdir, is in spool-census.txt
 ```
+
+Nested gitdirs are counted by the same command because `--path-format=absolute
+--git-dir` resolves them to `.git/modules/web-games-*`; the previous version of
+this document listed them as bare names with no ref and no bytes.
 
 The daemon's own routes deliberately refuse most of these; the journal shows the
 reasoning is intact (e.g. `epoch spool … preserved; not provably redundant`,
 `no settled+closing marker`, `producer endpoint carries unknown payload`).
 **Nothing further was deleted during this audit** — the reclaim rule used
 earlier (published-ref reachability plus a published-tree index) preserved
-anything not provably redundant, and re-running it now would clear only the
-settled, provably-redundant remainder. That is left as an operator action rather
-than executed blind while the fleet is live.
+anything not provably redundant. The backlog also *grows*: it was 4981 spools /
+969.1 MiB at the old capture and 5141 / 992.3 MiB by `16:50`, i.e. the
+reclamation bought time, not a solution, and re-running it is an operator action
+rather than something to execute blind while the fleet is live.
 
 ## A4 — /tmp disk recovery: VERIFIED
 
