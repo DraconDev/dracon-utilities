@@ -569,21 +569,34 @@ The guard unfroze itself at 16:26:30 and did not re-freeze before the capture.
 
 ## Changes made by this audit
 
-1. Rebuilt dracon-sync from `HEAD` (commit `d2f2e72b`) in a dedicated target dir
+1. **Code fix in `dracon-sync/src/sync.rs`, `refresh_stale_upstream_ref`** — the
+   early return on a converged upstream is gone; staleness is decided per remote
+   name and only stale names are fetched. Committed as `b76168cc`
+   (`1 file(s) in src/sync.rs DELTA:+32/-14`), which the daemon pushed to all
+   three remotes. **Rollback:** `git revert b76168cc`.
+2. **Regression test made discriminating** — `test_refresh_stale_upstream_ref_repairs_every_mirror_name`
+   now leaves `origin/main == HEAD` and rewinds only the mirror, matching the
+   live shape; proven to fail against the pre-fix code (A2). Same commit.
+3. Rebuilt dracon-sync from `HEAD` in a dedicated target dir
    `/home/dracon/dracon/build/target-audit-2026-11-11` — deliberately not the
-   live repo's target, so no build artifact lands where the daemon commits.
-2. Installed the artifact to `~/.local/bin/dracon-sync`, keeping the previous
-   binary at `/home/dracon/dracon/build/dracon-sync.pre-audit-2026-11-11.bak`
-   (sha `0e4b543e…`). **Rollback:** `install -m 0755` that backup back.
-3. Restarted the daemon via `kill -TERM` under `Restart=always` after
-   `systemctl restart` proved to need interactive auth unavailable here.
-4. Fast-forwarded six stale `refs/remotes/github/main` refs, each only after
-   proving the real tip was already an ancestor of `main`. **Rollback:** each
-   prior value is in the A2 table (`e7c1a5202a`, `b88a92e6dc`, `b151294464`,
-   `bdc6d84cb4`, `918e5fab5e`, `3ea223e55a`).
-5. Resumed the daemon from the memory-guard freeze twice (operator-level
-   `dracon-sync resume`), including once to surface and then clear the
-   replaced-executable state.
+   live repo's `target/`, so no build artifact lands where the daemon commits.
+4. Installed the artifact to `~/.local/bin/dracon-sync` twice (once for the
+   14:40 reload, once for the 16:24 reload). Previous binaries preserved at
+   `/home/dracon/dracon/build/dracon-sync.pre-audit-2026-11-11.bak`
+   (sha `0e4b543e…`) and the `458b4660…` build remains in the audit target dir.
+   **Rollback:** `install -m 0755 <either> ~/.local/bin/dracon-sync` + SIGTERM.
+5. Restarted the daemon twice with `kill -TERM` under the service's own
+   `Restart=always`, because `systemctl restart` and `sudo -n` need interactive
+   auth this session does not have (polkit `addAdminRule` → `unix-group:wheel`).
+6. Fast-forwarded six stale `refs/remotes/github/main` refs earlier in the run,
+   each only after proving the real tip was already an ancestor of `main`.
+   **Rollback:** prior values were `e7c1a5202a`, `b88a92e6dc`, `b151294464`,
+   `bdc6d84cb4`, `918e5fab5e`, `3ea223e55a`.
+7. Resumed the daemon from memory-guard freezes with `dracon-sync resume` (the
+   guard re-froze and self-cleared four times during the run — section C).
+8. Ran one manual `git fetch github` in `browser-extensions-shared` at 16:50:41
+   to close a 16-vs-5 churn gap the daemon had not yet caught up with. That is
+   the same operation the fixed code performs; **rollback** value recorded in B.
 
 No history was rewritten, no force-push was performed, no hook was bypassed or
 weakened, and no spool was deleted during this audit.
@@ -610,15 +623,21 @@ weakened, and no spool was deleted during this audit.
    release/install path that refuses to overwrite the path while the service is
    active. Not implemented here: it changes daemon lifecycle behaviour and needs
    its own audited contract.
-2. **`/home/dracon/.dracon` carries 4981 spools / 969 MiB** that the earlier
-   reclaim pass never covered. Re-running the redundancy reclaimer over that root
-   is the natural next action; it was not done blind during this audit.
+2. **`/home/dracon/.dracon` carried 4981 spools / 969.1 MiB when this audit
+   started and 5141 / 992.3 MiB by `16:50`** — the earlier reclaim pass never
+   covered that root, and the backlog grows faster than it is reclaimed. Re-running
+   the redundancy reclaimer over that root is the natural next action; it was not
+   done blind against a live root.
 3. **`dracon-utilities` accumulates cargo `target/` (29 GiB) inside a watched
    repo** and is not covered by `.gitignore`, so the daemon repeatedly tries to
    stage it (`⚠️ git add failed for 11852 paths … target-sync/…`). Adding
    `target*/` to that repo's ignore set would remove a standing failure source.
    Not done here: it touches another repo's ignore policy.
-4. **The mirror-refresh fix does not cover a name whose remote was never fetched.**
+4. **The mirror-refresh fix still depends on `git fetch <name>` succeeding within
+   30 s.** It does not cover a remote that is unreachable, and it runs only after
+   a clean (non-degraded) push, so a repo whose push is permanently degraded
+   keeps its skew. Observed here: `browser-extensions-shared` accumulated a
+   16-vs-5 gap while its publication was owned by a long-running hook.
    It repairs a stale ref by fetching the name, which is why the six skews above
    were repairable manually. It does not run for repos the daemon never pushes to
    (e.g. `/home/dracon/Dev/eve`, ~1135 ahead, outside the watch roots).
