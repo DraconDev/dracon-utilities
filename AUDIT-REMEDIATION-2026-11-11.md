@@ -574,7 +574,7 @@ Class-by-class, with the exact evidence:
 | epoch-spool backlog | 19 repos, 6597 spool dirs (6048 MiB) per the gitdir-resolved census at `16:50:18Z`; largest `/home/dracon/.dracon` 5141 (992.3 MiB), `browser-extensions-shared` 452 (1189.1 MiB), `dracon-platform` 454 (849.3 MiB), `ai-auto-writer` 105 (1542.2 MiB), `tiles-tui-file-manager` 50 (624.9 MiB). Exact commands in A3. |
 | stuck-push ledger | empty — `dracon-sync repair stuck-list` → `✅ no stuck repos` (16:50, section A5) |
 | hook-blocked pushes | none — the previously refused `dracon-platform` 91-commit push dry-runs as `c7ad5a2641..645e1add76  main -> main` (16:50:50Z, section A1) |
-| freeze markers | not frozen at end of goal (marker absent `16:55:05Z`, `frozen_secs` all `None` at `16:53:39Z`). **Four pause episodes occurred during the run — see section C.** |
+| freeze markers | not frozen at end of goal (marker absent `16:55:05Z` and again `2026-11-11T17:21:28Z`, the last checkpoint before this claim; `frozen_secs` all `None` at `16:53:39Z`). **14 contiguous freeze episodes occurred on 2026-11-11 — see section C.** |
 | push PENDING (not stuck) | 2 at `16:53:39Z` — `browser-extensions-shared` (`1 unpushed commits`) and `dracon-platform` (`1 unpushed commits`); at `2026-11-11T17:05:33Z` re-sampled: 4 repos with live churn (`browser-extensions-shared` 18, `junk-runner` 2, `ai-auto-writer` 1, `dracon-platform` 1). None is in the stuck ledger; all are commits newer than the last push. |
 | disk / memory | `81G` free (91%) at `16:50:18Z`; headroom 7.09% by `MemAvailable`, 13.67% by the guard's own formula, same stamp (section C) |
 
@@ -797,8 +797,9 @@ $ journalctl -u dracon-sync-operator.service --since "2026-11-11 16:24:46" | gre
    each only after proving the real tip was already an ancestor of `main`.
    **Rollback:** prior values were `e7c1a5202a`, `b88a92e6dc`, `b151294464`,
    `bdc6d84cb4`, `918e5fab5e`, `3ea223e55a`.
-7. Resumed the daemon from memory-guard freezes with `dracon-sync resume` (the
-   guard re-froze and self-cleared four times during the run — section C).
+7. Resumed the daemon from memory-guard freezes with `dracon-sync resume` — the
+   guard froze 14 times during 2026-11-11 (episodes listed in C) and has not
+   frozen since 16:26:30.
 8. Ran one manual `git fetch github` in `browser-extensions-shared` at 16:50:41
    to close a 16-vs-5 churn gap the daemon had not yet caught up with. That is
    the same operation the fixed code performs; **rollback** value recorded in B.
