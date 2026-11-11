@@ -943,13 +943,13 @@ commits landed
 **The freeze at claim time was the honest state then, and it is not a regression.**
 It has since cleared exactly as the mechanism predicts — marker absent at
 `2026-11-11T20:46:11Z`, after episodes 15 (`17:30:22–18:01:25`) and 16
-(`19:24:52–19:54:51`) ran and released.
-The daemon is parked by `dracon-memory-guard.sh` because the host is short of
-reclaimable memory; the guard releases only above 25% headroom and below 5.0
-`full` PSI — and at `17:40:13Z` the host reported `14.82%` headroom with
-`full avg10` PSI already recovered to `2.42`, i.e. headroom is the binding
-constraint. Leaving it engaged is the correct behaviour, and the freeze watchdog
-self-clears a stale marker if the pressure lifts.
+(`19:24:52–19:54:51`) ran and released. Each episode engages for the same cause:
+the guard parks the daemon while the host is short of reclaimable memory, and
+releases only above 25% headroom and below 5.0 `full` PSI — at `17:40:13Z`
+headroom was `14.82%` (so it stayed parked) while `full avg10` PSI had already
+recovered to `2.42` — headroom is the binding constraint. Leaving it engaged was
+the correct behaviour, and the marker clearing on its own at `18:01:25` confirms
+the guard does release it rather than leaving it stuck.
 
 **Contract 6 caveat.** The dry-run of `dracon-platform` → `gitlab` at
 `17:38:52Z` printed `Everything up-to-date` instead of a ref-update line, because
