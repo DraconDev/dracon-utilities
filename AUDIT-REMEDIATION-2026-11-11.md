@@ -66,12 +66,18 @@ converged, so the single most common production shape — upstream long repaired
 a **mirror** still pinned at an old tip — never reached the loop at all.
 
 ```
-$ git show b76168cc:src/sync.rs | grep -n "converged — the common case"
-6239:    let upstream_sha = output(&["rev-parse", &upstream_ref]);
-6241:    if upstream_sha.is_some() && upstream_sha == head_sha {
-6242:        return; // converged — the common case, zero network cost
-6270:    for candidate in super::git::multi_remote::list_remotes(repo) {   <- loop, unreachable
+$ git show d2f2e72b:src/sync.rs | sed -n '6239,6243p'
+    let upstream_sha = output(&["rev-parse", &upstream_ref]);
+    let head_sha = output(&["rev-parse", "HEAD"]);
+    if upstream_sha.is_some() && upstream_sha == head_sha {
+        return; // converged — the common case, zero network cost
+    }
+$ git show d2f2e72b:src/sync.rs | grep -n "list_remotes(repo)"
+6270:    for candidate in super::git::multi_remote::list_remotes(repo) {
 ```
+
+`d2f2e72b` is the commit this brief calls "the fix"; the `return` at 6242 exits
+before the loop at 6270, which is the whole defect.
 
 Live counter-evidence, on the rebuilt daemon (sha `458b4660…`) that the previous
 version of this document called "fixed":
