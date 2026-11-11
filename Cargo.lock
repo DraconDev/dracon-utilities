@@ -1026,7 +1026,7 @@ dependencies = [
 
 [[package]]
 name = "dracon-warden"
-version = "0.113.16"
+version = "0.113.17"
 dependencies = [
  "age",
  "anyhow",
