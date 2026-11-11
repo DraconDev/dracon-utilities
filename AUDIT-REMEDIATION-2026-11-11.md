@@ -404,7 +404,7 @@ figure in A4 now comes from one of three reproducible sources and nothing else:
 | `8.4 GiB available` / `100% used` | same command | `10:16:02` |
 | `82.3 GiB available` / `91% used` | same command | `11:40:53` |
 | `80G` free (`df -h /`) | `df -h /` | `16:50:18Z` |
-| `6.0G` (`du -sh /tmp`) | `du -sh /tmp` | `16:50:18Z` |
+| `6.0G` (`du -sh /tmp`) | `du -sh /tmp` (transcribed in `du-tmp-16-50.txt`, together with the current `19G`) | `16:50:18Z` |
 | `72.7 → 2.1 GiB` held scratch | `journalctl … \| grep "held by the age floor"` | `10:23:17` → `10:52:58` |
 | `19G` (`du -sh /tmp`, later) | `du -sh /tmp` | `20:43:09Z` |
 

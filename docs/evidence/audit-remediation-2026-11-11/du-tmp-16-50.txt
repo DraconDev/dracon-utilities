@@ -1,0 +1,34 @@
+# Provenance of the `6.0G /tmp` figure quoted in A4 of
+# AUDIT-REMEDIATION-2026-11-11.md
+#
+# PROBLEM: that figure was measured at 2026-11-11T16:50:18Z but was never
+# transcribed into an evidence file, so a reader could not recompute it
+# (contract 8). The CURRENT value is different and is deliberately NOT the
+# quoted one, because other agents have been building since.
+#
+# The quote is reproduced here from the audit log instead of from a fresh
+# measurement, and the fresh measurement is recorded alongside so the difference
+# is visible rather than hidden.
+
+captured_at=2026-11-11T20:45:00Z
+
+## the figure the doc quotes (audit-time, from the audit transcript at 16:50:18Z)
+16:50:18Z  du -sh /tmp   ->  6.0G
+
+## the same command re-run now (NOT the quoted figure; /tmp has regrew)
+$ du -sh /tmp
+19G	/tmp
+
+## and the same-key per-metric pair from the guard journal (pre/post cleanup)
+$ journalctl --since "2026-11-11 10:20:00" --until "2026-11-11 11:00:00" \
+    | grep "held by the age floor"
+Nov 11 10:23:17 ... Tmp: 72.7 GiB held by the age floor across 4279 entries
+Nov 11 10:52:58 ... Tmp: 2.1 GiB held by the age floor across 3424 entries
+
+## root free space around the same window (guard journal)
+$ journalctl --since "2026-11-11 09:00:00" --until "2026-11-11 14:30:00" \
+    | grep "GiB available"
+Nov 11 09:42:44 ... 100% used; 6.9 GiB available
+Nov 11 10:16:02 ... 100% used, 8.4 GiB available
+Nov 11 11:40:53 ... 91% used; 82.3 GiB available
+Nov 11 14:26:39 ... 91% used; 80.0 GiB available
