@@ -1,0 +1,29 @@
+capture_at=2026-11-11T17:21:28Z
+
+=== command (verbatim, re-runnable) ===
+$ journalctl -u dracon-sync-operator.service --since "2026-11-11 00:00:00" --no-pager \
+    | grep "sync daemon paused" | awk "{print \$1, \$2, \$3}"
+$ <group contiguous runs where the gap between consecutive pause lines <= 120s>
+
+=== output: 14 contiguous freeze episodes on 2026-11-11 (27663 pause log lines) ===
+  2026-11-11T01:20:21 .. 01:50:33  (30.2 min)
+  2026-11-11T02:07:44 .. 02:39:50  (32.1 min)
+  2026-11-11T02:46:59 .. 03:50:42  (63.7 min)
+  2026-11-11T04:03:00 .. 04:33:11  (30.2 min)
+  2026-11-11T04:54:58 .. 05:25:55  (30.9 min)
+  2026-11-11T05:50:19 .. 06:21:01  (30.7 min)
+  2026-11-11T08:38:43 .. 09:10:43  (32.0 min)
+  2026-11-11T09:16:41 .. 09:47:05  (30.4 min)
+  2026-11-11T09:49:56 .. 10:19:33  (29.6 min)
+  2026-11-11T12:02:59 .. 12:33:06  (30.1 min)
+  2026-11-11T12:49:02 .. 13:52:36  (63.6 min)   <- spans the audit start (13:48)
+  2026-11-11T14:11:16 .. 14:37:44  (26.5 min)
+  2026-11-11T14:41:53 .. 15:13:05  (31.2 min)   <- frozen at the 14:45 audit end (frozen_secs=127)
+  2026-11-11T16:18:54 .. 16:26:30  ( 7.6 min)   <- last; self-cleared, none since
+
+=== marker + guard state at end of goal ===
+sampled 2026-11-11T17:21:28Z
+MARKER_ABSENT
+HEALTHY_STREAK=0
+BAD_STREAK=0
+FROZEN_BY_US=0

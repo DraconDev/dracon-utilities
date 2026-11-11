@@ -654,19 +654,32 @@ mid-freeze. The correction, with contiguous pause episodes derived from the
 journal:
 
 ```
-$ journalctl -u dracon-sync-operator.service --since "2026-11-11 13:30:00" \
-    | grep "⏸️ sync daemon paused"   # first/last of each contiguous run
-  2026-11-11T13:30:00 .. 13:52:36   (22.6 min)
-  2026-11-11T14:11:16 .. 14:37:44   (26.5 min)
-  2026-11-11T14:41:53 .. 15:13:05   (31.2 min)
-  2026-11-11T16:18:54 .. 16:26:30   ( 7.6 min)
+$ journalctl -u dracon-sync-operator.service --since "2026-11-11 00:00:00" \
+    | grep "sync daemon paused" | awk '{print $1, $2, $3}'   # 27663 lines
+$ <group contiguous runs where consecutive pause lines are <= 120s apart>
+  2026-11-11T01:20:21 .. 01:50:33  (30.2 min)
+  2026-11-11T02:07:44 .. 02:39:50  (32.1 min)
+  2026-11-11T02:46:59 .. 03:50:42  (63.7 min)
+  2026-11-11T04:03:00 .. 04:33:11  (30.2 min)
+  2026-11-11T04:54:58 .. 05:25:55  (30.9 min)
+  2026-11-11T05:50:19 .. 06:21:01  (30.7 min)
+  2026-11-11T08:38:43 .. 09:10:43  (32.0 min)
+  2026-11-11T09:16:41 .. 09:47:05  (30.4 min)
+  2026-11-11T09:49:56 .. 10:19:33  (29.6 min)
+  2026-11-11T12:02:59 .. 12:33:06  (30.1 min)
+  2026-11-11T12:49:02 .. 13:52:36  (63.6 min)
+  2026-11-11T14:11:16 .. 14:37:44  (26.5 min)
+  2026-11-11T14:41:53 .. 15:13:05  (31.2 min)
+  2026-11-11T16:18:54 .. 16:26:30  ( 7.6 min)
 $ python3 -c "…sorted({r['frozen_secs'] for r in open(REPOS_JSON)…})"
 frozen_secs values in the 14:46 capture: [127]     # i.e. frozen at the old audit end
 ```
 
-So at the stated 14:45 audit end the daemon **was** frozen (episode
-14:41:53–15:13:05, marker present), and `frozen_secs=127` in `repos.json` is that
-freeze. Four episodes ran during the whole session.
+So at the stated 14:45 audit end the daemon **was** frozen — the marker was
+present and `repos.json`'s `frozen_secs=127` on all 38 rows is that freeze,
+started 14:41:53 and self-cleared at 15:13:05. **Fourteen** contiguous episodes
+ran across 2026-11-11, not four: the previous draft only looked back to 13:30 and
+undercounted by ten.
 
 **End-of-goal freeze sample** (`2026-11-11T16:55:05Z`):
 
