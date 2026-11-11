@@ -1,6 +1,6 @@
 # AUDIT — 2026-11-11 remediation verification + fleet sweep
 
-Date: 2026-11-11 (13:48–16:55)
+Date: 2026-11-11 (13:48–17:07)
 Scope: the four remediations landed earlier in this session (warden binary-lane
 receipts, dracon-sync stale-mirror refresh, epoch-spool reclamation, /tmp disk
 recovery), plus a read-only sweep of the watched fleet for the same classes.
@@ -157,7 +157,7 @@ $ git show HEAD:src/sync.rs | sed -n '6271,6283p'
     if stale.is_empty() {
         return; // every name already agrees with HEAD — zero network cost
     }
-$ git show HEAD:src/sync.rs | sed -n '6292,6299p'
+$ git show HEAD:src/sync.rs | sed -n '6293,6300p'
     for name in &stale {
         let _ = super::git::run_git_with_timeout_env_progress(
             repo,
