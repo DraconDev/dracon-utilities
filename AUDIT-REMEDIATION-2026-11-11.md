@@ -296,9 +296,34 @@ tracking refs equal their real `ls-remote` tips at capture time.
 
 ## A3 — epoch-spool reclamation: OVERSTATED
 
-The reclamation did happen and the freed bytes are real — `df` went from 3.5–8.1
-GiB free to 79–82 GiB free across this run, and that is the change the disk
-claim rests on. What this audit cannot do is re-derive the *spool* half of the
+The reclamation did happen and the freed bytes are real, but the *baselines*
+below were previously quoted from the wrong metric and are corrected here. The
+repeatable source is the guard's own disk monitor, not `df` at a moment nobody
+captured (`docs/evidence/audit-remediation-2026-11-11/disk-baseline.txt`):
+
+```
+$ journalctl --since "2026-11-11 09:00:00" --until "2026-11-11 14:30:00"     | grep "GiB available"
+09:42:44  disk/rapid-fill - … (100% used); 6.9 GiB available …      <- pre-cleanup floor
+10:16:02  disk/trend-warning - … (100% used, 8.4 GiB available) …   <- pre-cleanup
+11:40:53  disk/rapid-fill - … (91% used); 82.3 GiB available …      <- post-cleanup
+14:26:39  disk/rapid-fill - … (91% used); 80.0 GiB available …
+```
+
+**Correction, stated plainly.** The earlier draft said root "went from 3.5–8.1
+GiB free". Those two literals are *not* free-space readings at all — they are
+`Tmp: … held by the age floor` scratch metrics from 2026-11-09 and 2026-11-10:
+
+```
+$ journalctl --until "2026-11-11 00:00:00" | grep -E "Tmp: (3\.5|8\.1) GiB"
+Nov 09 06:54:49 … 🧹 Tmp: 3.5 GiB held by the age floor across 3354 entries …
+Nov 10 10:07:40 … 🧹 Tmp: 8.1 GiB held by the age floor across 4123 entries …
+$ journalctl --since "2026-11-11 00:00:00" | grep -cE "(3\.5|8\.1) GiB available"
+0
+```
+
+The real root floor for 2026-11-11 was `6.9 GiB available at 100% used`, and it
+recovered to `82.3 GiB at 91%` after the cleanup. The A3 verdict does not change,
+but the number behind it is now the one the journal actually contains. What this audit cannot do is re-derive the *spool* half of the
 claim: the earlier pass's own counts (3059/3292 spools down to a few hundred)
 were reported before any capture was written to disk, and no artifact here
 contains them, so they are taken on trust and flagged as such rather than quoted
@@ -352,23 +377,39 @@ execute blind while the fleet is live.
 
 ```
 $ df -h /
-/dev/nvme0n1p2  907G  781G   80G  91% /
+/dev/nvme0n1p2  907G  781G   80G  91% /       # 2026-11-11T16:50:18Z
 $ du -sh /tmp
-6.0G	/tmp
+6.0G	/tmp                                   # 2026-11-11T16:50:18Z
 ```
 
-Root was 3.5–8.1 GiB free (100%) before the cleanup and is 80 GiB free (91%)
-at audit time (783G used / 78 GiB free / 92% by the end of the sweep as other
-agents kept building):
+Root was `6.9 GiB available at 100% used` immediately before the cleanup
+(`09:42:44`) and `8.4 GiB` at `10:16:02`, per the guard journal command quoted in
+A3 — **not** the "3.5–8.1 GiB" the earlier draft claimed (see the correction in
+A3). It is 80 GiB free (91%) at audit time (783G used / 78 GiB free / 92% by the
+end of the sweep as other agents kept building):
 
 ```
 $ df -h /        (end of audit)
 /dev/nvme0n1p2  907G  783G   78G  92% /
 ```
 
-`/tmp` went from 72.7 GiB to 6.0 GiB at audit time and is `8.8 GiB`
-(`du -sh --apparent-size /tmp`) at `2026-11-11T17:33Z` — it is growing again as
-other agents build, but from a clean base rather than from a 72.7 GiB pile. The
+**The `/tmp` before/after pair is only meaningful within one metric.** The
+`72.7 GiB` figure is the guard's *age-floor-held scratch* reading, not a `du`
+total, so it is paired with the same key from the same monitor rather than with
+`du`:
+
+```
+$ journalctl --since "2026-11-11 10:20:00" --until "2026-11-11 11:00:00"     | grep "held by the age floor"
+10:23:17 … 🧹 Tmp: 72.7 GiB held by the age floor across 4279 entries …
+10:52:58 … 🧹 Tmp:  2.1 GiB held by the age floor across 3424 entries …
+```
+
+That is a `72.7 → 2.1 GiB` drop in held scratch across the cleanup window. The
+`du` side is separate and is what the doc's `6.0G /tmp` line records (`16:50:18Z`);
+by `2026-11-11T20:43:09Z` a fresh `du -sh /tmp` reads `19G`, because other agents
+have been building since. Both numbers are reproducible from the commands stated
+here; they are simply not the same measurement, and the earlier draft implied
+they were. The
 ENOSPC symptoms that were blocking the daemon (`No space left on device (os error
 28)` in scheduler evidence, `sha1 file …` during private staging) have not
 recurred.
