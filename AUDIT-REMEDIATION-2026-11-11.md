@@ -53,61 +53,129 @@ test tests::tests::pre_push_review_receipt_binds_blob_and_individual_match ... o
 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 251 filtered out
 ```
 
-## A2 — dracon-sync stale-mirror refresh: VERIFIED (source) + fleet gap found
+## A2 — dracon-sync stale-mirror refresh: **FALSE as shipped, then FIXED and VERIFIED live**
 
-The fix replaced the single-remote refresh with a loop over every configured
-remote name, skipping any whose tracking ref already equals HEAD.
+The claim was that the fix refreshes every configured remote name so one stale
+tracking ref can no longer poison `count_ahead_commits` (which takes the MAX
+across tracking refs). That was **not true of the code as shipped**: the
+multi-remote loop sat *behind* an early return on the configured upstream being
+converged, so the single most common production shape — upstream long repaired,
+a **mirror** still pinned at an old tip — never reached the loop at all.
 
 ```
-$ cd /home/dracon/Dev/dracon-utilities/dracon-sync
-$ git show HEAD:src/sync.rs | grep -c "list_remotes(repo)"
-1
-$ git log -1 --format='%H %ad' --date=iso d2f2e72b
-d2f2e72b86639eba2c66e0db85ab3a34a4439566 2026-11-11 03:19:08 +0000
+$ git show b76168cc:src/sync.rs | grep -n "converged — the common case"
+6239:    let upstream_sha = output(&["rev-parse", &upstream_ref]);
+6241:    if upstream_sha.is_some() && upstream_sha == head_sha {
+6242:        return; // converged — the common case, zero network cost
+6270:    for candidate in super::git::multi_remote::list_remotes(repo) {   <- loop, unreachable
+```
+
+Live counter-evidence, on the rebuilt daemon (sha `458b4660…`) that the previous
+version of this document called "fixed":
+
+```
+$ C=/home/dracon/Dev/dracon-platform/web/games/wip/capture-anime-girls
+$ git -C $C rev-parse --short HEAD origin/main gitlab/main
+8c9692f6          HEAD
+8c9692f6          origin/main      <- converged, so the early return fired
+d191dde3          gitlab/main      <- pinned at 2026-11-09
+$ git -C $C ls-remote gitlab refs/heads/main
+8c9692f6b9ad…     <- real gitlab tip == HEAD
+$ git -C $C rev-list --count gitlab/main..HEAD
+233
+$ journalctl -u dracon-sync-operator.service --since "6m ago" | grep capture-anime-girls | grep scaling
+Nov 11 16:13:25 … ⏫ … scaling push timeout 900s → 5400s      (repeats every ~20 s)
+```
+
+**The fix.** Two changes to `refresh_stale_upstream_ref` (`src/sync.rs`):
+
+1. The early return on a converged *upstream* is gone. Staleness is now decided
+   **per name**: the function collects the set of remote names whose tracking
+   ref disagrees with HEAD and fetches exactly those. A converged name still
+   costs one local `rev-parse` and no network, so the "common case is free"
+   property is preserved without the early return.
+2. The regression test now reproduces the *real* shape instead of sidestepping
+   it. Before, it rewound **both** `origin/main` and `github/main`
+   (`src/sync.rs:12397-12398` at `b76168cc`), which kept the early return from
+   firing — a test that could not fail. It now leaves `origin/main == HEAD`
+   (`assert_eq!(upstream, head, "precondition: the configured upstream must
+   already be converged")`) and rewinds only the mirror.
+
+That claim is now proven, not asserted. The test **fails against the pre-fix
+implementation and passes against the fix** — the discriminating experiment was
+run by temporarily reinstating the early return in the working tree, running the
+test, and restoring the real fix from a saved copy:
+
+```
+$ # implementation reverted to the pre-fix early return, then:
+$ cargo test --release --bin dracon-sync -- \
+    test_refresh_stale_upstream_ref_repairs_every_mirror_name
+assertion `left == right` failed: github tracking ref must converge to HEAD after refresh
+  left:  f4e0c4b9b0478b9ed084e88fba01dd6aaf3cc2d2   (stale mirror left unrepaired)
+  right: 6f7d9f3f3e89bfe2de66dbf26949e2d8bd4d4594
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1666 filtered out
+```
+
+With the real fix restored, at the current `HEAD` (`c0ce1642`) in a clean tree:
+
+```
 $ CARGO_TARGET_DIR=/home/dracon/dracon/build/target-audit-2026-11-11 \
-    cargo test --offline --release --bin dracon-sync -- \
-    test_refresh_stale_upstream_ref count_ahead
+    cargo test --offline --release --bin dracon-sync -- test_refresh_stale_upstream_ref count_ahead
+test sync::tests::test_count_ahead_commits_takes_max_across_tracking_refs ... ok
+test sync::tests::test_refresh_stale_upstream_ref_converges ... ok
+test sync::tests::test_refresh_stale_upstream_ref_repairs_every_mirror_name ... ok
 test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 1660 filtered out
 ```
 
-**Gap found by the sweep: the defect class was still live on six repos.** Their
-`github` tracking refs disagreed with `origin`/`gitlab`, exactly the shape that
-poisons `count_ahead_commits` (which takes the MAX across tracking refs):
+**Raw probe of the binary the daemon is actually executing** (contract 3). The
+symbol is present in both binaries, so it is *not* the discriminating evidence —
+what discriminates is behaviour, quoted after it:
 
 ```
-$ (per repo) git rev-list --count <remote>/main..main
-  browser-extensions-shared      origin=9  github=163  gitlab=9
-  dracon-platform                origin=1  github=26   gitlab=1
-  dracon-strategy                origin=0  github=90   gitlab=0
-  empire                         origin=0  github=52   gitlab=0
-  terhub                         origin=0  github=18   gitlab=0
-  tiles-tui-file-manager         origin=0  github=133  gitlab=0
+$ D=$(systemctl show dracon-sync-operator.service -p MainPID --value); echo $D
+268859
+$ strings /proc/$D/exe | grep multi_remote12list_remotes
+_RNvNtNtCsaDOpQRXmWQz_11dracon_sync3git12multi_remote12list_remotes
+$ strings /home/dracon/dracon/build/dracon-sync.pre-audit-2026-11-11.bak | grep multi_remote12list_remotes
+_RNvNtNtCsjSeFhZRzQFl_11dracon_sync3git12multi_remote12list_remotes
+$ strings /proc/$D/exe | grep -c "upstream-refresh"
+1
 ```
 
-Before touching any ref, each was proven to be merely stale — the real GitHub
-tip is already an ancestor of `main`, so no published work was missing:
+**Behaviour proof (the part that actually discriminates).** After installing the
+fixed build (`379d448d…`, daemon pid 268859 started 16:24:46) the daemon itself
+repaired the mirror-only skew that the old code could never reach — and it did
+so under the exact precondition that used to trigger the early return
+(`origin/main == HEAD`):
 
 ```
-$ (per repo) git merge-base --is-ancestor <real-github-tip> main
-  browser-extensions-shared    STALE-REF-ONLY (real tip already in main)
-  dracon-platform              STALE-REF-ONLY (real tip already in main)
-  dracon-strategy              STALE-REF-ONLY (real tip already in main)
-  empire                       STALE-REF-ONLY (real tip already in main)
-  terhub                       STALE-REF-ONLY (real tip already in main)
-  tiles-tui-file-manager       STALE-REF-ONLY (real tip already in main)
+$ git -C $C rev-parse --short origin/main HEAD
+8c9692f6
+8c9692f6
+$ git -C $C reflog show refs/remotes/gitlab/main --date=iso | head -2
+8c9692f6 refs/remotes/gitlab/main@{2026-11-11 16:27:34 +0000}: fetch gitlab: fast-forward
+d191dde3 refs/remotes/gitlab/main@{2026-11-09 10:35:47 +0000}: update by push
+$ git -C $C rev-list --count gitlab/main..HEAD
+0
 ```
 
-All six were fast-forwarded to the real `ls-remote` tip, and the counts are now
-consistent:
+The inflation stopped at that moment. Push-timeout scaling for that repository
+has not appeared since:
 
 ```
-  browser-extensions-shared      origin=6 github=6 gitlab=6
-  dracon-platform                origin=1 github=1 gitlab=1
-  dracon-strategy                origin=0 github=0 gitlab=0
-  empire                         origin=0 github=0 gitlab=0
-  terhub                         origin=0 github=0 gitlab=0
-  tiles-tui-file-manager         origin=0 github=0 gitlab=0
+$ journalctl -u dracon-sync-operator.service --since "2026-11-11 16:28:00" \
+    | grep "scaling push timeout" | sed -E 's/.*\(([0-9]+) commits.*/\1/' | sort -rn | head -3
+35
+16
+11
 ```
+
+(The largest remaining figure is `browser-extensions-shared`'s real churn, not a
+mirror skew — its `gitlab`/`origin` refs agree with `HEAD` there.)
+
+The same repair-and-nothing-repeats behaviour shows in the per-repo table in
+section B, where every repo's tracking refs equal their real `ls-remote` tips at
+capture time.
 
 ## A3 — epoch-spool reclamation: OVERSTATED
 
