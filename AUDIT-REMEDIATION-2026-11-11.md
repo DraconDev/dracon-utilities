@@ -239,12 +239,18 @@ per-repo table in section B, where every repo's tracking refs equal their real
 
 ## A3 — epoch-spool reclamation: OVERSTATED
 
-The reclamation numbers are real and reproduce as described: the two large repos
-dropped from 3059/3292 spools to a few hundred, and the freed bytes were
-confirmed by `df`. But the earlier claim that this "bought hours, not weeks"
-understates the structure of the backlog: **spools regenerate continuously and
-`/home/dracon/.dracon` carries its own 4981-spool backlog** that was never
-touched, because the reclaim pass covered only the two big repos.
+The reclamation did happen and the freed bytes are real — `df` went from 3.5–8.1
+GiB free to 79–82 GiB free across this run, and that is the change the disk
+claim rests on. What this audit cannot do is re-derive the *spool* half of the
+claim: the earlier pass's own counts (3059/3292 spools down to a few hundred)
+were reported before any capture was written to disk, and no artifact here
+contains them, so they are taken on trust and flagged as such rather than quoted
+as verified numbers.
+
+The structural finding is independent of that and does hold: **spools regenerate
+faster than they are reclaimed, and `/home/dracon/.dracon` carries its own
+backlog that the reclaim pass never touched**, because that pass covered only the
+two big repos.
 
 Exact, re-runnable command (also used for the per-repo spool column in section
 B), with its output stamped `2026-11-11T16:50:18Z`
