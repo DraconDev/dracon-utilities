@@ -435,6 +435,104 @@ carries ~1135 commits ahead of `origin/main` and is **not** in the 38 watched
 repos, so the daemon will not drain it. That is not a defect in the sync daemon;
 it is outside its watch roots.
 
+## C — contract 8 reproducibility: disk, memory, spools, and the freeze history
+
+Everything below is copy-pasteable and timestamped. The full transcript is
+`docs/evidence/audit-remediation-2026-11-11/final-capture.txt`.
+
+**Disk** (`2026-11-11T16:50:18Z`):
+
+```
+$ df -h /
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/nvme0n1p2  907G  780G   81G  91% /
+```
+
+**Memory headroom** — two figures are quoted because they measure different
+things, and the previous version of this document quoted neither:
+
+```
+$ grep -E 'MemTotal|MemAvailable' /proc/meminfo          (2026-11-11T16:50:18Z)
+MemTotal:       31914628 kB
+MemAvailable:    2267188 kB
+$ awk '/MemTotal/{t=$2}/MemAvailable/{a=$2}END{printf "headroom=%.2f%%\n", a/t*100}' /proc/meminfo
+headroom=7.09%
+$ free -m
+               total        used        free      shared  buff/cache   available
+Mem:           31166       28963        1258          90        2860        2203
+$ awk '/MemFree/{f=$2}/Buffers/{b=$2}/^Cached/{c=$2}/SReclaimable/{s=$2}/MemTotal/{t=$2}\
+    END{printf "headroom=%.2f%%\n", (f+b+c+s)/t*100}' /proc/meminfo
+headroom=13.67%
+```
+
+`7.09%` is `MemAvailable/MemTotal`. `13.67%` is the memory guard's own formula
+(`MemFree + Buffers + Cached + SReclaimable`, per
+`~/.dracon/scripts/dracon-memory-guard.sh`). The guard freezes below **8%**
+(`MEMORY_GUARD_FREEZE_HEADROOM_PCT`, line 52 of that script) — which is why
+freeze episodes recurred during this run and why the guard's own number, not
+`MemAvailable`, is the value that decides.
+
+**Epoch-spool counts**, exact command, stamped `2026-11-11T16:50:18Z`
+(`docs/evidence/audit-remediation-2026-11-11/spool-census.sh`, census output in
+`spool-census.txt`):
+
+```
+$ for r in <each repo from dracon-sync repos>; do
+    gd=$(git -C "$r" rev-parse --path-format=absolute --git-dir 2>/dev/null) || gd="$r/.git"
+    n=$(ls -d "$gd"/dracon-staging-* 2>/dev/null | wc -l)
+    k=$(du -sk "$gd"/dracon-staging-* 2>/dev/null | awk '{s+=$1} END {print s+0}')
+    printf '%s\t%s\t%.1f\t%s\n' "$r" "$n" "$(awk -v k="$k" 'BEGIN{print k/1024}')" "$gd"
+  done
+/home/dracon/Dev/browser-extensions-shared\t452\t1189.1\t/home/dracon/Dev/browser-extensions-shared/.git
+/home/dracon/.dracon\t5141\t992.3\t/home/dracon/.dracon/.git
+/home/dracon/Dev/dracon-platform\t454\t849.3\t/home/dracon/Dev/dracon-platform/.git
+/home/dracon/Dev/dracon-strategy/ai-auto-writer\t105\t1542.2\t/home/dracon/Dev/dracon-strategy/ai-auto-writer/.git
+/home/dracon/Dev/tiles-tui-file-manager\t50\t624.9\t/home/dracon/Dev/tiles-tui-file-manager/.git
+  … 14 more repos with 1–29 spools each; full list in spool-census.txt
+```
+
+Nested submodule gitdirs are included by the same command (`--path-format=absolute
+--git-dir` resolves to `.git/modules/web-games-*`), which is why `junk-runner`
+(276), `endless-td` (29), `capture-anime-girls` (13), `doomtap` (9) and
+`deathrun` (4) appear in the census rather than as bare names.
+
+**Freeze history** (`docs/evidence/audit-remediation-2026-11-11/freeze-timeline.txt`).
+The previous version of this document said the freeze marker was "none
+continuous", which its own `repos.json` contradicts — that file records
+`frozen_secs = 127` on **all 38 rows** and was captured while the daemon was
+mid-freeze. The correction, with contiguous pause episodes derived from the
+journal:
+
+```
+$ journalctl -u dracon-sync-operator.service --since "2026-11-11 13:30:00" \
+    | grep "⏸️ sync daemon paused"   # first/last of each contiguous run
+  2026-11-11T13:30:00 .. 13:52:36   (22.6 min)
+  2026-11-11T14:11:16 .. 14:37:44   (26.5 min)
+  2026-11-11T14:41:53 .. 15:13:05   (31.2 min)
+  2026-11-11T16:18:54 .. 16:26:30   ( 7.6 min)
+$ python3 -c "…sorted({r['frozen_secs'] for r in open(REPOS_JSON)…})"
+frozen_secs values in the 14:46 capture: [127]     # i.e. frozen at the old audit end
+```
+
+So at the stated 14:45 audit end the daemon **was** frozen (episode
+14:41:53–15:13:05, marker present), and `frozen_secs=127` in `repos.json` is that
+freeze. Four episodes ran during the whole session.
+
+**End-of-goal freeze sample** (`2026-11-11T16:55:05Z`):
+
+```
+$ test -f /home/dracon/.dracon/dracon-sync.freeze && cat … || echo MARKER_ABSENT
+MARKER_ABSENT
+$ grep -E 'FROZEN_BY_US|BAD_STREAK|HEALTHY_STREAK' ~/.dracon/memory/memory-guard.state
+HEALTHY_STREAK=0
+BAD_STREAK=0
+FROZEN_BY_US=0
+$ python3 -c "…frozen_secs from repos-final.json…"
+repos-final.json frozen_secs distinct: [None]       # not frozen
+```
+
+The guard unfroze itself at 16:26:30 and did not re-freeze before the capture.
+
 ## Changes made by this audit
 
 1. Rebuilt dracon-sync from `HEAD` (commit `d2f2e72b`) in a dedicated target dir
