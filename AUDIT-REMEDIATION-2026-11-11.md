@@ -287,7 +287,7 @@ $ for r in $(python3 -c "import json;print('\n'.join(r['repo'] for r in
 /home/dracon/Dev/dracon-platform                        454    849.3 MiB
 /home/dracon/Dev/dracon-strategy/ai-auto-writer         105   1542.2 MiB
 /home/dracon/Dev/tiles-tui-file-manager                  50    624.9 MiB
-/home/dracon/Dev/dracon-platform/web/games/wip/junk-runner  276  149.6 MiB
+/home/dracon/Dev/dracon-platform/web/games/wip/junk-runner  277  150.0 MiB
   … plus 13 more repos with 1–29 spools each; the complete list, including
     every nested submodule gitdir, is in spool-census.txt
 ```
