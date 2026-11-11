@@ -1,0 +1,7 @@
+=== DISCRIMINATING-TEST PROOF (tmp experiment, source restored immediately) ===
+$ # implementation reverted to the PRE-FIX early return (upstream-converged => return)
+$ cargo test --release --bin dracon-sync -- test_refresh_stale_upstream_ref_repairs_every_mirror_name
+assertion `left == right` failed: github tracking ref must converge to HEAD after refresh
+  left:  f4e0c4b9b0478b9ed084e88fba01dd6aaf3cc2d2   (stale mirror left unrepaired)
+  right: 6f7d9f3f3e89bfe2de66dbf26949e2d8bd4d4594
+test result: FAILED. 0 passed; 1 failed; 1666 filtered out

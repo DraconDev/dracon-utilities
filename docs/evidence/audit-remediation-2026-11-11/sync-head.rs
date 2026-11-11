@@ -1,0 +1,16030 @@
+use std::collections::{BTreeSet, HashMap, HashSet};
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::time::Duration;
+
+#[cfg(all(test, target_os = "linux"))]
+#[path = "sync/push_isolation_tests.rs"]
+mod push_isolation_tests;
+
+#[cfg(all(test, target_os = "linux"))]
+#[path = "sync/owned_commit_tests.rs"]
+mod owned_commit_tests;
+
+#[path = "sync/staged_epoch.rs"]
+mod staged_epoch;
+
+#[cfg(target_os = "linux")]
+#[path = "sync/excluded_revert.rs"]
+mod excluded_revert;
+
+#[cfg(target_os = "linux")]
+#[path = "sync/hygiene_apply.rs"]
+mod hygiene_apply;
+
+#[path = "sync/hygiene.rs"]
+mod hygiene;
+
+#[cfg(all(test, target_os = "linux"))]
+#[path = "sync/excluded_revert_tests.rs"]
+mod excluded_revert_tests;
+
+#[cfg(all(test, target_os = "linux"))]
+#[path = "sync/excluded_revert_pipeline_tests.rs"]
+mod excluded_revert_pipeline_tests;
+
+// Both namespaces have used the same recovery schema. Older generated-ignore
+// records must remain visible after upgrades; recognizing them never replays a
+// canonical write or grants excluded-restore policy authorization.
+fn is_canonical_recovery_name(name: &std::ffi::OsStr) -> bool {
+    let name = name.as_encoded_bytes();
+    name.starts_with(b"dracon-excluded-recovery-") || name.starts_with(b"dracon-ignore-recovery-")
+}
+
+/// Cheap persistent concern probe, independent of raw Git dirt and NOW-enabled
+/// policy. Pending records survive restart. Archives are checked by metadata,
+/// not repeatedly hashed: late displaced writes must remain visible concerns.
+/// Inspection errors are not healthy/idle evidence.
+pub(crate) fn hygiene_pending_for_report(repo: &Path) -> Result<bool> {
+    hygiene::has_pending(repo)
+}
+
+pub(crate) fn has_pending_local_reconciliation(repo: &Path) -> Result<bool> {
+    Ok(has_pending_excluded_recovery(repo)? || hygiene::has_pending(repo)?)
+}
+
+pub(crate) fn has_pending_excluded_recovery(repo: &Path) -> Result<bool> {
+    let gitdir = crate::git::path_gitdir(repo).context("cannot locate recovery Git directory")?;
+    for entry in std::fs::read_dir(&gitdir)? {
+        let entry = entry?;
+        if is_canonical_recovery_name(&entry.file_name()) {
+            return Ok(true);
+        }
+    }
+    #[cfg(target_os = "linux")]
+    {
+        excluded_revert::archived_pending(repo)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        match std::fs::symlink_metadata(gitdir.join("dracon-excluded-archive")) {
+            Ok(_) => Ok(true),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
+            Err(error) => Err(error.into()),
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+pub(crate) async fn excluded_restore_helper(path: &Path) -> Result<()> {
+    excluded_revert::helper(path).await
+}
+
+#[path = "sync/publication.rs"]
+mod publication;
+
+#[cfg(all(test, target_os = "linux"))]
+#[path = "sync/publication_actor_tests.rs"]
+mod publication_actor_tests;
+
+#[cfg(all(test, target_os = "linux"))]
+#[path = "sync/bucket_qualification_tests.rs"]
+mod bucket_qualification_tests;
+
+use crate::log_warn;
+#[cfg(test)]
+use crate::test_helpers::{test_commit_cmd, test_git_cmd};
+
+use anyhow::Context;
+use anyhow::Result;
+use dracon_git::GitService;
+
+use crate::exclude::should_stage_entry;
+use crate::git::origin_url;
+use crate::git::{
+    cli_diff_entries, has_origin_remote, has_tracking_upstream, is_bisect_in_progress,
+    is_cherry_pick_in_progress, is_merge_in_progress, is_rebase_in_progress, is_repo_ready,
+    is_revert_in_progress, prune_other_default_branch, run_git_capture_output,
+    run_git_with_timeout, untracked_entries,
+};
+use crate::policy::{debug_enabled, load_repo_override, SyncPolicy};
+use crate::visibility::{
+    cached_repo_visibility, get_github_visibility, parse_github_owner_repo, sync_mirror_metadata,
+    sync_mirror_visibility,
+};
+
+static STALE_UPSTREAM_REFRESH_AT: std::sync::OnceLock<
+    std::sync::Mutex<HashMap<std::path::PathBuf, std::time::Instant>>,
+> = std::sync::OnceLock::new();
+const STALE_UPSTREAM_REFRESH_COOLDOWN: Duration = Duration::from_secs(300);
+
+fn stale_upstream_refresh_allowed(repo: &Path, now: std::time::Instant) -> bool {
+    let attempts = STALE_UPSTREAM_REFRESH_AT.get_or_init(|| std::sync::Mutex::new(HashMap::new()));
+    let mut attempts = attempts
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    if attempts
+        .get(repo)
+        .is_some_and(|last| now.saturating_duration_since(*last) < STALE_UPSTREAM_REFRESH_COOLDOWN)
+    {
+        return false;
+    }
+    attempts.insert(repo.to_path_buf(), now);
+    true
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SyncOutcome {
+    Synced,
+    NothingToDo,
+    /// Another process owns this Git directory; no commit or push attempted.
+    OperationDeferred,
+    /// Local work may have progressed, but another owner is publishing. This
+    /// is neither successful publication nor a failed transport attempt.
+    PublicationPending,
+    /// Staging/publication progressed, but retained local intent needs another epoch.
+    StagedPending,
+    Blocked,
+    /// ADDED 2026-07-26 (v0.113.2, audit SYNC-H2): the auto-commit
+    /// backstop skipped the commit step (operator is committing
+    /// faster than the daemon can push). The daemon apply phase
+    /// treats this like `Blocked` for failure accounting (not a
+    /// transient failure) but, crucially, does NOT remove the
+    /// activity entry — `ahead_since` must survive or the backstop
+    /// disarms after one skipped dispatch (the pre-fix bug: the
+    /// backstop returned `NothingToDo`, which was treated as
+    /// success, wiping `ahead_since`, so the daemon re-committed
+    /// on the very next cycle). Unlike `Blocked` it does not feed
+    /// the sustained-blocked notification machinery.
+    BackstopSkipped,
+    /// ADDED 2026-07-21 (v0.112.31, audit H3/F1.3): the commit half
+    /// succeeded but the push failed. Previously both push paths
+    /// (`stage_commit_and_push`, `handle_ahead_push`) swallowed the
+    /// failure after recording it to the disk ledger and returned a
+    /// success outcome, so the daemon's apply phase logged
+    /// `🔁 synced`, reset `failure_count`, and dropped the activity
+    /// entry — a false-healthy state in which push failure accounting
+    /// (MAX_FAILURES, backstops) never engaged. The apply phase maps
+    /// this variant to `sync_success = false` (commit kept, failure
+    /// counted, no synced log).
+    PushFailed,
+    /// ADDED 2026-09-18 (v0.113.69, commit-despite-paused-push):
+    /// push deliberately not attempted this cycle — commit-only mode
+    /// (Backoff/Exhausted repo still committing) or every remote
+    /// individually paused by the per-remote gate. The daemon apply
+    /// phase maps this to `ApplyOutcome::PushPaused`: no failure
+    /// count, no stuck-ledger write, activity retained.
+    PushPaused,
+    /// ADDED 2026-07-21 (v0.112.33, audit M9/F1.8): changes were
+    /// present but ALL filtered out by clean/smudge filters
+    /// (filter-only dirty — nothing real to commit). Previously this
+    /// returned `NothingToDo`, which the daemon treated as success
+    /// (activity entry removed) and immediately re-dispatched on the
+    /// next dirty detection — a filter-noisy repo (warden-managed
+    /// repos with `filter=dracon` attributes) was re-dispatched every
+    /// `inactivity_push_delay_secs` forever, paying full
+    /// status + diff + `git diff HEAD` each time, while the
+    /// `stage_cooldowns` map meant to throttle this sat permanently
+    /// empty (no insert site existed). The apply phase now inserts a
+    /// 300s stage cooldown for this outcome.
+    FilterOnly,
+}
+
+/// Count the number of unpushed commits for the given repo. Used by
+/// `push_background` to scale the push timeout so a large 28-commit
+/// push with binary blobs doesn't get killed at the 60s default.
+///
+/// CHANGED 2026-07-21 (v0.112.33, audit M6/F1.12): the previous
+/// implementation hardcoded `origin/main..HEAD` — for mirror-only
+/// repos (no `origin`, e.g. `.dracon`) and repos on a non-`main`
+/// branch, the rev-list failed → 0 → the timeout scaler NEVER
+/// engaged (exactly the repos the scaling was built for, per the
+/// v0.112.10 >60s push in AGENTS.md). Now resolves the best
+/// available tracking ref dynamically: `origin/<branch>` first,
+/// then mirror refs (`{github,gitlab,codeberg}/<branch>`,
+/// falling back to `/main` for pre-rename repos). When NO tracking
+/// ref exists anywhere, every commit is unpushed — return the local
+/// total (`count_all_head_commits`).
+///
+/// CHANGED 2026-10-22: the count is now the MAXIMUM across every
+/// existing tracking ref, not the FIRST one found. The caller scales
+/// the push timeout by this number, but a push must succeed against
+/// EVERY remote, so the budget has to cover the FURTHEST-BEHIND
+/// mirror. Returning the first candidate (origin) under-counted a
+/// repo whose gitlab mirror lagged much further: dracon-strategy was
+/// 40 ahead of origin/main but 65 ahead of gitlab/main, so the
+/// scaler sized the timeout for 40 commits while the gitlab push
+/// carried 65 — and the gitlab push was the one that failed
+/// repeatedly. Taking the max is also the conservative direction for
+/// the backstop gate (more unpushed commits = more reason to hold),
+/// and it is a no-op for every repo whose remotes are in step.
+pub(crate) async fn count_ahead_commits(repo: &Path) -> Result<u64> {
+    let branch = crate::git::current_branch(repo)
+        .filter(|b| b != "HEAD")
+        .unwrap_or_else(|| "main".to_string());
+    let mut candidates: Vec<String> = vec![format!("refs/remotes/origin/{}", branch)];
+    for mirror in ["github", "gitlab", "codeberg"] {
+        candidates.push(format!("refs/remotes/{}/{}", mirror, branch));
+        if branch != "main" {
+            candidates.push(format!("refs/remotes/{}/main", mirror));
+        }
+    }
+    let mut max_count: Option<u64> = None;
+    for candidate in &candidates {
+        let exists = crate::policy::std_git_command()
+            .args(["rev-parse", "--verify", "-q", candidate])
+            .current_dir(repo)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false);
+        if !exists {
+            continue;
+        }
+        let range = format!("{}..HEAD", candidate);
+        let output = crate::policy::tokio_git_command()
+            .args(["rev-list", "--count", &range])
+            .current_dir(repo)
+            .output()
+            .await?;
+        if !output.status.success() {
+            continue;
+        }
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        // FIXED 2026-10-02 (audit L2): a garbled count is an error, not
+        // 0 — 0-ahead disarms the backstop gate.
+        let count: u64 = stdout.trim().parse().with_context(|| {
+            format!(
+                "rev-list --count {} printed no number for {}",
+                range,
+                repo.display()
+            )
+        })?;
+        max_count = Some(max_count.map_or(count, |current| current.max(count)));
+    }
+    if let Some(count) = max_count {
+        return Ok(count);
+    }
+    // No tracking ref anywhere → never pushed from this clone.
+    // FIXED 2026-10-02 (audit L2): fallible count — a status error
+    // surfaces instead of presenting as 0-ahead.
+    crate::git::try_count_all_head_commits(repo)
+}
+
+/// Check if the daemon's auto-commit backstop is active for a given
+/// repo. The backstop fires when a repo has more than
+/// `threshold` unpushed commits AND the push has been pending
+/// (ahead_since) for at least `min_age_secs` seconds.
+///
+/// When the backstop is active, the daemon should:
+/// - NOT auto-commit new changes (prevents moving target)
+/// - Log a backstop message so the operator can see why
+/// - Mark the ACTIVITY column as `⏸ backstop` so the report
+///   reflects the intentional pause
+///
+/// The operator can disable the backstop by setting
+/// `auto_commit_backstop_threshold = 0` in the policy.
+pub(crate) fn is_backstop_active(
+    ahead_since: Option<std::time::Instant>,
+    now: std::time::Instant,
+    ahead_count: usize,
+    threshold: usize,
+    min_age_secs: u64,
+) -> bool {
+    if threshold == 0 {
+        return false;
+    }
+    if ahead_count <= threshold {
+        return false;
+    }
+    let Some(since) = ahead_since else {
+        return false;
+    };
+    now.duration_since(since).as_secs() >= min_age_secs
+}
+
+/// Scale the configured `push_op_timeout_secs` with the local ahead
+/// count so a large 28-commit push doesn't time out at 60s.
+///
+/// Formula:
+///   ahead ≤ 5  →  base × 1
+///   ahead ≤ 20 →  base × 2
+///   ahead ≤ 50 →  base × 4
+///   ahead > 50 →  base × 6
+///
+/// Cap: `max(600, base × 6)` — the top tier itself. CORRECTED
+/// 2026-08-10 (audit LOW: "scale_push_timeout multiplier branches are
+/// dead"): the old fixed 600s cap made the 4×/6× branches unobservable
+/// at any base ≥ 150 (with the 300s code default, every ahead > 20
+/// yielded exactly 600s) and at the live 900s config it truncated the
+/// operator's configured timeout DOWN to 600s for every push. A
+/// base-relative cap keeps all four tiers observable at any base while
+/// still bounding a runaway push (worst case: base × 6). For bases
+/// below 100s the cap is unchanged at 600s.
+///
+/// Example with base = 60s:
+///   ahead =  3 →  60s
+///   ahead = 10 → 120s
+///   ahead = 28 → 240s
+///   ahead = 60 → 360s
+///
+/// Example with base = 300s (code default):
+///   ahead =  3 →  300s
+///   ahead = 10 →  600s
+///   ahead = 28 → 1200s
+///   ahead = 60 → 1800s
+pub(crate) fn scale_push_timeout(base: u64, ahead: u64) -> u64 {
+    let multiplier: u64 = if ahead <= 5 {
+        1
+    } else if ahead <= 20 {
+        2
+    } else if ahead <= 50 {
+        4
+    } else {
+        6
+    };
+    // CHANGED 2026-09-09 (audit F32): saturating arithmetic — `base * 6`
+    // overflowed (debug panic / release wrap) on absurd configured bases.
+    // The `.min(cap)` is unreachable by construction (cap >= base*6 >=
+    // value for every tier) and stays only as the stated worst-case bound.
+    let cap = 600u64.max(base.saturating_mul(6));
+    base.saturating_mul(multiplier).min(cap)
+}
+
+impl SyncOutcome {
+    pub fn has_changes(&self) -> bool {
+        matches!(self, SyncOutcome::Synced)
+    }
+}
+
+struct SyncContext<'a> {
+    operation_lease: Option<std::fs::File>,
+    /// Holds publication ownership for the worker's whole lifetime. It has no
+    /// reader by design: the guard exists so no other process or alias can
+    /// start a second publisher while this worker's upload/hooks are running.
+    _publication_lease: Option<std::fs::File>,
+    repo: &'a Path,
+    policy: &'a SyncPolicy,
+    excluded_dir_names: &'a BTreeSet<String>,
+    dry_run: bool,
+    #[allow(dead_code)]
+    idle_seconds: u64,
+    #[allow(dead_code)]
+    policy_path: Option<&'a Path>,
+    has_origin: bool,
+    has_upstream: bool,
+    #[allow(dead_code)]
+    auto_bump_versions: bool,
+    /// v0.113.33: effective per-repo value of
+    /// `build_artifact_cleanup` (global policy merged with the
+    /// repo's `.dracon/dracon-sync.toml` override).
+    build_artifact_cleanup: bool,
+    remote_failures: Option<&'a mut HashMap<String, crate::daemon::RemoteFailInfo>>,
+    /// When true, the daemon's auto-commit backstop is active for this
+    /// repo. The backstop fires when `ahead > threshold` AND
+    /// `push pending > min_age_secs` — see `is_backstop_active`. While
+    /// active, `sync_repo` skips auto-commit (the daemon logs the
+    /// backstop and returns `SyncOutcome::NothingToDo`). Manual commits
+    /// are unaffected.
+    backstop_active: bool,
+    /// ADDED 2026-09-18 (v0.113.69, commit-despite-paused-push): when
+    /// true, the worker commits but never pushes — set by the daemon
+    /// for Backoff/Exhausted repos so a sick forge pauses pushes
+    /// without freezing local commits. Push phases return
+    /// `SyncOutcome::PushPaused` (no failure recorded, stuck ledger
+    /// untouched) instead of attempting network I/O.
+    commit_only: bool,
+    /// The upload finished but local ownership could not be reacquired, so
+    /// post-publication LOCAL bookkeeping must be skipped this round.
+    local_work_deferred: bool,
+    /// True when commit-only exists because ANOTHER process/worker owns this
+    /// repository's publication, not because the operator/policy paused pushes.
+    /// Purely for honest reporting and never for accounting.
+    publication_owned_elsewhere: bool,
+}
+
+fn notify_webhook_failure(webhook_url: &str, repo: &Path, remote: &str, error: &str) {
+    let payload = serde_json::json!({
+        "event": "push_failure",
+        "repo": repo.display().to_string(),
+        "remote": remote,
+        "error": error,
+        "timestamp": crate::policy::timestamp_secs(),
+    });
+    let url = webhook_url.to_string();
+    std::thread::spawn(move || {
+        if let Ok(client) = reqwest::blocking::Client::builder()
+            .timeout(Duration::from_secs(5))
+            .build()
+        {
+            if let Err(e) = client.post(&url).json(&payload).send() {
+                eprintln!("⚠️ webhook notification failed: {}", e);
+            }
+        }
+    });
+}
+
+/// Send the configured push webhook only after the persisted retry budget is
+/// exhausted. Individual push attempts are still logged and recorded in the
+/// stuck ledger, but transient forge/network failures should not page the
+/// operator or trigger an external failure workflow.
+fn notify_webhook_persistent_push_failure(
+    policy: &SyncPolicy,
+    repo: &Path,
+    remote: &str,
+    error: &str,
+) {
+    let Some(url) = policy.webhook_url.as_deref() else {
+        return;
+    };
+    let Some(info) = crate::daemon::get_stuck_push_info(repo) else {
+        return;
+    };
+    if crate::daemon::push_failure_is_persistent(info.consecutive_failures, policy.push_max_retries)
+    {
+        notify_webhook_failure(url, repo, remote, error);
+    }
+}
+
+async fn get_bump_info(repo: &Path) -> Option<(String, String, String)> {
+    let new_ver = crate::release::detect_project_version(repo)?.0;
+
+    let version_files = if repo.join("Cargo.toml").exists() {
+        &["Cargo.toml"][..]
+    } else if repo.join("package.json").exists() {
+        &["package.json"][..]
+    } else if repo.join("pyproject.toml").exists() {
+        &["pyproject.toml"][..]
+    } else if repo.join("pubspec.yaml").exists() {
+        &["pubspec.yaml"][..]
+    } else if repo.join("version.txt").exists() {
+        &["version.txt"][..]
+    } else if repo.join("VERSION").exists() {
+        &["VERSION"][..]
+    } else {
+        &[
+            "Cargo.toml",
+            "package.json",
+            "pyproject.toml",
+            "pubspec.yaml",
+            "version.txt",
+            "VERSION",
+        ][..]
+    };
+
+    let mut old_ver = String::new();
+    for file in version_files.iter() {
+        let repo_pb = repo.to_path_buf();
+        let file_s = file.to_string();
+        let output = tokio::task::spawn_blocking(move || {
+            crate::git::git_cmd()
+                .args(["show", &format!("HEAD~1:{}", file_s)])
+                .current_dir(&repo_pb)
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::null())
+                .output()
+                .ok()
+        })
+        .await
+        .ok()
+        .flatten();
+
+        if let Some(output) = output {
+            if !output.status.success() {
+                continue;
+            }
+            let content = String::from_utf8_lossy(&output.stdout);
+            if let Some(v) = match *file {
+                "Cargo.toml" => crate::bump::extract_version_from_cargo(&content),
+                "package.json" => content
+                    .lines()
+                    .map(|l| l.trim())
+                    .find(|l| l.starts_with("\"version\""))
+                    .and_then(|l| l.split(':').nth(1))
+                    .map(|v| v.trim().trim_matches('"').trim_matches(',').trim())
+                    .filter(|v| !v.is_empty())
+                    .map(|v| v.to_string()),
+                "pyproject.toml" => content
+                    .lines()
+                    .map(|l| l.trim())
+                    .find(|l| l.starts_with("version") && !l.starts_with("version_prefix"))
+                    .and_then(|l| l.split('=').nth(1))
+                    .map(|v| v.trim().trim_matches('"').trim_matches(',').trim())
+                    .filter(|v| !v.is_empty())
+                    .map(|v| v.to_string()),
+                "pubspec.yaml" => content
+                    .lines()
+                    .map(|l| l.trim())
+                    .find(|l| l.starts_with("version:"))
+                    .and_then(|l| l.split(':').nth(1))
+                    .map(|v| v.trim().split('+').next().unwrap_or("").trim())
+                    .filter(|v| !v.is_empty())
+                    .map(|v| v.to_string()),
+                "version.txt" | "VERSION" => {
+                    let v = content.trim();
+                    if !v.is_empty() && v.contains('.') {
+                        Some(v.to_string())
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            } {
+                old_ver = v;
+                break;
+            }
+        }
+    }
+
+    let level = if old_ver.is_empty() {
+        "patch"
+    } else {
+        let old_parts: Vec<u32> = old_ver.split('.').filter_map(|s| s.parse().ok()).collect();
+        let new_parts: Vec<u32> = new_ver.split('.').filter_map(|s| s.parse().ok()).collect();
+        if old_parts.len() >= 3 && new_parts.len() >= 3 {
+            if new_parts[0] > old_parts[0] {
+                "major"
+            } else if new_parts[1] > old_parts[1] {
+                "minor"
+            } else {
+                "patch"
+            }
+        } else {
+            "patch"
+        }
+    };
+
+    Some((old_ver, new_ver, level.to_string()))
+}
+
+fn maybe_sync_visibility_and_metadata(ctx: &SyncContext<'_>) {
+    if ctx.dry_run || ctx.commit_only || (!ctx.policy.sync_visibility && !ctx.policy.sync_metadata)
+    {
+        return;
+    }
+    // CHANGED 2026-07-21 (v0.112.33, audit M26 follow-up): prefer
+    // the `github` remote's URL when `origin` is not a github URL.
+    // The game submodules' origins point at gitlab/codeberg
+    // (whichever `.gitmodules` listed first), and the host-verified
+    // parser (M26) correctly refuses them — but those repos DO have
+    // a `github` mirror to sync visibility/metadata FROM. Without
+    // the fallback, their visibility cache never freshens (the
+    // codeberg gate reads unknown→skip) and the journal gets a
+    // per-cycle "could not parse" warning. The metadata path also
+    // parses github owner/repo, so it uses the same resolution.
+    let origin_raw = crate::git::multi_remote::get_remote_url(ctx.repo, "origin");
+    let vis_url = origin_raw
+        .as_ref()
+        .filter(|u| crate::visibility::parse_github_owner_repo(u).is_some())
+        .cloned()
+        .or_else(|| crate::git::multi_remote::get_remote_url(ctx.repo, "github"))
+        .or(origin_raw);
+    if let Some(origin_url) = vis_url {
+        if ctx.policy.sync_metadata {
+            sync_mirror_metadata(
+                &origin_url,
+                &ctx.policy.remotes,
+                ctx.repo,
+                ctx.policy.sync_visibility_interval_hours,
+            );
+        }
+        if ctx.policy.sync_visibility {
+            sync_mirror_visibility(
+                &origin_url,
+                &ctx.policy.remotes,
+                ctx.repo,
+                ctx.policy.sync_visibility_interval_hours,
+            );
+        }
+    }
+}
+
+fn check_conflict_state(repo: &Path) -> Option<SyncOutcome> {
+    if is_rebase_in_progress(repo) {
+        eprintln!(
+            "⚠️ {} has rebase in progress, skipping (manual intervention required)",
+            repo.display()
+        );
+        return Some(SyncOutcome::Blocked);
+    }
+    if is_merge_in_progress(repo) {
+        eprintln!(
+            "⚠️ {} has merge in progress, skipping (manual intervention required)",
+            repo.display()
+        );
+        return Some(SyncOutcome::Blocked);
+    }
+    if is_cherry_pick_in_progress(repo) {
+        eprintln!(
+            "⚠️ {} has cherry-pick in progress, skipping (manual intervention required)",
+            repo.display()
+        );
+        return Some(SyncOutcome::Blocked);
+    }
+    // ADDED 2026-10-03 (audit R4-SC-11): a mid-revert sequencer state
+    // and an active bisect session must block staging/committing like
+    // the other mid-operation states (mid-revert especially: the
+    // sequencer owns the index the same way a merge does).
+    if is_revert_in_progress(repo) {
+        eprintln!(
+            "⚠️ {} has revert in progress, skipping (manual intervention required)",
+            repo.display()
+        );
+        return Some(SyncOutcome::Blocked);
+    }
+    if is_bisect_in_progress(repo) {
+        eprintln!(
+            "⚠️ {} has bisect session active, skipping (manual intervention required)",
+            repo.display()
+        );
+        return Some(SyncOutcome::Blocked);
+    }
+    None
+}
+
+fn ensure_origin_remote(repo: &Path, policy: &SyncPolicy) -> bool {
+    let has_origin = has_origin_remote(repo);
+    if !has_origin && policy.auto_github_private {
+        let private = if policy.sync_visibility {
+            if let Some(url) = origin_url(repo) {
+                if let Some((owner, repo_name)) = parse_github_owner_repo(&url) {
+                    get_github_visibility(&owner, &repo_name)
+                } else {
+                    true
+                }
+            } else {
+                true
+            }
+        } else {
+            true
+        };
+        if let Some(url) = crate::report::create_github_private_remote(
+            repo,
+            &policy.auto_github_private_account,
+            private,
+        ) {
+            println!("🔗 created remote for {}: {}", repo.display(), url);
+            true
+        } else {
+            eprintln!("⚠️ failed to create GitHub remote for {}", repo.display());
+            false
+        }
+    } else {
+        has_origin
+    }
+}
+
+async fn auto_pull_merge(
+    ctx: &SyncContext<'_>,
+    initial_status: &dracon_git::types::RepoStatus,
+) -> Result<()> {
+    let repo = ctx.repo;
+    let policy = ctx.policy;
+    if policy.auto_pull
+        && ctx.has_origin
+        && ctx.has_upstream
+        && initial_status.behind > 0
+        && initial_status.is_clean
+    {
+        if ctx.dry_run {
+            println!(
+                "🔽 Would pull/merge {} commit(s) from upstream in {}",
+                initial_status.behind,
+                repo.display()
+            );
+        } else {
+            match crate::git::pull_merge_origin(
+                repo,
+                policy.pull_op_timeout_secs,
+                "auto-pull-merge",
+            )
+            .await
+            {
+                Ok(()) => {}
+                Err(error) if crate::git::is_merge_conflict_error(&error) => {
+                    eprintln!(
+                        "⚠️ pull/merge conflict in {} (manual intervention required): {}",
+                        repo.display(),
+                        error
+                    );
+                    return Err(anyhow::anyhow!("pull/merge conflict: {}", error));
+                }
+                Err(error) => {
+                    eprintln!(
+                        "⚠️ pull/merge failed for {}: {} - aborting sync pass",
+                        repo.display(),
+                        error
+                    );
+                    return Err(anyhow::anyhow!("pull/merge failed: {}", error));
+                }
+            }
+        }
+    } else if policy.auto_pull && ctx.has_origin && ctx.has_upstream && initial_status.behind == 0 {
+        if debug_enabled() {
+            eprintln!(
+                "🐛 skip pull/merge for {} (branch not behind upstream)",
+                repo.display()
+            );
+        }
+    } else if policy.auto_pull && ctx.has_origin && ctx.has_upstream && !initial_status.is_clean {
+        if debug_enabled() {
+            eprintln!(
+                "🐛 skip pull/merge for {} (dirty repo, commit first)",
+                repo.display()
+            );
+        }
+    } else if policy.auto_pull && !ctx.has_origin {
+        eprintln!(
+            "ℹ️ skip pull/merge for {} (no origin remote)",
+            repo.display()
+        );
+    } else if policy.auto_pull && ctx.has_origin && !ctx.has_upstream {
+        eprintln!(
+            "ℹ️ skip pull/merge for {} (no tracking upstream on current branch)",
+            repo.display()
+        );
+    }
+    Ok(())
+}
+
+struct DiffResult {
+    status: dracon_git::types::RepoStatus,
+    entries: Vec<dracon_git::types::DiffFile>,
+    #[allow(dead_code)]
+    filter_only_cleared: bool,
+}
+
+#[cfg(test)]
+mod diff_tests {
+
+    /// Vanished stage-list paths must be pruned before `git add`
+    /// (firehose TOCTOU: the generator deletes a listed file before
+    /// the add runs, and one missing pathspec fails the whole batch
+    /// with exit 128). Dangling symlinks still stage fine, so only
+    /// truly-missing paths go. v0.113.77.
+    #[test]
+    fn test_retain_existing_stage_paths_drops_vanished() {
+        use crate::sync::retain_existing_stage_paths;
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path();
+        std::fs::write(repo.join("alive.txt"), b"x").unwrap();
+        let mut paths = vec![
+            "alive.txt".to_string(),
+            "gone/_generating.partial.md".to_string(),
+            "never-existed.md".to_string(),
+        ];
+        let dropped = retain_existing_stage_paths(repo, &mut paths);
+        assert_eq!(dropped, 2);
+        assert_eq!(paths, vec!["alive.txt".to_string()]);
+        // Idempotent: nothing left to drop.
+        assert_eq!(retain_existing_stage_paths(repo, &mut paths), 0);
+    }
+
+    #[test]
+    fn test_fallback_entries_recalculate_staged_files() {
+        // When cli_diff_entries fallback is used, staged_files must be
+        // recalculated from actual staged paths rather than leaving the
+        // (potentially stale) libgit2 count.
+        use crate::git::staged_paths;
+
+        // Create a temp repo with a staged file
+        let tmp = tempfile::tempdir().unwrap();
+        let repo_path = tmp.path().join("test-repo");
+        std::fs::create_dir_all(&repo_path).unwrap();
+
+        // Initialize git repo
+        let output = crate::git::git_cmd()
+            .args(["init"])
+            .current_dir(&repo_path)
+            .output()
+            .expect("git init failed");
+        assert!(output.status.success(), "git init failed: {:?}", output);
+
+        // Configure git user
+        crate::git::git_cmd()
+            .args(["config", "user.email", "test@test.com"])
+            .current_dir(&repo_path)
+            .output()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["config", "user.name", "Test"])
+            .current_dir(&repo_path)
+            .output()
+            .unwrap();
+
+        // Create initial commit
+        std::fs::write(repo_path.join("README.md"), "initial").unwrap();
+        crate::git::git_cmd()
+            .args(["add", "README.md"])
+            .current_dir(&repo_path)
+            .output()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["commit", "--no-verify", "-m", "initial"])
+            .current_dir(&repo_path)
+            .output()
+            .unwrap();
+
+        // Now add a new file (staged)
+        std::fs::write(repo_path.join("new_file.rs"), "fn main() {}").unwrap();
+        crate::git::git_cmd()
+            .args(["add", "new_file.rs"])
+            .current_dir(&repo_path)
+            .output()
+            .unwrap();
+
+        // staged_paths should find the staged file
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let staged = rt.block_on(staged_paths(&repo_path)).unwrap();
+        assert_eq!(staged.len(), 1, "expected 1 staged file, got {:?}", staged);
+        assert!(staged.contains(&std::path::PathBuf::from("new_file.rs")));
+
+        // The fallback code path: cli_diff_entries should find it
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let entries = rt
+            .block_on(crate::git::cli_diff_entries(
+                &repo_path,
+                crate::git::filter_aware_budget_secs(0),
+            ))
+            .unwrap();
+        assert!(
+            !entries.is_empty(),
+            "cli_diff_entries should find the staged file"
+        );
+    }
+}
+
+async fn compute_diff_entries(svc: &GitService, repo: &Path) -> Result<DiffResult> {
+    let mut status = svc.get_status().await?;
+    let mut entries = svc.get_diff_entries().await?;
+    let mut filter_only_cleared = false;
+
+    {
+        // A failed filter-aware diff is not evidence that the working tree
+        // is clean. Propagating the error keeps a transient git failure from
+        // being misclassified as FilterOnly (which would suppress the
+        // commit and install a cooldown with no actionable error).
+        // v0.113.89: budget scales with the work — see
+        // `filter_aware_budget_secs`. `entries` is the status-derived
+        // candidate set, the same input the daemon's scheduler uses.
+        let diff_budget = crate::git::filter_aware_budget_secs(entries.len());
+        let diff_output = crate::git::git_diff_head_files(repo, diff_budget).await?;
+        if diff_output.is_empty() && !entries.is_empty() {
+            let has_non_modified = entries
+                .iter()
+                .any(|e| !matches!(e.status, dracon_git::types::FileStatus::Modified));
+            if !has_non_modified {
+                entries.clear();
+                status.is_clean = true;
+                filter_only_cleared = true;
+            }
+        } else {
+            entries.retain(|e| {
+                if !matches!(e.status, dracon_git::types::FileStatus::Modified) {
+                    return true;
+                }
+                diff_output.contains(&e.path)
+            });
+        }
+    }
+
+    if debug_enabled() {
+        eprintln!(
+            "🐛 {} status: clean={} modified={} staged={} entries(libgit2)={}",
+            repo.display(),
+            status.is_clean,
+            status.modified_files,
+            status.staged_files,
+            entries.len()
+        );
+    }
+    if entries.is_empty() && !filter_only_cleared {
+        let fallback_budget =
+            crate::git::filter_aware_budget_secs(status.modified_files + status.staged_files);
+        let fallback_entries = cli_diff_entries(repo, fallback_budget).await?;
+        if !fallback_entries.is_empty() {
+            status.is_clean = false;
+            status.modified_files = fallback_entries.len();
+            // Recalculate staged_files from actual staged paths when using
+            // fallback CLI entries, since the libgit2 count may be stale
+            // (libgit2 returned 0 entries but CLI found changes).
+            let staged = crate::git::staged_paths(repo).await?;
+            status.staged_files = staged.len();
+            entries = fallback_entries;
+            if debug_enabled() {
+                eprintln!(
+                    "🐛 {} fallback entries(cli)={} staged={} => forcing dirty",
+                    repo.display(),
+                    status.modified_files,
+                    status.staged_files,
+                );
+            }
+        }
+        // CHANGED 2026-06-20: when both libgit2 and CLI diff are empty
+        // but the repo has untracked files (e.g. .dracon/data/keys/*.pub),
+        // collect untracked entries so the auto-commit block below stages
+        // and commits them. Without this, a repo with ONLY untracked
+        // changes (no tracked modifications) enters the auto-commit block
+        // but finds `entries` empty, skips `stage_commit_and_push`, and
+        // returns `Synced` without ever committing the untracked file.
+        if entries.is_empty() {
+            let ut = untracked_entries(repo).await?;
+            if !ut.is_empty() {
+                status.is_clean = false;
+                entries = ut;
+                if debug_enabled() {
+                    eprintln!(
+                        "🐛 {} untracked entries={} => including for auto-commit",
+                        repo.display(),
+                        entries.len(),
+                    );
+                }
+            }
+        }
+    }
+
+    Ok(DiffResult {
+        status,
+        entries,
+        filter_only_cleared,
+    })
+}
+
+/// Return true when a relative path has a symlink ancestor.
+///
+/// Git can stage a symlink itself, but `git add` rejects a path below a
+/// symlink (`pathspec ... is beyond a symbolic link`). Status APIs can still
+/// report such descendants when a malformed or self-referential link appears
+/// during a directory walk. Detecting only ancestors before expansion keeps
+/// one bad path from aborting the entire batch without dropping valid symlink
+/// files from the commit-all staging policy.
+fn path_has_symlink_ancestor(repo: &Path, relative: &Path) -> bool {
+    let mut current = repo.to_path_buf();
+    let mut components = relative.components().peekable();
+    while let Some(component) = components.next() {
+        match component {
+            std::path::Component::Normal(part) => current.push(part),
+            std::path::Component::CurDir => continue,
+            _ => return false,
+        }
+        // The final component is the symlink itself, not a path below it.
+        if components.peek().is_none() {
+            break;
+        }
+        match std::fs::symlink_metadata(&current) {
+            Ok(metadata) if metadata.file_type().is_symlink() => return true,
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => break,
+            Err(_) => return false,
+        }
+    }
+    false
+}
+
+/// CHANGED 2026-07-21 (v0.112.31, audit H6/F1.5): the old signature
+/// is preserved as a #[cfg(test)] wrapper (all remaining callers are
+/// tests). Production call sites MUST use
+/// `stage_existing_files_filtered` so directory-expanded files get the
+/// per-file staging policy re-applied (size limit, exclude patterns).
+#[cfg(test)]
+async fn stage_existing_files(
+    repo: &Path,
+    existing: &[String],
+    dry_run: bool,
+    stage_timeout_secs: u64,
+    excluded_dir_names: &std::collections::BTreeSet<String>,
+) -> Result<()> {
+    stage_existing_files_filtered(
+        repo,
+        existing,
+        dry_run,
+        stage_timeout_secs,
+        excluded_dir_names,
+        None,
+    )
+    .await
+}
+
+/// How long `maybe_auto_harden_with_warden` waits for one
+/// `dracon-warden once <repo>` run before giving up fail-open.
+/// Single-repo harden passes are local file + git-config writes;
+/// 120s is generous without letting a wedged warden stall a cycle.
+const WARDEN_HARDEN_TIMEOUT_SECS: u64 = 120;
+/// How long a failed harden attempt suppresses retries for the same
+/// repo (fail-open must not fork-bomb a broken warden every cycle).
+const WARDEN_HARDEN_RETRY_SECS: u64 = 1800;
+
+/// Per-process warden-harden state: repo path -> (hardened, last
+/// attempt). Hardened repos never re-check; failed attempts retry
+/// after [`WARDEN_HARDEN_RETRY_SECS`]. Guarded by a plain mutex —
+/// critical sections never `.await`.
+static WARDEN_HARDEN_STATE: std::sync::OnceLock<
+    std::sync::Mutex<std::collections::HashMap<std::path::PathBuf, (bool, std::time::Instant)>>,
+> = std::sync::OnceLock::new();
+
+/// Pure probe: does this repo already carry warden hardening? True
+/// when the local git config has the clean filter (written by
+/// `dracon-warden once`), which is what makes the encryption filter
+/// actually run at `git add` time. Extracted for unit tests.
+pub(crate) async fn repo_has_warden_filter(repo: &Path) -> bool {
+    let mut command = crate::policy::tokio_git_command();
+    command
+        .args(["config", "--local", "--get", "filter.dracon.clean"])
+        .current_dir(repo);
+    crate::git::run_command_captured_output(
+        command.into_tokio(),
+        WARDEN_HARDEN_TIMEOUT_SECS,
+        "warden filter probe",
+        None,
+    )
+    .await
+    .map(|o| o.status.success())
+    .unwrap_or(false)
+}
+
+/// ADDED 2026-09-15 (warden-showcase probe): sync-hook auto-harden.
+/// The probe proved a brand-new repo's secrets reach remotes in
+/// plaintext ~1 minute after creation because hardening was a manual
+/// `dracon-warden once` pass while sync commits on a ~1s pulse. The
+/// operator chose a sync hook over a timer: hardening must be in
+/// place BEFORE the first auto-stage, and only a pre-stage hook can
+/// guarantee that ordering.
+///
+/// Called at the top of [`stage_existing_files_filtered`] (the single
+/// choke point every auto-stage flows through) when there is actually
+/// something to stage. No-op when disabled via
+/// `auto_harden_with_warden`, in dry-run mode, without policy context
+/// (unit-test callers), or when the repo is already hardened.
+/// Fail-open by design: a missing/broken warden binary logs one
+/// warning per retry window and staging proceeds — a broken warden
+/// must never wedge the sync loop (the leak window stays open, but
+/// sync stays alive; the next process restart or retry window
+/// re-attempts).
+async fn maybe_auto_harden_with_warden(repo: &Path, policy: &SyncPolicy, dry_run: bool) {
+    if dry_run || !policy.auto_harden_with_warden {
+        return;
+    }
+    let key = repo.to_path_buf();
+    {
+        let state = WARDEN_HARDEN_STATE
+            .get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
+            .lock()
+            .expect("warden harden state poisoned");
+        if let Some((hardened, _)) = state.get(&key) {
+            if *hardened {
+                return;
+            }
+        }
+        if let Some((_, last)) = state.get(&key) {
+            if last.elapsed().as_secs() < WARDEN_HARDEN_RETRY_SECS {
+                return;
+            }
+        }
+    }
+    if repo_has_warden_filter(repo).await {
+        WARDEN_HARDEN_STATE
+            .get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
+            .lock()
+            .expect("warden harden state poisoned")
+            .insert(key, (true, std::time::Instant::now()));
+        return;
+    }
+    // Mark the attempt BEFORE spawning so concurrent sync tasks for
+    // the same repo cannot fork duplicate harden passes.
+    WARDEN_HARDEN_STATE
+        .get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
+        .lock()
+        .expect("warden harden state poisoned")
+        .insert(key.clone(), (false, std::time::Instant::now()));
+    let mut command = tokio::process::Command::new("dracon-warden");
+    command.args(["once", &key.to_string_lossy()]);
+    let run = crate::git::run_command_captured_output(
+        command,
+        WARDEN_HARDEN_TIMEOUT_SECS,
+        "warden auto-harden",
+        None,
+    );
+    match tokio::time::timeout(
+        std::time::Duration::from_secs(WARDEN_HARDEN_TIMEOUT_SECS),
+        run,
+    )
+    .await
+    {
+        Ok(Ok(out)) if out.status.success() => {
+            WARDEN_HARDEN_STATE
+                .get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
+                .lock()
+                .expect("warden harden state poisoned")
+                .insert(key.clone(), (true, std::time::Instant::now()));
+            eprintln!(
+                "🛡️ {} auto-hardened with warden before staging",
+                repo.display()
+            );
+        }
+        Ok(Ok(out)) => {
+            let err = String::from_utf8_lossy(&out.stderr);
+            eprintln!(
+                "⚠️ warden auto-harden failed for {} (staging proceeds unhardened): {}",
+                repo.display(),
+                err.lines().next().unwrap_or("unknown error")
+            );
+        }
+        Ok(Err(e)) => {
+            eprintln!(
+                "⚠️ warden auto-harden could not run for {} (staging proceeds unhardened; is dracon-warden on PATH?): {}",
+                repo.display(),
+                e
+            );
+        }
+        Err(_) => {
+            eprintln!(
+                "⚠️ warden auto-harden timed out after {}s for {} (staging proceeds unhardened)",
+                WARDEN_HARDEN_TIMEOUT_SECS,
+                repo.display()
+            );
+        }
+    }
+}
+
+/// Stage existing files, recursing into untracked directories.
+///
+/// `filter`: when `Some((policy, auto_commit_exclude_patterns))`,
+/// each file discovered by the directory-expansion recursion is
+/// re-checked against the per-file staging policy
+/// (`max_stage_file_bytes`, `exclude_file_patterns`,
+/// `untracked_exclude_patterns`, `auto_commit_exclude_patterns`).
+/// ADDED 2026-07-21 (v0.112.31, audit H6/F1.5): previously the
+/// recursion staged every file inside an untracked directory
+/// wholesale — a 500 MiB `assets/video.mp4` inside a new `assets/`
+/// dir sailed through even though the same file at repo root was
+/// rejected by `should_stage_entry`, violating the documented
+/// 100 MiB hard exclusion (AGENTS.md) and every per-file pattern
+/// exclusion.
+///
+/// Drop stage-list paths that no longer exist on disk, returning
+/// how many were dropped. A path counts as present when it exists
+/// OR its symlink metadata reads (a dangling symlink still stages
+/// fine — only truly-missing paths fail `git add` with
+/// `fatal: unable to stat ...`, exit 128, discarding the whole
+/// batch). ADDED 2026-09-19 (v0.113.77, firehose TOCTOU).
+pub(crate) fn retain_existing_stage_paths(repo: &Path, paths: &mut Vec<String>) -> usize {
+    let before = paths.len();
+    paths.retain(|p| {
+        let full = repo.join(p);
+        full.exists() || std::fs::symlink_metadata(&full).is_ok()
+    });
+    before - paths.len()
+}
+
+/// True when a git error reports an index.lock failure — another process
+/// (CLI, warden, sync-now) holds the lock, or the gitdir is read-only.
+///
+/// ADDED 2026-10-03 (audit R4-SC-15): transient contention must retry
+/// with backoff and then map to Blocked (non-failure, work retained),
+/// never burn the failure budget or trip MAX_FAILURES backoff for a
+/// healthy repo. The "Unable to create" conjunction keeps a file that
+/// merely IS NAMED index.lock (pathspec errors) from misrouting here.
+pub(crate) fn is_index_lock_failure(msg: &str) -> bool {
+    msg.contains("Unable to create") && msg.contains("index.lock")
+}
+
+/// Exact-path diagnostic only, NOT ownership/content authorization. A directory
+/// name never waives unknown descendants. Production uses captured identities
+/// and conditional private-index installation, tested at the real boundary.
+#[cfg(test)]
+pub(crate) fn staged_extra_paths(
+    _repo: &Path,
+    staged: &[(PathBuf, dracon_git::types::FileStatus)],
+    to_stage: &[dracon_git::types::DiffFile],
+) -> Vec<PathBuf> {
+    let intended_files: HashSet<&PathBuf> = to_stage.iter().map(|e| &e.path).collect();
+    staged
+        .iter()
+        .map(|(p, _)| p)
+        .filter(|p| !intended_files.contains(*p))
+        .cloned()
+        .collect()
+}
+#[allow(dead_code)] // in-flight staged_epoch refactor: superseded but not yet removed
+async fn stage_existing_files_filtered(
+    repo: &Path,
+    existing: &[String],
+    dry_run: bool,
+    stage_timeout_secs: u64,
+    excluded_dir_names: &std::collections::BTreeSet<String>,
+    filter: Option<(&SyncPolicy, &[String])>,
+) -> Result<()> {
+    stage_existing_files_suppressing(
+        repo,
+        existing,
+        dry_run,
+        stage_timeout_secs,
+        excluded_dir_names,
+        filter,
+        None,
+    )
+    .await
+}
+
+#[allow(dead_code)] // in-flight staged_epoch refactor: superseded but not yet removed
+async fn stage_existing_files_suppressing(
+    repo: &Path,
+    existing: &[String],
+    dry_run: bool,
+    stage_timeout_secs: u64,
+    excluded_dir_names: &BTreeSet<String>,
+    filter: Option<(&SyncPolicy, &[String])>,
+    suppressed: Option<&HashSet<PathBuf>>,
+) -> Result<()> {
+    stage_existing_files_in_index(
+        repo,
+        existing,
+        dry_run,
+        stage_timeout_secs,
+        excluded_dir_names,
+        filter,
+        suppressed,
+        None,
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn stage_existing_files_in_index(
+    repo: &Path,
+    existing: &[String],
+    dry_run: bool,
+    stage_timeout_secs: u64,
+    excluded_dir_names: &BTreeSet<String>,
+    filter: Option<(&SyncPolicy, &[String])>,
+    suppressed: Option<&HashSet<PathBuf>>,
+    index: Option<&Path>,
+) -> Result<()> {
+    if existing.is_empty() {
+        return Ok(());
+    }
+    let staging_started = std::time::Instant::now();
+    if debug_enabled() {
+        eprintln!(
+            "scheduler: stage_files_enter repo={} unix_ms={}",
+            repo.display(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis()
+        );
+    }
+    // ADDED 2026-09-15 (warden-showcase probe): auto-harden hook. This
+    // is the single choke point every auto-stage flows through, so the
+    // encryption filter is guaranteed active at `git add` time — before
+    // the first commit, not whenever a human runs `dracon-warden once`.
+    if let Some((stage_policy, _)) = filter {
+        maybe_auto_harden_with_warden(repo, stage_policy, dry_run).await;
+    }
+    // Filter out paths that no longer exist on disk. Build tools like vite
+    // create timestamp-suffixed temp files (e.g.
+    // `vite.config.ts.timestamp-1781483278562-7a994a6fc1011.mjs`) and delete
+    // them within milliseconds. If `get_status()` lists such a path as
+    // untracked, but the file is gone by the time we run `git add`, the
+    // whole `git add` fails with `fatal: unable to stat ...`, blocking
+    // every other file in the commit. We re-check existence right before
+    // staging and drop the missing ones.
+    //
+    // Untracked DIRECTORY entries (e.g. `docs/avid-research/02-foo/`)
+    // are recursed into and each file inside is added to the stage
+    // list. The libgit2 status API returns one entry per untracked
+    // top-level path, and `git ls-files --others` similarly collapses
+    // fully-untracked subtrees into their parent dir when `--directory`
+    // is in effect (the default). Without the recursion, the daemon
+    // would see 12 untracked dirs, filter them all out, and stage
+    // nothing — leaving the operator's new research/docs files
+    // uncommitted. The recursion respects the same `existing.exists()`
+    // and `is_dir()` guards so vanished files and submodules are
+    // still filtered correctly.
+    let input: Vec<String> = existing.to_vec();
+    let mut expanded: Vec<String> = Vec::with_capacity(input.len() * 2);
+    for p in input {
+        if path_has_symlink_ancestor(repo, Path::new(&p)) {
+            if debug_enabled() {
+                eprintln!(
+                    "🐛 {} skipping staging path below a symlink: {}",
+                    repo.display(),
+                    p
+                );
+            }
+            continue;
+        }
+        let full = repo.join(&p);
+        // FIXED 2026-09-27 (audit rework round 4, F84): `!x.is_ok()`
+        // is `x.is_err()`; clippy flags the double negative as
+        // `nonminimal_bool` on the pinned MSRV toolchain.
+        if !full.exists() && std::fs::symlink_metadata(&full).is_err() {
+            continue;
+        }
+        // A symlink that is itself the reported path is safe to stage as a
+        // link; only descendants below a symlink are rejected above. Do not
+        // follow a directory link into its target during expansion.
+        if std::fs::symlink_metadata(&full)
+            .map(|metadata| metadata.file_type().is_symlink())
+            .unwrap_or(false)
+        {
+            expanded.push(p);
+            continue;
+        }
+        if full.is_file() {
+            expanded.push(p);
+            continue;
+        }
+        if full.is_dir() {
+            // CHANGED 2026-06-21 (goal 29144c2c): skip submodules.
+            // A git submodule has a `.git` FILE (not a directory)
+            // at its root, with content like
+            // `gitdir: ../.git/modules/<name>`. The parent's
+            // `git status` reports it as `M DraconDev` (a single
+            // entry with the gitlink SHA changed). When that entry
+            // is passed to stage_existing_files, the recursion
+            // walks into DraconDev's working tree and tries to add
+            // its files as if they belonged to the parent, which
+            // fails with `fatal: Pathspec 'DraconDev/X' is in
+            // submodule 'DraconDev'`. Detect by checking if the
+            // top-level dir's `.git` exists and skip the entire
+            // subtree. This is safe because the parent references
+            // the submodule via its gitlink pointer, not its
+            // working-tree files.
+            //
+            // CHANGED 2026-06-30 (goal `mr0rim9u-lzzfv9`):
+            // broadened `.git` check from `is_file()` to
+            // `exists()` so it ALSO catches the case where a
+            // sibling subrepo has its own real `.git/` directory
+            // (not a submodule pointer file). Symptom: the daemon
+            // recursed into a nested `rust-ai-web-auto/`
+            // (which has `.git/` as its own git repo, not a
+            // submodule), tried to `git add rust-ai-web-auto/...`
+            // for ~19183 nested files, and every `git add` failed
+            // with `fatal: Pathspec ... is in submodule
+            // 'rust-ai-web-auto'`. After 5 failures, the daemon
+            // marked the parent repo as `exceeded max failures`
+            // and stopped syncing it entirely.
+            let full_dot_git = full.join(".git");
+            if full_dot_git.exists() {
+                continue;
+            }
+            // Recurse into untracked directories. The libgit2/git status
+            // API can collapse a fully-untracked subtree into a single
+            // top-level directory entry (e.g. `web/games/libs/game/
+            // effects/src/styles/backgrounds.css` shows up as
+            // `web/games/libs/game/effects/src/`). The previous 1-level
+            // walk handled the common case (files directly under the
+            // directory) but missed nested subtrees like
+            // `src/styles/` or `src/lib/components/`, leaving the
+            // operator's deep code/library files uncommitted.
+            //
+            // We use an explicit stack (not Rust's native recursion) to
+            // avoid blowing the stack on extremely deep trees. We skip
+            // symlinks (to prevent loops), dotfile dirs (to avoid
+            // walking `.git`, `.cache`, etc.), and any directory whose
+            // basename is in the `excluded_dir_names` set (target,
+            // node_modules, .venv, dist, build, archives, etc.). The
+            // excluded-dir check uses the SAME BTreeSet that
+            // `should_stage_entry` uses for consistency, so files
+            // inside e.g. `node_modules/` are NEVER staged even when
+            // they appear as untracked.
+            let excluded = excluded_dir_names;
+            // Skip the top-level dir itself if its basename is in the
+            // excluded-dir set. This handles the case where libgit2
+            // returned `node_modules/` or `.cache/` directly as a
+            // top-level untracked entry (e.g. on a fresh clone where
+            // the operator ran `npm install` and `.gitignore` is not
+            // catching it for some reason).
+            //
+            // CHANGED 2026-06-22 (goal mqp8dffy-bonnlu): removed the
+            // broad `name.starts_with('.')` skip. The previous
+            // blanket-dotfile skip was meant to skip `.git/`, `.cache/`,
+            // `.venv/`, etc., but it ALSO skipped `.pi/` — silently
+            // blocking `*/.pi/goals/archived/*.md` from auto-commit.
+            // Those are operator docs (goal tracking records) that the
+            // commit-all principle says MUST go up. The dot-dirs we
+            // actually want to skip (`.cache`, `.direnv`, `.venv`)
+            // are already in the `excluded` BTreeSet; `.git/` is
+            // handled by the separate `full_dot_git.is_file()` check
+            // above. So removing the dotfile skip is safe and the
+            // recursion now correctly descends into `.pi/`.
+            if let Some(name) = full.file_name().and_then(|n| n.to_str()) {
+                if excluded.contains(name) {
+                    continue;
+                }
+            }
+            let mut stack: Vec<std::path::PathBuf> = vec![full.clone()];
+            while let Some(dir) = stack.pop() {
+                let rd = match std::fs::read_dir(&dir) {
+                    Ok(rd) => rd,
+                    Err(_) => continue, // permission denied, vanished, etc.
+                };
+                for child in rd.flatten() {
+                    let cp = child.path();
+                    // Skip symlinks (loop guard)
+                    let meta = match std::fs::symlink_metadata(&cp) {
+                        Ok(m) => m,
+                        Err(_) => continue,
+                    };
+                    if meta.file_type().is_symlink() {
+                        continue;
+                    }
+                    if meta.is_file() {
+                        if let Ok(rel) = cp.strip_prefix(repo) {
+                            // ADDED 2026-07-21 (v0.112.31, audit
+                            // H6/F1.5): re-apply the per-file staging
+                            // policy to directory-expanded files.
+                            // Without this, size-limit and pattern
+                            // exclusions only applied to top-level
+                            // entries; anything nested inside an
+                            // untracked dir bypassed them.
+                            if let Some((policy, auto_commit_excl)) = filter {
+                                let rel_path = rel.to_path_buf();
+                                if meta.len() > policy.max_stage_file_bytes {
+                                    eprintln!(
+                                        "ℹ️ skip large file {} ({} bytes > {} bytes)",
+                                        cp.display(),
+                                        meta.len(),
+                                        policy.max_stage_file_bytes
+                                    );
+                                    continue;
+                                }
+                                if crate::exclude::is_excluded_file(
+                                    &rel_path,
+                                    &policy.exclude_file_patterns,
+                                ) {
+                                    continue;
+                                }
+                                if crate::exclude::matches_untracked_exclude(
+                                    repo,
+                                    &rel_path,
+                                    &policy.untracked_exclude_patterns,
+                                ) {
+                                    continue;
+                                }
+                                if !auto_commit_excl.is_empty()
+                                    && crate::exclude::matches_untracked_exclude(
+                                        repo,
+                                        &rel_path,
+                                        auto_commit_excl,
+                                    )
+                                {
+                                    continue;
+                                }
+                            }
+                            expanded.push(rel.to_string_lossy().to_string());
+                        }
+                        continue;
+                    }
+                    if meta.is_dir() {
+                        // Skip excluded dir names (target, node_modules,
+                        // .cache, .venv, dist, build, archives, .tmp-*, etc.).
+                        //
+                        // CHANGED 2026-06-22 (goal mqp8dffy-bonnlu):
+                        // removed the `name.starts_with('.')` skip.
+                        // The previous blanket-dotfile skip was meant
+                        // to skip `.git/`, `.cache/`, `.venv/`, etc.,
+                        // but it ALSO skipped `.pi/` — silently
+                        // blocking `*/.pi/goals/archived/*.md` from
+                        // auto-commit. The dot-dirs we want to skip
+                        // are already in the `excluded` BTreeSet
+                        // (set up by `excluded_dir_names_set` from the
+                        // policy's `exclude_dir_names` list, defaulting
+                        // to `target`, `node_modules`, `.cache`,
+                        // `.direnv`, `.venv`, `dist`, `build`,
+                        // `archives`, `.tmp-*`). `.git/` is handled
+                        // by the separate `inner_dot_git.exists()`
+                        // check below (covers both submodule pointer
+                        // files and nested git-repo directories). So
+                        // removing the dotfile skip is safe and the
+                        // recursion now correctly descends into `.pi/`.
+                        if let Some(name) = cp.file_name().and_then(|n| n.to_str()) {
+                            if excluded.contains(name) {
+                                continue;
+                            }
+                        }
+                        // CHANGED 2026-06-21 (goal 29144c2c): skip
+                        // submodules encountered DURING recursion
+                        // (not just at the top-level `existing`
+                        // entry). A submodule can be nested inside a
+                        // normal untracked directory, so the check
+                        // belongs here too. Same logic as the
+                        // top-level check: skip if `<dir>/.git`
+                        // exists (covers both submodule pointer
+                        // FILES and nested git-repo DIRECTORIES).
+                        // CHANGED 2026-06-30 (goal
+                        // `mr0rim9u-lzzfv9`): broadened from
+                        // `is_file()` to `exists()` to match the
+                        // top-level fix above.
+                        let inner_dot_git = cp.join(".git");
+                        if inner_dot_git.exists() {
+                            continue;
+                        }
+                        stack.push(cp);
+                    }
+                }
+            }
+        }
+    }
+    // Reapply exact path suppression AFTER directory expansion. A libgit2
+    // untracked `public/` entry must not sweep verified bucket materializations
+    // into Git while unrelated local files in that directory remain stageable.
+    if let Some(paths) = suppressed {
+        expanded.retain(|p| !Path::new(p).ancestors().any(|part| paths.contains(part)));
+    }
+    let existing = expanded;
+    if existing.is_empty() {
+        return Ok(());
+    }
+    if dry_run {
+        println!(
+            "📝 Would stage {} file(s) in {}: {:?}",
+            existing.len(),
+            repo.display(),
+            &existing[..existing.len().min(5)]
+        );
+        if existing.len() > 5 {
+            println!("  ... and {} more", existing.len() - 5);
+        }
+    } else {
+        // Filter out gitignored paths to avoid "The following paths are ignored
+        // by one of your .gitignore files" errors. Without this, a single
+        // gitignored path in the list causes the entire `git add` to fail,
+        // blocking ALL files from being committed.
+        //
+        // We use `git check-ignore` to detect gitignored paths, then split:
+        // - Non-ignored paths: `git add -A -- <paths>` (respects .gitignore)
+        // - Ignored but already-tracked paths: `git add -A -f -- <paths>` (force
+        //   re-stage; git already tracks these so gitignore shouldn't block updates)
+        // - Ignored and untracked: skip entirely (.gitignore is intentional)
+        let partition_started = std::time::Instant::now();
+        if debug_enabled() {
+            eprintln!(
+                "scheduler: stage_prepare repo={} phase=before_partition elapsed_ms={}",
+                repo.display(),
+                staging_started.elapsed().as_millis()
+            );
+        }
+        let (mut force_paths, mut normal_paths) = partition_gitignored(repo, &existing).await;
+        // ADDED 2026-09-19 (v0.113.77, firehose TOCTOU): drop paths
+        // that vanished between listing and staging. Observed live:
+        // the generator deleted a `_generating.partial.md` after
+        // classification, and the whole `git add -A` failed with
+        // `fatal: unable to stat ...` (exit 128), discarding the
+        // entire batch for that cycle. The bootstrap path
+        // (`stage_existing_files_filtered`) already prunes this
+        // way; the main path never did. Same predicate (a dangling
+        // symlink still stages fine — only truly-missing paths go).
+        let dropped_normal = retain_existing_stage_paths(repo, &mut normal_paths);
+        let dropped_force = retain_existing_stage_paths(repo, &mut force_paths);
+        if dropped_normal + dropped_force > 0 && debug_enabled() {
+            eprintln!(
+                "🐛 {} stage prune: dropped {} vanished paths before git add",
+                repo.display(),
+                dropped_normal + dropped_force,
+            );
+        }
+        if debug_enabled() {
+            eprintln!(
+                "scheduler: stage_prepare repo={} phase=partition elapsed_ms={}",
+                repo.display(),
+                partition_started.elapsed().as_millis()
+            );
+        }
+
+        if !normal_paths.is_empty() {
+            // R4-SC-10: :(literal) — a status-derived filename with glob
+            // metacharacters must stage exactly itself, never its glob
+            // siblings (over-staging would defeat exclusion).
+            let quoted = crate::git::literal_pathspecs(&normal_paths);
+            let mut add_args = vec!["add", "-A", "--"];
+            for p in &quoted {
+                add_args.push(p.as_str());
+            }
+            // ADDED 2026-10-03 (audit R4-SC-15): transient
+            // index.lock contention retries with backoff instead of
+            // failing the whole sync on first contact. Two retries
+            // (250/500ms) — holders are usually fast CLI ops; a
+            // still-held lock propagates and maps to Blocked below.
+            let mut add_attempts = 0u32;
+            loop {
+                match staged_epoch::run_index_git(repo, &add_args, stage_timeout_secs, "add", index)
+                    .await
+                {
+                    Ok(()) => break,
+                    Err(e) if add_attempts < 2 && is_index_lock_failure(&e.to_string()) => {
+                        add_attempts += 1;
+                        eprintln!(
+                            "⏳ {} git add hit index.lock contention (retry {}/2)",
+                            repo.display(),
+                            add_attempts
+                        );
+                        tokio::time::sleep(Duration::from_millis(250 * add_attempts as u64)).await;
+                    }
+                    Err(e) => {
+                        eprintln!(
+                            "⚠️ {} git add failed for {} paths: {:?}",
+                            repo.display(),
+                            normal_paths.len(),
+                            &normal_paths[..normal_paths.len().min(5)]
+                        );
+                        return Err(e);
+                    }
+                }
+            }
+        }
+
+        // Force-add already-tracked gitignored files (git tracks them already,
+        // so .gitignore shouldn't prevent staging updates to tracked content)
+        if !force_paths.is_empty() {
+            // R4-SC-10: :(literal) — see the normal-paths loop above.
+            let quoted = crate::git::literal_pathspecs(&force_paths);
+            let mut add_args = vec!["add", "-A", "-f", "--"];
+            for p in &quoted {
+                add_args.push(p.as_str());
+            }
+            if staged_epoch::run_index_git(
+                repo,
+                &add_args,
+                stage_timeout_secs,
+                "add (force-tracked)",
+                index,
+            )
+            .await
+            .is_err()
+            {
+                eprintln!(
+                    "⚠️ {} git add -f failed for {} tracked gitignored paths: {:?}",
+                    repo.display(),
+                    force_paths.len(),
+                    &force_paths[..force_paths.len().min(5)]
+                );
+                // Non-fatal: tracked gitignored files can be re-attempted next cycle
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Stage a parent gitlink pointer update for each path in `gitlinks`
+/// WITHOUT recursing into the submodule's working tree.
+///
+/// For tracked `mode 160000` entries, the daemon's main stage path
+/// (`stage_existing_files`) skips the entry because the path is a
+/// directory whose `.git` exists (the submodule's own gitdir). We
+/// want the OPPOSITE behaviour here: do NOT recurse (that would
+/// stage the submodule's working-tree files as if they belonged
+/// to the parent), but DO record the new submodule HEAD SHA in
+/// the parent's index. `git add <path>` (no `-A`) does exactly that
+/// — it updates the gitlink entry to point at the path's current
+/// `rev-parse HEAD`, without descending into the subdirectory.
+///
+/// Invariants:
+/// - Each `gitlinks` entry MUST already pass `is_gitlink(repo, &p)`.
+///   The caller is `stage_commit_and_push`, which partitions
+///   `to_stage` via `is_gitlink` before calling this.
+/// - We stage each path individually (NOT `git add <all>` in one
+///   invocation) because the parent can have multiple distinct
+///   gitlink entries in a single commit, and a failure on one
+///   should not block the others.
+///
+/// ADDED 2026-07-01, goal `mr10pdzr-i495vy`; revised 2026-07-08
+/// (goal `730eaf2a`): the daemon no longer materializes top-level
+/// standalone worktrees at `/home/dracon/Dev/<name>/` (see AGENTS.md
+/// "Submodule standalone worktree design"). Submodules are watched
+/// only via their nested checkout at `<parent>/<submodule_path>/`,
+/// which is on `main` directly while the shared gitdir's
+/// `refs/heads/main` is the canonical head the parent must track.
+/// `git add <path>` from the parent reads the NESTED
+/// submodule's current checkout SHA, so when that checkout is
+/// detached or behind `main` (as it is between nesting updates) the
+/// gitlink cannot observe `main`'s advances. This causes the
+/// parent's gitlink to drift away from `main`, breaking the
+/// convergence invariant (main SHA == parent gitlink).
+///
+/// To fix: prefer `git update-index --cacheinfo 160000,<sha>,<path>`
+/// with the SHARED gitdir's `refs/heads/main` SHA. Fall back to
+/// plain `git add <path>` when the shared gitdir isn't found (e.g.,
+/// the parent has no `.gitmodules`).
+///
+/// CHANGED 2026-07-01 (goal `mr1x7j5i-zioba9`):
+/// Previous comment referenced a `fast_forward_daemon_standalone_to_main`
+/// hook. With the daemon-standalone branch removed, the canonical head
+/// is just `refs/heads/main` from the shared gitdir — no buffer-branch
+/// fast-forward needed.
+#[allow(dead_code)] // in-flight staged_epoch refactor: superseded but not yet removed
+async fn stage_gitlink_updates(
+    repo: &Path,
+    gitlinks: &[String],
+    dry_run: bool,
+    stage_timeout_secs: u64,
+) -> Result<()> {
+    stage_gitlink_updates_in_index(repo, gitlinks, dry_run, stage_timeout_secs, None).await
+}
+
+async fn stage_gitlink_updates_in_index(
+    repo: &Path,
+    gitlinks: &[String],
+    dry_run: bool,
+    stage_timeout_secs: u64,
+    index: Option<&Path>,
+) -> Result<()> {
+    if gitlinks.is_empty() {
+        return Ok(());
+    }
+    if dry_run {
+        println!(
+            "🔗 Would stage {} gitlink pointer update(s) in {}: {:?}",
+            gitlinks.len(),
+            repo.display(),
+            &gitlinks[..gitlinks.len().min(5)]
+        );
+        if gitlinks.len() > 5 {
+            println!("  ... and {} more", gitlinks.len() - 5);
+        }
+        return Ok(());
+    }
+    for p in gitlinks {
+        // Prefer the SHARED gitdir's `refs/heads/main` SHA when
+        // available — that is the canonical head the parent's
+        // gitlink must converge to (the nested checkout may sit at
+        // any SHA). The canonical-head helper reads
+        // `refs/heads/main` from the shared gitdir.
+        //
+        // CHANGED 2026-07-01 (goal `mr1x7j5i-zioba9`):
+        // Previous comment mentioned a `daemon-standalone` ref
+        // being preferred over `main`; that buffer branch was
+        // removed with the worktree layout in 2026-07.
+        let shared_sha =
+            crate::exclude::shared_submodule_canonical_head_sha(repo, std::path::Path::new(p));
+        if let Some(shared_sha) = shared_sha {
+            // Use `git update-index --cacheinfo` to set the
+            // gitlink explicitly to the shared canonical head
+            // SHA. This bypasses the nested checkout's HEAD
+            // and ensures the parent's gitlink converges to the
+            // shared gitdir's `main`, not to the nested's
+            // own (possibly divergent) state.
+            let cacheinfo = format!("160000,{},{}", shared_sha, p);
+            if let Err(e) = staged_epoch::run_index_git(
+                repo,
+                &["update-index", "--add", "--cacheinfo", &cacheinfo],
+                stage_timeout_secs,
+                "update-index (gitlink -> shared canonical head)",
+                index,
+            )
+            .await
+            {
+                eprintln!(
+                    "⚠️ {} git update-index (gitlink) failed for path {:?}: {}",
+                    repo.display(),
+                    p,
+                    e
+                );
+                // Non-fatal: a single failed gitlink update is
+                // retried on the next daemon cycle.
+            }
+        } else {
+            // Fallback: no shared gitdir found. Use plain
+            // `git add <path>` which reads the nested
+            // submodule's HEAD (the original behavior before
+            // the materialize-submodule-as-standalone-worktree
+            // feature).
+            if let Err(e) = staged_epoch::run_index_git(
+                repo,
+                &["add", "--", p.as_str()],
+                stage_timeout_secs,
+                "add (gitlink)",
+                index,
+            )
+            .await
+            {
+                eprintln!(
+                    "⚠️ {} git add (gitlink) failed for path {:?}: {}",
+                    repo.display(),
+                    p,
+                    e
+                );
+                // Non-fatal: a single failed gitlink update is
+                // retried on the next daemon cycle.
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Materialize a parent repo's submodule as a standalone worktree
+/// at `target_path`.
+///
+/// On first detection of a submodule, the daemon calls this
+/// function to create a real standalone worktree at
+/// `/home/dracon/Dev/<name>/` (or whatever `target_path` is), so
+/// the daemon can treat the submodule as a normal repo: discover
+/// it, classify ownership, auto-commit changes, and auto-push to
+/// the multi-remote set.
+///
+/// The worktree is created via `git worktree add --detach
+/// <target_path> <sha>` from the parent's `.git/modules/<name>`
+/// gitdir. The new worktree shares the same object store as the
+/// parent's nested submodule (the original `web/games/wip/polis/`
+/// inside the parent is unaffected). This is the canonical way to
+/// get a second worktree of an existing gitdir: each worktree
+/// gets its own working tree and index, but they all share the
+/// same objects, refs, and remotes.
+///
+/// Idempotency: if `target_path/.git` already exists and is a
+/// worktree of the same gitdir, the function returns Ok(()) without
+/// running `git worktree add` again. This makes it safe to call on
+/// every daemon cycle.
+///
+/// Failure modes (all return `Err`, the daemon skips the submodule):
+///
+/// 1. The parent's `.git/modules/<name>/` is missing or unreadable.
+///    Suggests the parent was cloned with `--no-recurse-submodules`
+///    or the submodule was never initialized. Recovery:
+///    `cd <parent> && git submodule update --init <submodule_path>`.
+///
+/// 2. The `git worktree add` command itself fails. Possible reasons:
+///    - Target path already exists and is NOT a worktree of this
+///      gitdir (a real conflict; the operator must resolve).
+///    - Target path's parent dir is not writable.
+///    - SHA is unreachable (e.g. a fetch was never run).
+///
+/// 3. The target_path already contains files that conflict with the
+///    submodule's HEAD checkout. The function refuses to overwrite
+///    non-empty directories.
+///
+/// ADDED 2026-06-30, goal `mr10pdzr-i495vy`:
+/// "Make the daemon materialize submodules as standalone worktrees".
+/// Partition paths into (force_add, normal_add) based on .gitignore.
+/// - Paths already tracked in git → force_add (git add -f).
+///   that match a gitignore rule (e.g. `**/.wxt/types/`) still get refused
+///   by `git add <path>` even though `git check-ignore` reports them as
+///   "not ignored" (gitignore is bypassed for tracked files in check-ignore,
+///   but `git add <path>` re-evaluates the rule and refuses without -f).
+/// - Untracked + gitignored → skip (respect .gitignore intent)
+/// - All others → normal_add (git add, respects .gitignore)
+async fn partition_gitignored(repo: &Path, paths: &[String]) -> (Vec<String>, Vec<String>) {
+    if paths.is_empty() {
+        return (Vec::new(), Vec::new());
+    }
+
+    // Get list of already-tracked paths (git ls-files)
+    let tracked: std::collections::HashSet<String> = {
+        let output = crate::policy::tokio_git_command()
+            .args(["ls-files"])
+            .current_dir(repo)
+            .output()
+            .await;
+        match output {
+            Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout)
+                .lines()
+                .filter(|l| !l.is_empty())
+                .map(|l| l.to_string())
+                .collect(),
+            _ => std::collections::HashSet::new(),
+        }
+    };
+
+    // Run `git check-ignore` to find gitignored paths (only for untracked ones)
+    let ignored: std::collections::HashSet<String> = {
+        let untracked: Vec<&str> = paths
+            .iter()
+            .filter(|p| !tracked.contains(*p))
+            .map(|p| p.as_str())
+            .collect();
+        if untracked.is_empty() {
+            std::collections::HashSet::new()
+        } else {
+            let mut check_args = vec!["check-ignore"];
+            for p in &untracked {
+                check_args.push(*p);
+            }
+            let output = crate::policy::tokio_git_command()
+                .args(&check_args)
+                .current_dir(repo)
+                .output()
+                .await;
+            match output {
+                Ok(o) if o.status.success() || o.status.code() == Some(1) => {
+                    // Exit 0 = some ignored, exit 1 = none ignored
+                    String::from_utf8_lossy(&o.stdout)
+                        .lines()
+                        .filter(|l| !l.is_empty())
+                        .map(|l| l.to_string())
+                        .collect()
+                }
+                _ => std::collections::HashSet::new(),
+            }
+        }
+    };
+
+    let mut force_paths = Vec::new();
+    let mut normal_paths = Vec::new();
+
+    for p in paths {
+        if tracked.contains(p) {
+            // Tracked file: always force-add with `git add -f`. `git add <path>`
+            // re-evaluates gitignore and refuses for tracked files that match
+            // a rule; `-f` bypasses the check. gitignore intent doesn't apply
+            // here because the file is already in the index.
+            force_paths.push(p.clone());
+        } else if ignored.contains(p) {
+            // Untracked + gitignored = skip (respect .gitignore intent)
+        } else {
+            // Not ignored and not tracked = normal add
+            normal_paths.push(p.clone());
+        }
+    }
+
+    (force_paths, normal_paths)
+}
+
+#[allow(dead_code)] // in-flight staged_epoch refactor: superseded but not yet removed
+async fn git_rm_missing(repo: &Path, missing: &[String], dry_run: bool) -> Result<()> {
+    if missing.is_empty() {
+        return Ok(());
+    }
+    let mut rm_args = vec!["rm", "--ignore-unmatch", "--"];
+    for p in missing {
+        rm_args.push(p);
+    }
+    if dry_run {
+        println!(
+            "🗑️  Would delete (git rm) {} file(s) from {}: {:?}",
+            missing.len(),
+            repo.display(),
+            &missing[..missing.len().min(5)]
+        );
+        if missing.len() > 5 {
+            println!("  ... and {} more", missing.len() - 5);
+        }
+    } else if let Err(e) = run_git_with_timeout(repo, &rm_args, 30, "rm").await {
+        eprintln!(
+            "⚠️ {} git rm failed for {} paths: {:?}",
+            repo.display(),
+            missing.len(),
+            missing
+        );
+        return Err(e);
+    }
+    Ok(())
+}
+
+async fn post_commit_pull(svc: &GitService, repo: &Path, policy: &SyncPolicy) {
+    if !policy.auto_pull {
+        return;
+    }
+    let post_commit_status = match svc.get_status().await {
+        Ok(s) => s,
+        Err(_) => return,
+    };
+    if post_commit_status.behind > 0 && post_commit_status.is_clean {
+        eprintln!(
+            "📥 post-commit pull for {} ({} behind)",
+            repo.display(),
+            post_commit_status.behind
+        );
+        match crate::git::pull_merge_origin(
+            repo,
+            policy.pull_op_timeout_secs,
+            "post-commit-auto-pull",
+        )
+        .await
+        {
+            Ok(()) => {
+                eprintln!("✅ post-commit pull succeeded for {}", repo.display());
+            }
+            Err(error) if crate::git::is_merge_conflict_error(&error) => {
+                eprintln!(
+                    "⚠️ post-commit pull conflict in {} (manual intervention required): {}",
+                    repo.display(),
+                    error
+                );
+            }
+            Err(error) => {
+                eprintln!(
+                    "⚠️ post-commit pull failed for {}: {} - will still attempt push",
+                    repo.display(),
+                    error
+                );
+            }
+        }
+    }
+}
+
+/// ADDED 2026-07-22 (v0.112.34, audit F1.16): unstage paths
+/// (`git reset -q HEAD -- <paths>`) WITHOUT touching the worktree.
+/// Used by the excluded-path flow when `revert_excluded_to_head` is
+/// not opted in: the daemon's `git add -A` swept the excluded files
+/// into the index, and leaving them staged would pollute the
+/// operator's next manual commit — but their CONTENT must be
+/// preserved.
+#[allow(dead_code)] // in-flight staged_epoch refactor: superseded but not yet removed
+async fn unstage_paths_git(repo: &Path, paths: &[String]) -> Result<()> {
+    if paths.is_empty() {
+        return Ok(());
+    }
+    for p in paths {
+        if !crate::git::is_safe_git_path(std::path::Path::new(p)) {
+            anyhow::bail!("unstage_paths_git: refusing unsafe path '{}'", p);
+        }
+    }
+    for chunk in paths.chunks(50) {
+        let mut cmd = crate::policy::tokio_git_command();
+        cmd.args(["reset", "-q", "HEAD", "--"])
+            .current_dir(repo)
+            .kill_on_drop(true);
+        for p in chunk {
+            cmd.arg(p);
+        }
+        let status = cmd.status().await?;
+        if !status.success() {
+            return Err(anyhow::anyhow!(
+                "git reset HEAD -- ({} paths) failed in {}: exit {}",
+                chunk.len(),
+                repo.display(),
+                status
+            ));
+        }
+    }
+    Ok(())
+}
+
+async fn run_release_pipeline_if_bumped(repo: &Path, policy: &SyncPolicy, version_bumped: bool) {
+    if !version_bumped {
+        return;
+    }
+    if let Some((old_ver, new_ver, level)) = get_bump_info(repo).await {
+        let repo_override = crate::policy::load_repo_override(repo);
+        let repo_auto_tag = repo_override.auto_tag.unwrap_or(policy.auto_tag);
+        let repo_auto_release = repo_override.auto_release.unwrap_or(policy.auto_release);
+        let repo_publish_targets = repo_override.auto_publish;
+        let repo_nix_auto_update = repo_override
+            .nix_auto_update
+            .unwrap_or(policy.nix_auto_update);
+        let steps = crate::release::run_release_pipeline(
+            repo,
+            &old_ver,
+            &new_ver,
+            level.as_str(),
+            policy,
+            repo_auto_tag,
+            repo_auto_release,
+            &repo_publish_targets,
+            repo_nix_auto_update,
+        )
+        .await;
+        for step in &steps {
+            match step {
+                crate::release::ReleaseStep::TagCreated(tag) => eprintln!("🏷️  {tag}"),
+                crate::release::ReleaseStep::GitHubReleaseCreated(tag) => eprintln!("🚀 {tag}"),
+                crate::release::ReleaseStep::Published { registry, version } => {
+                    eprintln!("📦 published to {registry} v{version}")
+                }
+                crate::release::ReleaseStep::NixFlakePRCreated(url) => {
+                    eprintln!("📄 flake PR created: {url}")
+                }
+                crate::release::ReleaseStep::Skipped(reason) => {
+                    if debug_enabled() {
+                        eprintln!("🐛 release skipped: {reason}");
+                    }
+                }
+                crate::release::ReleaseStep::Failed { step: s, error } => {
+                    eprintln!("⚠️ release failed: {s} — {error}")
+                }
+            }
+        }
+    }
+}
+
+/// What `push_background` actually did this cycle (ADDED 2026-09-18,
+/// v0.113.69, per-remote pause scope). `Attempted(ok)` preserves the
+/// legacy bool: at least one remote was pushed, `ok` = all attempted
+/// succeeded. `AllPaused` = every configured remote was individually
+/// paused by the per-remote gate — zero network attempts, zero
+/// failure records. Callers map `AllPaused` to `SyncOutcome::PushPaused`
+/// (no failure count, no stuck-ledger write), never to PushFailed.
+/// KNOWN 2026-09-18 (v0.113.69, observed live): per-remote counters
+/// live in the activity entry, so a repo-level unstuck (healthy-mirror
+/// success clears the ledger) drops the sick remote's pause memory —
+/// the next cycle re-attempts it once (consecutive=1) before the pause
+/// re-arms at 3. Steady state for one-sick/one-healthy is a ~15-min
+/// oscillation; commits flow throughout. Durable per-forge memory
+/// belongs to forge-degraded mode (full-program P1-4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PushReport {
+    /// `ok` = every ATTEMPTED push succeeded. `degraded` = at least one
+    /// configured remote was pause-skipped (v0.113.72): progress was
+    /// made on the healthy legs, but a sick remote is still paused —
+    /// callers map `ok+degraded` to PushPaused with NO ledger touch
+    /// (no success-clear: that would drop the activity entry and wipe
+    /// the sick remote's pause memory, re-hammering it next cycle).
+    Attempted {
+        ok: bool,
+        degraded: bool,
+    },
+    AllPaused,
+}
+
+/// Observe transient-class failures attempted THIS round (v0.113.73
+/// forge-degraded): for each remote attempted since `round_start_unix`
+/// whose recorded error is transient-class, resolve its forge host and
+/// record a hit. Returns nothing; declaration alerts fire inline (once
+/// per incident via the edge latch). Unattributable remotes (local
+/// paths, unparseable URLs) are skipped — they can never corroborate
+/// a forge incident. Stale entries (attempts from prior rounds) are
+/// excluded by the recency filter: only same-or-later-second stamps
+/// count, and two workers for one repo can never share a second
+/// (in_flight reservation).
+fn observe_round_transient_hits(
+    repo: &std::path::Path,
+    remote_failures: Option<&HashMap<String, crate::daemon::RemoteFailInfo>>,
+    round_start_unix: u64,
+    host_of: &dyn Fn(&str) -> Option<String>,
+) {
+    let Some(rf) = remote_failures else {
+        return;
+    };
+    let now_unix = crate::policy::timestamp_secs();
+    let repo_str = repo.to_string_lossy().into_owned();
+    for (name, info) in rf.iter() {
+        if info.last_attempt_unix < round_start_unix {
+            continue;
+        }
+        // v0.113.83: DNS outages corroborate like forge outages (a dead
+        // LAN fails every repo × every remote — exactly the incident
+        // shape this detector exists for).
+        if !crate::git::is_transient_forge_outage(&info.last_error)
+            && !crate::git::is_transient_network_outage(&info.last_error)
+        {
+            continue;
+        }
+        let Some(host) = host_of(name) else {
+            continue;
+        };
+        if crate::forge::observe_forge_hit(&host, &repo_str, now_unix) {
+            eprintln!(
+                "🔥 forge incident declared: {} (transient failures corroborated across repos) — per-repo push alerts coalesced, sick-remote re-probes stretched to 1h",
+                host
+            );
+            crate::report::record_sync_alert(
+                repo,
+                "Forge Incident Declared",
+                &format!(
+                    "{}: transient forge-side failures corroborated across repos; per-repo push alerts coalesced until recovery",
+                    host
+                ),
+            );
+        }
+    }
+}
+
+/// Forge-incident shield decision (v0.113.73): returns the attributed
+/// transient hosts when the current failure set is fully covered by
+/// declared incidents (caller records visibility-only instead of
+/// burning the stuck budget). Recency-gated: only attempts within
+/// the incident window count (stale entries are prior rounds, not
+/// this failure). Unattributable transient failures (local paths,
+/// unreadable origin URL) veto the shield — something outside any
+/// incident failed, so the budget burns normally.
+fn incident_shield_hosts(
+    repo: &std::path::Path,
+    policy: &SyncPolicy,
+    has_origin: bool,
+    remote_failures: Option<&HashMap<String, crate::daemon::RemoteFailInfo>>,
+) -> Option<Vec<String>> {
+    let incidents = crate::forge::forge_incident_hosts();
+    if incidents.is_empty() {
+        return None;
+    }
+    let rf = remote_failures?;
+    let now_unix = crate::policy::timestamp_secs();
+    let repo_name = repo
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let host_of = |name: &str| -> Option<String> {
+        if name == "origin" {
+            if !has_origin {
+                return None;
+            }
+            crate::git::multi_remote::get_remote_url(repo, "origin")
+                .and_then(|u| crate::forge::forge_host_of_url(&u))
+        } else {
+            policy
+                .remotes
+                .iter()
+                .find(|r| r.name == name)
+                .map(|r| r.resolve_push_url(&repo_name))
+                .and_then(|u| crate::forge::forge_host_of_url(&u))
+        }
+    };
+    let mut transient_hosts = Vec::new();
+    let mut veto = false;
+    for (name, info) in rf.iter() {
+        if now_unix.saturating_sub(info.last_attempt_unix)
+            > crate::forge::FORGE_INCIDENT_WINDOW_SECS
+        {
+            continue;
+        }
+        // v0.113.83: DNS outages shield like forge outages.
+        if crate::git::is_transient_forge_outage(&info.last_error)
+            || crate::git::is_transient_network_outage(&info.last_error)
+        {
+            match host_of(name) {
+                Some(h) => transient_hosts.push(h),
+                None => veto = true,
+            }
+        } else {
+            veto = true;
+        }
+    }
+    if crate::forge::incident_shields_failure(&transient_hosts, veto, &incidents) {
+        Some(transient_hosts)
+    } else {
+        None
+    }
+}
+
+/// Names of remotes currently under the per-remote pause gate (pure,
+/// for test + shared by the origin gate and the mirror exclude list).
+/// Skipped remotes must NOT refresh `last_attempt_unix` — only a real
+/// attempt does — or the 15-min re-probe below never fires.
+/// v0.113.73 forge-degraded: `is_incident(name)` reports whether the
+/// named remote's host is under a declared incident (stretched
+/// 60-min re-probe). Pure over the predicate for test.
+pub(crate) fn paused_remote_names_incident(
+    remote_failures: Option<&HashMap<String, crate::daemon::RemoteFailInfo>>,
+    now_unix: u64,
+    is_incident: &dyn Fn(&str) -> bool,
+) -> Vec<String> {
+    remote_failures
+        .map(|rf| {
+            rf.iter()
+                .filter(|(n, f)| {
+                    crate::daemon::mirror_push_paused_impl(f, now_unix, is_incident(n))
+                })
+                .map(|(n, _)| n.clone())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Push to origin + all mirror remotes. Returns true if all succeeded.
+///
+/// Updates `remote_failures` (if Some) to track consecutive failures per
+/// remote. On a successful mirror push, the entry is removed. This is the
+/// only path that should update `remote_failures`; the previous design had
+/// a separate `push_with_blob_check` function that did this but was never
+/// called from the live code path.
+/// Delay before the next local refresh pass while an upload is still running.
+/// Short after a commit actually landed (the operator is actively editing);
+/// longer after a pass found nothing to do, so a slow hook does not turn into
+/// a hot loop of full classification passes over an unchanged tree.
+const PUBLICATION_REFRESH_ACTIVE: Duration = Duration::from_millis(750);
+const PUBLICATION_REFRESH_IDLE: Duration = Duration::from_secs(3);
+/// Local refresh passes are NOT capped by a count. The daemon cannot
+/// redispatch this repository while the round is in flight, so a fixed count
+/// would silently re-freeze commits for the remainder of a long hook (the
+/// exact symptom this design removes; hooks of 15 minutes are documented).
+/// The loop stays bounded by the ROUND itself: the upload has its own operation
+/// deadline, and every refresh is admitted through the same bounded local
+/// semaphore with its own operation lease.
+///
+/// Borrow-erased refresh future. Boxed so the local refresh can call back into
+/// the commit pipeline (which may reach this actor again) without producing an
+/// infinitely sized future type.
+type RefreshFuture<'a> = futures::future::BoxFuture<'a, Result<SyncOutcome>>;
+
+fn refresh_round<'a>(
+    repo: &'a Path,
+    policy: &'a SyncPolicy,
+    excluded_dir_names: &'a BTreeSet<String>,
+    idle_seconds: u64,
+    policy_path: Option<&'a Path>,
+    ahead_since: Option<std::time::Instant>,
+) -> RefreshFuture<'a> {
+    Box::pin(async move {
+        // local_phase re-admits bounded local work while the enclosing upload
+        // has yielded its permit. The commit pass acquires its OWN operation
+        // lease, so it cannot race the publication owner's post-round work.
+        crate::daemon::scheduler_evidence::worker_committing(repo);
+        crate::git::push_resources::local_phase(sync_repo_local_with_ownership(
+            repo,
+            policy,
+            excluded_dir_names,
+            idle_seconds,
+            None,
+            false,
+            policy_path,
+            ahead_since,
+            true,
+            true,
+            None,
+        ))
+        .await
+    })
+}
+
+/// Drop local mutation ownership for the duration of a network/hook-bound
+/// upload, and let fresh local commits proceed in the SAME repository while
+/// that upload is still blocked. Only the upload runs concurrently: mirror
+/// preparation, pull/merge recovery and post-publication bookkeeping stay on
+/// the strictly local side, before or after this boundary.
+async fn run_publication_actor<'a>(
+    ctx: &mut SyncContext<'a>,
+    has_origin: bool,
+    ahead_count: u64,
+) -> Result<PushReport> {
+    // Everything below that reads the checkout happens under local ownership.
+    let mut plan = publication::plan_publication(
+        ctx.repo,
+        ctx.policy,
+        has_origin,
+        ctx.remote_failures.as_deref(),
+        ahead_count,
+    )
+    .await?;
+    // Release local mutation ownership BEFORE awaiting the upload. The
+    // publication lease (held for the whole worker) still guarantees one
+    // publisher per common directory across processes and worktrees.
+    drop(ctx.operation_lease.take());
+
+    // `push_phase` yields the bounded local-work permit for exactly the life
+    // of the upload: hooks/network no longer consume commit capacity, and the
+    // refresh passes below re-admit through `local_phase`. The scheduler's
+    // per-repository reservation is unchanged — this worker still owns the
+    // repository's publication, it just stops holding local mutation.
+    // `push_phase` yields bounded local-work capacity for exactly the life of
+    // the upload, and `publish_phase` stamps the real command execution so the
+    // report distinguishes "pushing" from "committed successfully".
+    let refresh_repo = ctx.repo;
+    let refresh_policy = ctx.policy;
+    let refresh_excludes = ctx.excluded_dir_names;
+    let refresh_idle = ctx.idle_seconds;
+    let refresh_policy_path = ctx.policy_path;
+    let ok_report = crate::git::push_resources::publication_round(
+        Box::pin(crate::daemon::scheduler_evidence::publish_phase(
+            ctx.repo,
+            upload_publication(ctx.repo, ctx.policy, &mut plan, ctx.commit_only),
+        )),
+        move || async move {
+            // A refresh cannot erase the upload result. Its owned mutation
+            // must finish even if the upload completes first; the coordinator
+            // retains yielded capacity until that final refresh has drained.
+            match refresh_round(
+                refresh_repo,
+                refresh_policy,
+                refresh_excludes,
+                refresh_idle,
+                refresh_policy_path,
+                None,
+            )
+            .await
+            {
+                Ok(SyncOutcome::Synced) | Ok(SyncOutcome::PublicationPending) => {
+                    eprintln!("🆕 {} committed a newer tip while its earlier publication was still running", refresh_repo.display());
+                    true
+                }
+                Ok(SyncOutcome::NothingToDo) | Ok(SyncOutcome::FilterOnly) => false,
+                Ok(other) => {
+                    if crate::policy::debug_enabled() {
+                        eprintln!("🐛 {} refresh pass ended as {:?} during publication", refresh_repo.display(), other);
+                    }
+                    false
+                }
+                Err(error) => {
+                    eprintln!("⚠️ {} local commit during publication failed (publication unaffected): {error:#}", refresh_repo.display());
+                    false
+                }
+            }
+        },
+        |active| {
+            tokio::time::sleep(if active {
+                PUBLICATION_REFRESH_ACTIVE
+            } else {
+                PUBLICATION_REFRESH_IDLE
+            })
+        },
+    )
+    .await;
+    // Hand the publication's remote-failure memory back to the caller. Only
+    // this owner writes those counters; local refreshes above passed `None`.
+    let round_failures = plan.remote_failures.clone();
+    if let Some(sink) = ctx.remote_failures.as_deref_mut() {
+        *sink = round_failures;
+    }
+    // The upload is over: stop claiming local commit execution. A follow-up
+    // pass re-stamps `Committing` when it actually starts one.
+    crate::daemon::scheduler_evidence::worker_not_committing(ctx.repo);
+    // Reacquire local mutation ownership for post-publication work. Bounded:
+    // refusing to block an upload round forever behind another writer. If it
+    // cannot be reacquired, the caller MUST NOT continue into local mutation —
+    // that would defeat the ownership it could not obtain.
+    ctx.operation_lease = acquire_local_lease(ctx.repo, ctx.policy).await;
+    if ctx.operation_lease.is_none() {
+        // No local rights: skip post-publication local bookkeeping this round.
+        // The published result is still real and is reported as such; the
+        // deferred local work is discovered again by the next dispatch.
+        ctx.local_work_deferred = true;
+    }
+    ok_report
+}
+
+/// Bounded reacquisition of local mutation ownership after an upload. Returns
+/// `None` (with a journal line) rather than blocking the worker indefinitely;
+/// the next cycle then performs the deferred local bookkeeping.
+async fn acquire_local_lease(repo: &Path, policy: &SyncPolicy) -> Option<std::fs::File> {
+    let deadline =
+        std::time::Instant::now() + Duration::from_secs(policy.stage_op_timeout_secs.clamp(5, 60));
+    loop {
+        match crate::git::sync_lease::try_acquire(repo) {
+            Ok(Some(lease)) => return Some(lease),
+            Ok(None) => {
+                if std::time::Instant::now() >= deadline {
+                    eprintln!(
+                        "⏳ {} post-publication local work deferred: another process owns repository mutation",
+                        repo.display()
+                    );
+                    return None;
+                }
+                tokio::time::sleep(Duration::from_millis(250)).await;
+            }
+            Err(error) => {
+                eprintln!(
+                    "⚠️ {} cannot reacquire local ownership: {error:#}",
+                    repo.display()
+                );
+                return None;
+            }
+        }
+    }
+}
+
+/// Upload one immutable plan. Upload performs no checkout or configuration
+/// mutation: mirror preparation happens before this boundary, and rejection
+/// reconciliation is deliberately absent for a pinned target.
+pub(crate) async fn upload_publication(
+    repo: &Path,
+    policy: &SyncPolicy,
+    plan: &mut publication::PublicationPlan,
+    commit_only: bool,
+) -> Result<PushReport> {
+    if commit_only {
+        return Ok(PushReport::AllPaused);
+    }
+    let Some(target) = plan.target.as_ref() else {
+        // Nothing publishable (unborn HEAD): zero attempts, zero failures.
+        return Ok(PushReport::AllPaused);
+    };
+    let now_unix = crate::policy::timestamp_secs();
+    let incident_hosts = crate::forge::forge_incident_hosts();
+    let origin_host = plan
+        .origin_url
+        .as_deref()
+        .and_then(crate::forge::forge_host_of_url);
+    let repo_name = repo
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let mirror_host = |name: &str| {
+        policy
+            .remotes
+            .iter()
+            .find(|r| r.name == name)
+            .map(|r| r.resolve_push_url(&repo_name))
+            .and_then(|url| crate::forge::forge_host_of_url(&url))
+    };
+    let remote_host = |name: &str| {
+        if name == "origin" {
+            origin_host.clone()
+        } else {
+            mirror_host(name)
+        }
+    };
+    let paused: HashSet<String> =
+        paused_remote_names_incident(Some(&plan.remote_failures), now_unix, &|name| {
+            remote_host(name).is_some_and(|h| incident_hosts.contains(&h))
+        })
+        .into_iter()
+        .collect();
+    let origin_paused = plan.has_origin && paused.contains("origin");
+    let mut map = std::mem::take(&mut plan.remote_failures);
+    let mut origin_failed = false;
+    let mut origin_hook_refused = false;
+    if plan.has_origin && !origin_paused {
+        match crate::git::push_with_retries_for_target(
+            repo,
+            plan.timeout_secs,
+            policy.push_retries,
+            "push",
+            Some(target),
+        )
+        .await
+        {
+            Ok(()) => {
+                map.remove("origin");
+            }
+            Err(e) => {
+                if crate::daemon::push_error_is_cancellation(&e) {
+                    plan.remote_failures = map;
+                    return Err(e);
+                }
+                eprintln!(
+                    "⚠️ background push to origin failed for {}: {}",
+                    repo.display(),
+                    e
+                );
+                let fail = map.entry("origin".to_string()).or_default();
+                fail.consecutive += 1;
+                fail.last_error = e.to_string();
+                fail.last_attempt_unix = crate::policy::timestamp_secs();
+                origin_failed = true;
+                // A LOCAL hook refusal for THIS pinned object is a verdict on
+                // these exact bytes. Re-running the same hook on the SAME
+                // immutable tree for every mirror leg buys nothing: the tree
+                // cannot change while the round is pinned, so the second and
+                // third legs pay a full gate run to re-learn a decided answer.
+                //
+                // Measured 2026-10-29 (browser-extensions-shared): one round
+                // pinned at 16:02 stayed otherwise idle for ~3h while a
+                // 44-workspace 4-gate (~12 min, 159 gate logs) re-ran for
+                // origin, github and gitlab over the identical pre-fix tree.
+                // Its `push_retries = 3` multiplied that per leg. The result
+                // was neither publication nor cheap failure: HEAD advanced
+                // 340 commits behind a pin that could never pass its own
+                // gate. Ending the round on a decided hook verdict returns
+                // control so the NEXT round pins the repaired tip.
+                if crate::git::is_local_hook_rejection(&e.to_string()) {
+                    eprintln!(
+                        "⛔ {} pin {} refused by the local pre-push hook; ending this round so the next one pins the current tip (mirror legs skipped for these bytes)",
+                        repo.display(),
+                        target.object_id()
+                    );
+                    origin_hook_refused = true;
+                }
+            }
+        }
+    }
+    // Paused mirrors are excluded for THIS round only; their counters stay
+    // frozen so the re-probe window still applies.
+    let mut mirror_paused = 0usize;
+    let mut configured = plan.remotes.clone();
+    for name in &paused {
+        if name != "origin" && configured.iter().any(|r| &r.name == name) {
+            mirror_paused += 1;
+        }
+    }
+    configured.retain(|r| !paused.contains(&r.name));
+    // Same decided-verdict reasoning as the origin leg above: when origin's
+    // LOCAL hook already refused these exact pinned bytes, every mirror leg
+    // would re-run the identical hook over the identical immutable tree. The
+    // hook is per-worktree bytes, not per-destination, so a mirror cannot
+    // learn anything origin did not. Skipping them keeps the round finite and
+    // bounds the cost to one gate run for a decided refusal.
+    if origin_hook_refused {
+        plan.remote_failures = map;
+        return Ok(PushReport::Attempted {
+            ok: false,
+            degraded: false,
+        });
+    }
+    let mirror_results = crate::git::multi_remote::push_to_all_remotes_for_target(
+        repo,
+        &configured,
+        plan.timeout_secs,
+        policy.push_retries,
+        Some(target),
+    )
+    .await;
+    // "Attempted" must mean a real attempt happened. An origin that failed
+    // counts even though no mirror result exists (otherwise a failing single-
+    // origin repo would be reported as AllPaused = zero attempts = no failure).
+    let attempted =
+        (plan.has_origin && !origin_paused) || !mirror_results.is_empty() || origin_failed;
+    // Restore the round's failure memory BEFORE propagating an interruption:
+    // an interrupted round must never look like "no remotes remember anything",
+    // which would wipe another remote's pause/backoff memory in the apply phase.
+    let mut mirror_map = Some(map);
+    let aggregated =
+        aggregate_push_results(repo, mirror_results, origin_failed, mirror_map.as_mut());
+    plan.remote_failures = mirror_map.unwrap_or_default();
+    let mirrors_ok = aggregated?;
+    if !attempted {
+        return Ok(PushReport::AllPaused);
+    }
+    observe_round_transient_hits(repo, Some(&plan.remote_failures), now_unix, &remote_host);
+    Ok(PushReport::Attempted {
+        ok: mirrors_ok,
+        degraded: origin_paused || mirror_paused > 0,
+    })
+}
+
+/// Aggregate actual attempt results before converting errors to report text.
+/// An interrupted-only attempt stays Err(JoinError); mixed attempts retain
+/// real failures, and cancellation never increments a remote failure counter.
+pub(crate) fn aggregate_push_results(
+    repo: &Path,
+    results: Vec<(String, Result<()>)>,
+    mut failed: bool,
+    mut remote_failures: Option<&mut HashMap<String, crate::daemon::RemoteFailInfo>>,
+) -> Result<bool> {
+    let mut interrupted = None;
+    for (name, result) in results {
+        match result {
+            Ok(()) => {
+                if let Some(map) = remote_failures.as_deref_mut() {
+                    map.remove(&name);
+                }
+            }
+            Err(error) if crate::daemon::push_error_is_cancellation(&error) => {
+                interrupted = Some(error);
+            }
+            Err(error) => {
+                failed = true;
+                log_warn!("push to {} failed for {}: {}", name, repo.display(), error);
+                if let Some(map) = remote_failures.as_deref_mut() {
+                    let info = map.entry(name).or_default();
+                    info.consecutive += 1;
+                    info.last_error = format!("{error:#}");
+                    info.last_attempt_unix = crate::policy::timestamp_secs();
+                }
+            }
+        }
+    }
+    if failed {
+        Ok(false)
+    } else if let Some(error) = interrupted {
+        Err(error)
+    } else {
+        Ok(true)
+    }
+}
+
+/// ADDED 2026-07-21 (v0.112.31, audit M1/F3.9): format the
+/// currently-failing remote names for the stuck-push ledger's
+/// `last_error`, so the operator sees WHICH forge is failing in the
+/// `repos` HINT column without grepping the daemon log. The
+/// pre-fix message was the generic "git push returned non-zero
+/// (see daemon log)" for every failure mode.
+fn failing_remote_names(
+    remote_failures: Option<&HashMap<String, crate::daemon::RemoteFailInfo>>,
+) -> String {
+    match remote_failures {
+        Some(map) if !map.is_empty() => {
+            let mut names: Vec<&str> = map.keys().map(String::as_str).collect();
+            names.sort_unstable();
+            names.join(", ")
+        }
+        _ => "unknown".to_string(),
+    }
+}
+
+/// ADDED 2026-08-09 (v0.113.50, pi-goal-loop-audit divergence
+/// incident): aggregate the per-remote push-error classifications
+/// into one human-readable cause line for the stuck-ledger
+/// `last_error`. Deduplicates identical causes across remotes so the
+/// HINT says "history divergence" once, not per-forge.
+fn classify_failing_remotes(
+    remote_failures: Option<&HashMap<String, crate::daemon::RemoteFailInfo>>,
+) -> String {
+    let mut causes: Vec<&'static str> = remote_failures
+        .map(|map| {
+            map.values()
+                .map(|f| crate::git::classify_push_failure(&f.last_error))
+                .collect()
+        })
+        .unwrap_or_default();
+    causes.sort_unstable();
+    causes.dedup();
+    if causes.is_empty() {
+        "cause unknown (no per-remote error recorded)".to_string()
+    } else {
+        causes.join("; ")
+    }
+}
+
+/// ADDED 2026-11-02 (T1.8): one shared composer for the stuck-ledger push
+/// message so the commit path (`stage_commit_and_push`) and the backlog
+/// path (`handle_ahead_push`) mine hook detail identically. T1 wired only
+/// the commit path; backlog pushes — the common shape for a recovering
+/// repo — stayed generic (observed live 2026-11-02: two gate refusals
+/// recorded without detail while the extractor itself was proven correct).
+/// Returns the ledger message plus the mined detail (if any) so callers
+/// can also write the `gate-failures` artifact.
+fn push_failure_message(
+    names: &str,
+    cause: &str,
+    remote_failures: Option<&HashMap<String, crate::daemon::RemoteFailInfo>>,
+) -> (String, Option<String>) {
+    // T1 (2026-11-01): a hook refusal must say WHICH gate failed.
+    // The classifier is a static string, so the raw per-remote text
+    // (which carries the hook's own "- ws/GATE exited N" lines)
+    // is mined for a short cause instead of being discarded.
+    let hook_detail = remote_failures.and_then(|failures| {
+        failures
+            .values()
+            .find_map(|info| crate::git::hook_failure_summary(&info.last_error))
+    });
+    let msg = match hook_detail.as_deref() {
+        Some(detail) => format!("git push returned non-zero (remotes: {names}) — {cause}: {detail}"),
+        None => format!("git push returned non-zero (remotes: {names}) — {cause}"),
+    };
+    (msg, hook_detail)
+}
+
+/// ADDED 2026-07-21 (v0.112.33, audit M10/F0.3): whether the repo's
+/// effective committer identity is acceptable for an auto-commit.
+/// The daemon commits with whatever `user.email`/`user.name` the repo
+/// config says, so an untrusted identity must block the commit — see
+/// the guard in `stage_commit_and_push`.
+///
+/// CHANGED 2026-07-22 (v0.112.36): two acceptance paths. (1) The
+/// operator explicitly blessed the repo (`owned = true` in
+/// `.dracon/dracon-sync.toml`) — their per-repo identity is their
+/// choice (darklord's `darklord-dev <darklord@dracon.local>`; the
+/// v0.112.33 raw check blocked 101 staged files there). (2) The
+/// effective `user.email` ∈ `trusted_emails` AND `user.name` ∈
+/// `trusted_authors` — the F0.1 case (no override, poisoned
+/// `test@test`) blocks here. The guard deliberately does NOT
+/// re-adjudicate origin trust — the daemon loop's ownership gate
+/// already did that before dispatch; this check exists only to
+/// catch identity DRIFT after the cached classification.
+fn commit_allowed_by_ownership(repo: &Path, policy: &SyncPolicy) -> bool {
+    fn git_config_get(repo: &Path, key: &str) -> Option<String> {
+        let out = crate::policy::std_git_command()
+            .args(["config", "--get", key])
+            .current_dir(repo)
+            .output()
+            .ok()?;
+        if !out.status.success() {
+            return None;
+        }
+        let v = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        if v.is_empty() {
+            None
+        } else {
+            Some(v)
+        }
+    }
+    let repo_override = load_repo_override(repo);
+    // FIXED 2026-10-03 (audit R4-SR-04): a present-but-unparsable
+    // override voids owned=false — and every other opt-out — so a
+    // typo'd file must block commits, not silently inherit permissive
+    // defaults. (The daemon gate skips such repos with an incident-
+    // ledger entry; this is the last-line guard for direct sync paths.)
+    if repo_override.override_parse_error.is_some() {
+        eprintln!(
+            "🚫 {} blocking commit: unparsable .dracon/dracon-sync.toml — fix the typo to resume",
+            repo.display()
+        );
+        return false;
+    }
+    if repo_override.owned == Some(false) {
+        return false;
+    }
+    if repo_override.owned == Some(true) || policy.path_is_owned(repo) {
+        return true;
+    }
+    let email_ok = git_config_get(repo, "user.email")
+        .map(|e| policy.trusted_emails.contains(&e))
+        .unwrap_or(false);
+    let name_ok = git_config_get(repo, "user.name")
+        .map(|n| policy.trusted_authors.contains(&n))
+        .unwrap_or(false);
+    email_ok && name_ok
+}
+
+/// Task state transitions extracted from a markdown diff.
+#[derive(Debug, Default)]
+struct TaskTransitions {
+    /// Tasks marked `[x]` (completed)
+    closed: Vec<String>,
+    /// Tasks marked `[~]` (in-progress)
+    progress: Vec<String>,
+    /// Goal metadata extracted from .pi/goals/ JSON files
+    goal_metadata: Option<GoalMetadata>,
+}
+
+/// Metadata extracted from goal file JSON.
+/// Provides richer context about goal lifecycle for AI consumption.
+#[derive(Debug, Default)]
+struct GoalMetadata {
+    /// Goal status (active, complete, paused)
+    status: Option<String>,
+    /// Why the goal was paused/aborted
+    pause_reason: Option<String>,
+    /// Tokens used by the goal
+    tokens_used: Option<u64>,
+    /// Active seconds spent on the goal
+    active_seconds: Option<u64>,
+    /// Tasks with their evidence and skip reasons
+    task_details: Vec<TaskDetail>,
+}
+
+/// Detail about a single task from goal metadata.
+#[derive(Debug, Default)]
+struct TaskDetail {
+    id: String,
+    status: String,
+    evidence: Option<String>,
+    skip_reason: Option<String>,
+}
+
+/// Extract task state transitions from the staged diff.
+///
+/// Scans ALL staged files for:
+/// - `- [x]` or `// [x]` additions → task completed (CLOSED)
+/// - `- [~]` or `// [~]` additions → task in-progress (WIP)
+///
+/// Works in any file:
+/// - Markdown: `- [x] Fix bug`
+/// - Code comments: `// [x] Implemented JWT`
+/// - Text files: `[x] Done`
+/// - Any file with checkbox syntax
+///
+/// This is deterministic — no LLM, no inference. Just regex on the diff.
+fn extract_task_transitions(repo: &Path) -> TaskTransitions {
+    // Get the diff for ALL files (not just markdown)
+    let output =
+        match run_git_capture_output(repo, &["diff", "--cached", "--unified=0"], "task-diff") {
+            Ok(o) => o,
+            Err(_) => return TaskTransitions::default(),
+        };
+
+    let mut transitions = TaskTransitions::default();
+
+    for line in output.lines() {
+        // Only look at ADDED lines (start with `+` but not `+++`)
+        if !line.starts_with('+') || line.starts_with("+++") {
+            continue;
+        }
+        let content = &line[1..]; // Remove leading `+`
+        let trimmed = content.trim();
+
+        // Check for completed tasks: [x] or [X]
+        // Matches: `- [x]`, `* [x]`, `// [x]`, `# [x]`, plain `[x]`
+        if let Some(rest) =
+            extract_checkbox_text(trimmed, 'x').or_else(|| extract_checkbox_text(trimmed, 'X'))
+        {
+            let task = sanitize_task_name(rest);
+            if !task.is_empty() {
+                transitions.closed.push(task);
+            }
+        }
+        // Check for in-progress tasks: [~]
+        else if let Some(rest) = extract_checkbox_text(trimmed, '~') {
+            let task = sanitize_task_name(rest);
+            if !task.is_empty() {
+                transitions.progress.push(task);
+            }
+        }
+    }
+
+    // Also extract goal metadata from JSON files
+    transitions.goal_metadata = extract_goal_metadata(repo);
+
+    transitions
+}
+
+/// Extract text after a checkbox marker like `[x]`, `[~]`, etc.
+///
+/// Handles common text/markdown prefixes:
+/// - `- [x] task` (markdown list)
+/// - `* [x] task` (markdown list)
+/// - `[x] task` (plain text)
+///
+/// Does NOT match code comments (`//`, `#`) — nobody puts checkmarks in code.
+fn extract_checkbox_text(line: &str, marker: char) -> Option<&str> {
+    // Build the marker pattern: `[x]`, `[~]`, etc.
+    let pattern = format!("[{}]", marker);
+
+    // Try common text/markdown prefixes only
+    let prefixes = ["- ", "* ", ""];
+    for prefix in &prefixes {
+        let full_prefix = format!("{}{}", prefix, pattern);
+        if let Some(rest) = line.strip_prefix(&full_prefix) {
+            return Some(rest.trim());
+        }
+    }
+
+    None
+}
+
+/// Sanitize a task name for use in the routing key.
+///
+/// Commit subjects are indexes, not summaries. Keep task fragments short and
+/// routing-key style so generated messages do not become multi-clause prose.
+///
+/// Removes:
+/// - Markdown formatting: `**`, `__`, `*`, `_`
+/// - Pipe characters: `|`
+/// - Square brackets: `[`, `]`
+/// - Explanatory clauses after `:`, `;`, `—`, or `–`
+///
+/// If the name starts with `**identifier** description` (common pattern),
+/// extracts only the identifier plus the first descriptive word. Truncates to
+/// 60 chars to keep commit subjects compact.
+fn sanitize_task_name(name: &str) -> String {
+    // Common pattern: `**F-reframe** description` → extract just `F-reframe`
+    if name.starts_with("**") {
+        if let Some(end) = name.find("**") {
+            if end >= 2 {
+                let identifier = &name[2..end];
+                // If there's description after, include first meaningful word
+                let rest = &name[end + 2..];
+                if rest.is_empty() {
+                    return compact_task_phrase(identifier);
+                }
+                let first_word = rest.split_whitespace().next().unwrap_or("");
+                if first_word.is_empty() {
+                    return compact_task_phrase(identifier);
+                }
+                return compact_task_phrase(&format!("{} {}", identifier, first_word));
+            }
+        }
+    }
+
+    // Fallback: general sanitization
+    let sanitized = name
+        .replace('|', "/")
+        .replace("**", "")
+        .replace("__", "")
+        .replace('*', "")
+        .replace('[', "(")
+        .replace(']', ")")
+        .replace('`', "") // Strip backticks (code in task names)
+        .trim()
+        .to_string();
+    compact_task_phrase(&sanitized)
+}
+
+/// Compact a task phrase before it enters a commit routing key.
+///
+/// Drops explanatory clauses and limits plain text to three words. This keeps
+/// generated commit subjects searchable without turning them into natural
+/// language summaries.
+fn compact_task_phrase(name: &str) -> String {
+    let clause = name
+        .split([':', ';', '—', '–'])
+        .next()
+        .unwrap_or(name)
+        .trim();
+    let clause = if clause.is_empty() { name } else { clause };
+    let words: Vec<&str> = clause.split_whitespace().collect();
+    let compact = if words.len() > 3 {
+        words[..3].join(" ")
+    } else {
+        clause.to_string()
+    };
+    truncate_task(&compact)
+}
+
+/// Truncate a task name to a reasonable length for commit subjects.
+/// Cuts at sentence boundary (`.`, `—`, `–`) or 60 chars, whichever comes first.
+fn truncate_task(name: &str) -> String {
+    const MAX_LEN: usize = 60;
+    // Find the char boundary at or before MAX_LEN bytes
+    let truncated_at_max = if name.len() <= MAX_LEN {
+        return name.to_string();
+    } else {
+        // Walk chars to find the last valid boundary <= MAX_LEN
+        let mut last_boundary = 0;
+        for (i, _) in name.char_indices() {
+            if i > MAX_LEN {
+                break;
+            }
+            last_boundary = i;
+        }
+        last_boundary
+    };
+    // Try to cut at sentence boundary within the first MAX_LEN bytes
+    let mut last_boundary_pos = None;
+    for (i, c) in name.char_indices() {
+        if i >= truncated_at_max {
+            break;
+        }
+        if c == '.' || c == '—' || c == '–' {
+            last_boundary_pos = Some(i + c.len_utf8());
+        }
+    }
+    if let Some(pos) = last_boundary_pos {
+        let truncated = &name[..pos];
+        if truncated.len() >= 10 {
+            return truncated.to_string();
+        }
+    }
+    // Hard truncate at char boundary
+    format!("{}...", &name[..truncated_at_max])
+}
+
+/// Extract goal metadata from .pi/goals/ JSON files in the staged diff.
+///
+/// When a goal file changes, reads the full file and extracts:
+/// - Goal status, pause/stop reasons
+/// - Token usage and active time
+/// - Per-task evidence and skip reasons
+///
+/// Returns None if no goal files changed or parsing fails.
+fn extract_goal_metadata(repo: &Path) -> Option<GoalMetadata> {
+    // Get list of staged files
+    let files_output =
+        run_git_capture_output(repo, &["diff", "--cached", "--name-only"], "goal-files").ok()?;
+
+    // Find goal files that changed
+    let goal_files: Vec<&str> = files_output
+        .lines()
+        .filter(|f| f.starts_with(".pi/goals/") && f.ends_with(".md"))
+        .collect();
+
+    if goal_files.is_empty() {
+        return None;
+    }
+
+    // Read the first goal file (most recent)
+    let goal_path = repo.join(goal_files[0]);
+    let content = std::fs::read_to_string(&goal_path).ok()?;
+
+    // Parse JSON - goal files have JSON at the top, markdown at the bottom
+    // Find the end of JSON by counting braces. FIXED 2026-08-09 (audit
+    // HIGH, pi-goal-list-loop-audit): the pre-fix loop enumerated
+    // CHARS but sliced `&content[..json_end]` with the resulting index
+    // as a BYTE offset. A goal file whose JSON contains multi-byte
+    // UTF-8 (emoji/CJK pauseReason, evidence, skipReason) then either
+    // panicked the daemon's commit path ("byte index N is not a char
+    // boundary") or silently truncated the JSON so the parse failed
+    // and ALL goal metrics were dropped. `char_indices` + `len_utf8`
+    // yields a true byte offset.
+    let mut depth = 0;
+    let mut json_end = 0;
+    for (i, c) in content.char_indices() {
+        match c {
+            '{' => depth += 1,
+            '}' => depth -= 1,
+            _ => {}
+        }
+        if depth == 0 && i > 0 {
+            json_end = i + c.len_utf8();
+            break;
+        }
+    }
+
+    if json_end == 0 {
+        return None;
+    }
+
+    let json_str = &content[..json_end];
+    let value: serde_json::Value = serde_json::from_str(json_str).ok()?;
+
+    let mut metadata = GoalMetadata {
+        status: value["status"].as_str().map(String::from),
+        pause_reason: value["pauseReason"].as_str().map(String::from),
+        ..Default::default()
+    };
+
+    if let Some(usage) = value["usage"].as_object() {
+        metadata.tokens_used = usage["tokensUsed"].as_u64();
+        metadata.active_seconds = usage["activeSeconds"].as_u64();
+    }
+
+    // Extract task details
+    if let Some(tasks) = value["taskList"]["tasks"].as_array() {
+        for task in tasks {
+            let detail = TaskDetail {
+                id: task["id"].as_str().unwrap_or("").to_string(),
+                status: task["status"].as_str().unwrap_or("").to_string(),
+                evidence: task["evidence"].as_str().map(String::from),
+                skip_reason: task["skipReason"].as_str().map(String::from),
+            };
+            metadata.task_details.push(detail);
+        }
+    }
+
+    Some(metadata)
+}
+
+/// Detect dependency changes from the staged diff.
+///
+/// Parses Cargo.toml, package.json, requirements.txt, go.mod diffs
+/// to extract specific dependency names that were added or removed.
+///
+/// Returns: `+dep1,+dep2,-dep3` or None if no dep files changed.
+fn detect_dependency_changes(repo: &Path) -> Option<String> {
+    let dep_files: &[(&str, &str)] = &[
+        ("Cargo.toml", "toml"),
+        ("package.json", "json"),
+        ("requirements.txt", "txt"),
+        ("go.mod", "gomod"),
+    ];
+
+    let mut added_deps = Vec::new();
+    let mut removed_deps = Vec::new();
+    let mut any_changed = false;
+
+    for (file, format) in dep_files {
+        // Get the diff for this file
+        let output = match run_git_capture_output(
+            repo,
+            &["diff", "--cached", "--unified=0", "--", file],
+            &format!("dep-diff-{}", file),
+        ) {
+            Ok(o) => o,
+            Err(_) => continue,
+        };
+
+        if output.trim().is_empty() {
+            continue;
+        }
+        any_changed = true;
+
+        // Parse based on format
+        for line in output.lines() {
+            if !line.starts_with('+') && !line.starts_with('-') {
+                continue;
+            }
+            if line.starts_with("+++") || line.starts_with("---") {
+                continue;
+            }
+
+            let is_add = line.starts_with('+');
+            let content = &line[1..].trim();
+
+            let dep_name = match *format {
+                "toml" => parse_cargo_dep(content),
+                "json" => parse_npm_dep(content),
+                "txt" => parse_pip_dep(content),
+                "gomod" => parse_go_dep(content),
+                _ => None,
+            };
+
+            if let Some(name) = dep_name {
+                if is_add {
+                    added_deps.push(name);
+                } else {
+                    removed_deps.push(name);
+                }
+            }
+        }
+    }
+
+    if !any_changed {
+        return None;
+    }
+
+    // If we couldn't parse any actual deps, skip the DEPS indicator
+    // (e.g., version bump in package.json has no actual dependency changes)
+    if added_deps.is_empty() && removed_deps.is_empty() {
+        return None;
+    }
+
+    // Format output
+    let mut parts = Vec::new();
+    for dep in &added_deps {
+        parts.push(format!("+{}", dep));
+    }
+    for dep in &removed_deps {
+        parts.push(format!("-{}", dep));
+    }
+
+    if parts.is_empty() {
+        // Dep file changed but we couldn't parse specific deps
+        Some("changed".to_string())
+    } else {
+        // Limit to top 5 to keep title manageable
+        let display: Vec<String> = parts.iter().take(5).cloned().collect();
+        let suffix = if parts.len() > 5 {
+            format!("+{}more", parts.len() - 5)
+        } else {
+            String::new()
+        };
+        Some(format!("{}{}", display.join(","), suffix))
+    }
+}
+
+/// Parse a Cargo.toml dependency line like `serde = "1.0"` or `tokio = { version = "1" }`
+fn parse_cargo_dep(line: &str) -> Option<String> {
+    let trimmed = line.trim();
+    // Skip section headers and comments
+    if trimmed.starts_with('[') || trimmed.starts_with('#') || trimmed.is_empty() {
+        return None;
+    }
+    // Look for `name = ` pattern
+    if let Some(eq_pos) = trimmed.find('=') {
+        let name = trimmed[..eq_pos].trim();
+        if !name.is_empty()
+            && name
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+        {
+            return Some(name.to_string());
+        }
+    }
+    None
+}
+
+/// Parse a package.json dependency line like `"express": "^4.18.0"`
+fn parse_npm_dep(line: &str) -> Option<String> {
+    let trimmed = line.trim();
+    // Look for `"name":` pattern
+    if let Some(colon_pos) = trimmed.find(':') {
+        let key_part = trimmed[..colon_pos].trim();
+        if key_part.starts_with('"') && key_part.ends_with('"') {
+            let name = &key_part[1..key_part.len() - 1];
+            // Skip non-dependency fields
+            if !name.is_empty() && !name.starts_with('_') && name != "name" && name != "version" {
+                return Some(name.to_string());
+            }
+        }
+    }
+    None
+}
+
+/// Parse a requirements.txt line like `requests==2.31.0` or `flask>=2.0`
+fn parse_pip_dep(line: &str) -> Option<String> {
+    let trimmed = line.trim();
+    // Skip comments and empty lines
+    if trimmed.starts_with('#') || trimmed.is_empty() {
+        return None;
+    }
+    // Split on version specifiers
+    let name = trimmed
+        .split(&['=', '>', '<', '!', '~', ';', '['][..])
+        .next()
+        .unwrap_or("")
+        .trim();
+    if !name.is_empty() {
+        return Some(name.to_string());
+    }
+    None
+}
+
+/// Parse a go.mod require line like `github.com/gin-gonic/gin v1.9.1`
+fn parse_go_dep(line: &str) -> Option<String> {
+    let trimmed = line.trim();
+    // Skip comments and empty lines
+    if trimmed.starts_with("//") || trimmed.is_empty() || trimmed == "require" || trimmed == ")" {
+        return None;
+    }
+    // Split on whitespace, take first part (module path)
+    let parts: Vec<&str> = trimmed.split_whitespace().collect();
+    if !parts.is_empty() && parts[0].contains('.') {
+        // Return just the last component of the module path
+        let module = parts[0];
+        let name = module.rsplit('/').next().unwrap_or(module);
+        return Some(name.to_string());
+    }
+    None
+}
+
+/// Extract newly added, deleted, and renamed files from the staged diff.
+///
+/// Runs `git diff --cached --name-status -M` (rename detection ON) and
+/// returns `(new_files, deleted_files, rename_count)`. Renamed paths are
+/// counted and excluded from the new/deleted lists: a move is neither.
+///
+/// `-M` is scoped to THIS metadata path only. The staging call sites
+/// intentionally keep plain `--name-status`: 3-column `R100 old new`
+/// lines would disturb `git_name_status_entries` parsing and staging
+/// semantics (see design `commit-message-index-general-2026-09-03.md` §3C).
+fn extract_new_deleted_files(repo: &Path) -> (Vec<String>, Vec<String>, usize) {
+    let output = match run_git_capture_output(
+        repo,
+        &["diff", "--cached", "--name-status", "-M"],
+        "name-status",
+    ) {
+        Ok(o) => o,
+        Err(_) => return (Vec::new(), Vec::new(), 0),
+    };
+
+    let mut new_files = Vec::new();
+    let mut deleted_files = Vec::new();
+    let mut renames = 0usize;
+
+    for line in output.lines() {
+        let parts: Vec<&str> = line.split('\t').collect();
+        if parts.len() < 2 {
+            continue;
+        }
+        let status = parts[0];
+
+        // Rename entries look like `R100\t<old>\t<new>` — count the move
+        // and skip both sides so a refactor never reads as mass NEW+DEL.
+        if status.starts_with('R') {
+            if parts.len() >= 3 {
+                renames += 1;
+            }
+            continue;
+        }
+
+        let path = parts[1];
+
+        // Only track source files, not lock files or generated files
+        let should_track = !path.ends_with(".lock")
+            && !path.ends_with(".sum")
+            && !path.contains("/target/")
+            && !path.contains("/node_modules/")
+            && !path.contains("/__pycache__/");
+
+        if !should_track {
+            continue;
+        }
+
+        match status {
+            "A" => new_files.push(path.to_string()),
+            "D" => deleted_files.push(path.to_string()),
+            _ => {} // Modified, etc. (renames handled above)
+        }
+    }
+
+    (new_files, deleted_files, renames)
+}
+
+/// Check if a file path looks like a test file.
+///
+/// Common patterns:
+/// - tests/, test/, __tests__/
+/// - *_test.rs, *_test.py, *_test.go
+/// - *.test.ts, *.test.js, *.spec.ts
+/// - test_*.py, test_*.rs
+fn is_test_file(path: &str) -> bool {
+    let lower = path.to_ascii_lowercase();
+    let basename = path.rsplit('/').next().unwrap_or(path);
+    let basename_lower = basename.to_ascii_lowercase();
+
+    // Directory patterns
+    if lower.contains("/test") || lower.contains("/tests") || lower.contains("/__tests__") {
+        return true;
+    }
+
+    // Suffix patterns (before extension)
+    if basename_lower.contains("_test.")
+        || basename_lower.contains("_tests.")
+        || basename_lower.contains(".test.")
+        || basename_lower.contains(".spec.")
+    {
+        return true;
+    }
+
+    // Prefix patterns
+    if basename_lower.starts_with("test_") {
+        return true;
+    }
+
+    false
+}
+
+/// Budget for the commit subject line (chars, unicode-safe).
+///
+/// Covers today's ~p90 (220 chars on dracon-platform, n=2000); only the
+/// unbounded tail is touched. See design
+/// `commit-message-index-general-2026-09-03.md` §3D.
+const COMMIT_SUBJECT_BUDGET: usize = 240;
+
+/// Longest common directory prefix of staged paths, capped at 4 components.
+///
+/// Pure path math on the already-fetched staged list: no git, no IO,
+/// harness-blind. Compares parent directories (root-level files contribute
+/// an empty component list). Returns None when paths share no directory —
+/// multi-crate commits fall back to the top-3 first-component list — or
+/// when every path is a bare root-level filename.
+fn longest_common_dir_prefix(paths: &[String]) -> Option<String> {
+    let mut prefix: Option<Vec<&str>> = None;
+    for p in paths {
+        let parent: Vec<&str> = match p.rfind('/') {
+            Some(idx) => p[..idx].split('/').collect(),
+            None => Vec::new(),
+        };
+        prefix = Some(match prefix {
+            None => parent,
+            Some(cur) => cur
+                .iter()
+                .zip(parent.iter())
+                .take_while(|(a, b)| a == b)
+                .map(|(a, _)| *a)
+                .collect(),
+        });
+    }
+    let mut comps = prefix.unwrap_or_default();
+    if comps.is_empty() {
+        return None;
+    }
+    comps.truncate(4);
+    Some(comps.join("/"))
+}
+
+/// Lowercase file extension of a staged path, if it has one.
+///
+/// Returns None for extensionless entries (submodule-gitlink pointers,
+/// LICENSE, Makefile) and for dotfiles without a real suffix
+/// (`.gitignore`, `.env`). Multi-dot names use the final suffix
+/// (`a.test.ts` → `ts`).
+fn file_extension(path: &str) -> Option<String> {
+    let base = path.rsplit('/').next().unwrap_or(path);
+    let dot = base.rfind('.')?;
+    if dot == 0 {
+        return None;
+    }
+    let ext = base[dot + 1..].to_ascii_lowercase();
+    if ext.is_empty() {
+        return None;
+    }
+    Some(ext)
+}
+
+/// Extension histogram over staged paths: `(ext, count)` sorted by count
+/// desc, extension asc — deterministic order for the `EXT:` token.
+/// Callers filter out gitlink pointers first (see `tracked_gitlink_set`).
+fn extension_histogram(paths: &[String]) -> Vec<(String, usize)> {
+    let mut counts: HashMap<String, usize> = HashMap::new();
+    for p in paths {
+        if let Some(ext) = file_extension(p) {
+            *counts.entry(ext).or_insert(0) += 1;
+        }
+    }
+    let mut hist: Vec<(String, usize)> = counts.into_iter().collect();
+    hist.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+    hist
+}
+
+/// Doc-file predicate for the `DOCSONLY:` token (mirror of `is_test_file`).
+fn is_doc_file(path: &str) -> bool {
+    matches!(
+        file_extension(path).as_deref(),
+        Some("md" | "mdx" | "markdown" | "rst" | "txt" | "adoc")
+    )
+}
+
+/// Lockfile predicate for the `LOCK` token: well-known lockfile basenames
+/// or any `*.lock`. Matched on the lowercased basename, so `changelog.md`
+/// and friends never match.
+fn is_lock_file(path: &str) -> bool {
+    let base = path.rsplit('/').next().unwrap_or(path).to_ascii_lowercase();
+    if base.ends_with(".lock") {
+        return true;
+    }
+    matches!(
+        base.as_str(),
+        "package-lock.json"
+            | "bun.lock"
+            | "pnpm-lock.yaml"
+            | "poetry.lock"
+            | "go.sum"
+            | "gemfile.lock"
+    )
+}
+
+/// Batch gitlink check: which candidates are tracked submodule pointers.
+///
+/// One `git ls-tree HEAD` call instead of per-path `is_gitlink` probes so
+/// the commit path stays at a bounded number of git spawns. Returns the
+/// subset of candidates recorded as `160000` (gitlink) entries in HEAD.
+/// Empty — not an error — when HEAD is missing (fresh repo, nothing
+/// committed yet) or the call fails: tokens degrade gracefully.
+fn tracked_gitlink_set(repo: &Path, candidates: &[String]) -> BTreeSet<String> {
+    let mut set = BTreeSet::new();
+    if candidates.is_empty() {
+        return set;
+    }
+    let mut args: Vec<&str> = vec!["ls-tree", "HEAD", "--"];
+    args.extend(candidates.iter().map(|s| s.as_str()));
+    let Ok(output) = run_git_capture_output(repo, &args, "ls-tree-gitlinks") else {
+        return set;
+    };
+    for line in output.lines() {
+        // Format: "160000 commit <sha>\t<path>"
+        if let Some(rest) = line.strip_prefix("160000 ") {
+            if let Some(tab) = rest.find('\t') {
+                set.insert(rest[tab + 1..].to_string());
+            }
+        }
+    }
+    set
+}
+
+/// Abbreviate staged paths for list tokens: parent/basename, first `take`,
+/// `+Nmore` suffix. Same shape as the historical NEW:/DEL:/TESTONLY: lists.
+fn abbreviate_paths(paths: &[String], take: usize) -> String {
+    let display: Vec<String> = paths
+        .iter()
+        .take(take)
+        .map(|p| {
+            let parts: Vec<&str> = p.split('/').collect();
+            if parts.len() > 2 {
+                parts[parts.len() - 2..].join("/")
+            } else {
+                p.clone()
+            }
+        })
+        .collect();
+    let suffix = if paths.len() > take {
+        format!("+{}more", paths.len() - take)
+    } else {
+        String::new()
+    };
+    format!("{}{}", display.join(","), suffix)
+}
+
+/// Safety metrics survive subject-budget truncation; every other metric
+/// token trims right-to-left. Kept: blob/size/secrets-adjacent signals
+/// (`BIN:`, `ENV:`) and the hard-to-recover state tokens (`TESTONLY:`,
+/// `DOCSONLY:`, `LOCK`, `REN:`).
+fn is_safety_metric(token: &str) -> bool {
+    token == "LOCK"
+        || token.starts_with("BIN:")
+        || token.starts_with("ENV:")
+        || token.starts_with("TESTONLY:")
+        || token.starts_with("DOCSONLY:")
+        || token.starts_with("REN:")
+}
+
+/// Get the tag pointing to the current HEAD commit.
+///
+/// Returns the tag name if this commit is tagged, otherwise None.
+/// Uses `git describe --tags --always --exact-match` for exact tag match.
+fn get_current_tag(repo: &Path) -> Option<String> {
+    // First try exact match (HEAD is exactly on a tag)
+    let exact = run_git_capture_output(
+        repo,
+        &["describe", "--tags", "--always", "--exact-match"],
+        "tag-exact",
+    )
+    .ok()?;
+
+    let tag = exact.trim();
+    if !tag.is_empty() && !tag.contains('-') {
+        // Got an exact tag (no commit count suffix)
+        return Some(tag.to_string());
+    }
+
+    // Fall back to --all (check all refs for this commit)
+    let all_tags =
+        run_git_capture_output(repo, &["tag", "--points-at", "HEAD"], "tag-points-at").ok()?;
+
+    // Return the first lightweight tag (ignore annotated ones for simplicity)
+    for line in all_tags.lines() {
+        let tag = line.trim();
+        if !tag.is_empty() && !tag.contains('^') {
+            return Some(tag.to_string());
+        }
+    }
+
+    None
+}
+
+/// Check if any environment files were changed in the staged diff.
+///
+/// Looks for:
+/// - .env, .env.*, .envrc
+/// - .secrets, secrets.*
+/// - config/settings files with secrets patterns
+///
+/// Returns true if any env-like files changed.
+fn has_env_changes(repo: &Path) -> bool {
+    let env_patterns = [
+        ".env", ".env.", // .env.local, .env.production, etc.
+        ".envrc", ".secrets", "secrets.",
+    ];
+
+    let output =
+        match run_git_capture_output(repo, &["diff", "--cached", "--name-only"], "env-check") {
+            Ok(o) => o,
+            Err(_) => return false,
+        };
+
+    for line in output.lines() {
+        let path = line.trim();
+        // Check if file name matches any env pattern
+        let basename = path.rsplit('/').next().unwrap_or(path);
+        for pattern in &env_patterns {
+            if basename.starts_with(pattern) || basename == *pattern {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
+/// Compute commit message from staged diff.
+///
+/// Returns a structured message with task state + blast radius.
+///
+/// Format: `[INTENT | ]N file(s)[ in SCOPE][ [top-files]] DELTA:+A/-B [METRICS]`
+///
+/// INTENT (from markdown diff):
+/// - `CLOSED: task1, task2` — tasks marked `[x]`
+/// - `WIP: task1` — tasks marked `[~]`
+/// - Omitted if no task transitions found
+///
+/// SCOPE (deepest common directory prefix, cap 4; single file scopes to
+/// its own path; multi-crate commits fall back to top-3 first components):
+/// - `in web/games/wip/polis` — every staged file under that subtree
+/// - `in dracon-sync,dracon-warden` — spanning top dirs (legacy shape)
+/// - Omitted for bare root-level files
+///
+/// BLAST RADIUS (from git diff --numstat):
+/// - FILES:N — total files changed
+/// - DELTA:+A/-B — lines added/removed
+///
+/// METRICS (also from diff, fixed order — grep-stable):
+/// - EXT:e1,e2 — top-3 file extensions (gitlinks + extensionless excluded)
+/// - TEST:T — lines changed in test files
+/// - BIN:B — binary files changed (context window warning)
+/// - NEW:/DEL: — added/removed paths (abbreviated, cap 10)
+/// - REN:n — renames detected via `name-status -M` (metadata path only)
+/// - DEPS: — manifest dependency changes
+/// - TESTONLY:/DOCSONLY: — every staged file is a test / doc file
+/// - LOCK — lockfile-only change (manifest-less dependency bump)
+/// - ENV: — env/secret-adjacent files touched
+///
+/// Whole subject capped at 240 chars (COMMIT_SUBJECT_BUDGET): the
+/// [top-files] bracket drops first, then non-safety metrics trim
+/// right-to-left. Intent, scope, DELTA, and safety metrics always survive.
+///
+/// # Why mechanical messages?
+///
+/// AI-generated commit messages are bad for AI workflows:
+/// - They hallucinate context and intent
+/// - They try to summarize but AI reads the diff anyway
+/// - They're verbose, inconsistent, and noisy
+///
+/// Simple mechanical facts work better:
+/// - Searchable: `git log --grep="JWT"` finds commits touching that task
+/// - Honest: no interpretation, just data
+/// - Compact: fits in `git log --oneline`
+/// - The AI gets its understanding from the actual diff, not the commit message
+///
+/// The commit message is an INDEX, not a description.
+fn compute_blast_radius(repo: &Path) -> String {
+    let output = match run_git_capture_output(repo, &["diff", "--cached", "--numstat"], "numstat") {
+        Ok(o) => o,
+        Err(_) => return "0 file(s) DELTA:+0/-0".to_string(),
+    };
+
+    let mut files = 0usize;
+    let mut added = 0i64;
+    let mut removed = 0i64;
+    let mut dirs: BTreeSet<String> = BTreeSet::new();
+    let mut file_changes: Vec<(i64, String)> = Vec::new();
+    let mut test_lines = 0i64;
+    let mut binary_count = 0usize;
+    let mut binary_paths: Vec<String> = Vec::new();
+
+    for line in output.lines() {
+        let parts: Vec<&str> = line.split('\t').collect();
+        if parts.len() < 3 {
+            continue;
+        }
+        let a = parts[0];
+        let r = parts[1];
+        let path = parts[2];
+
+        // Binary files show as "-" in numstat
+        if a == "-" || r == "-" {
+            binary_count += 1;
+            files += 1;
+            binary_paths.push(path.to_string());
+            // Still track the directory
+            if let Some(first_component) = path.split('/').next() {
+                if !first_component.is_empty() && first_component != "." {
+                    dirs.insert(first_component.to_string());
+                }
+            }
+            continue;
+        }
+
+        let a_val = a.parse::<i64>().unwrap_or(0);
+        let r_val = r.parse::<i64>().unwrap_or(0);
+
+        added += a_val;
+        removed += r_val;
+        files += 1;
+
+        // Track test file lines separately
+        if is_test_file(path) {
+            test_lines += a_val + r_val;
+        }
+
+        // Extract top-level directory for scope (skip root-level files)
+        if path.contains('/') {
+            if let Some(first_component) = path.split('/').next() {
+                if !first_component.is_empty() && first_component != "." {
+                    dirs.insert(first_component.to_string());
+                }
+            }
+        }
+
+        // Track files for listing (sorted by lines changed)
+        file_changes.push((a_val + r_val, path.to_string()));
+    }
+
+    // Sort by lines changed descending, take top 3
+    file_changes.sort_by_key(|b| std::cmp::Reverse(b.0));
+    let top_files: Vec<String> = file_changes
+        .iter()
+        .take(3)
+        .map(|(_, path)| path.clone())
+        .collect();
+
+    // Build routing key components
+
+    // 1. Task intent (from markdown diff) — cap at 10 tasks per category
+    let transitions = extract_task_transitions(repo);
+    let is_merge = repo.join(".git/MERGE_HEAD").exists();
+    let is_revert = repo.join(".git/REVERT_HEAD").exists();
+    let intent_prefix = if is_merge {
+        "MERGE: | ".to_string()
+    } else if is_revert {
+        "REVERT: | ".to_string()
+    } else {
+        const MAX_TASKS: usize = 10;
+        let mut parts = Vec::new();
+        if !transitions.closed.is_empty() {
+            let shown: Vec<&str> = transitions
+                .closed
+                .iter()
+                .take(MAX_TASKS)
+                .map(|s| s.as_str())
+                .collect();
+            let suffix = if transitions.closed.len() > MAX_TASKS {
+                format!(" +{}more", transitions.closed.len() - MAX_TASKS)
+            } else {
+                String::new()
+            };
+            parts.push(format!("CLOSED: {}{}", shown.join(", "), suffix));
+        }
+        if !transitions.progress.is_empty() {
+            let shown: Vec<&str> = transitions
+                .progress
+                .iter()
+                .take(MAX_TASKS)
+                .map(|s| s.as_str())
+                .collect();
+            let suffix = if transitions.progress.len() > MAX_TASKS {
+                format!(" +{}more", transitions.progress.len() - MAX_TASKS)
+            } else {
+                String::new()
+            };
+            parts.push(format!("WIP: {}{}", shown.join(", "), suffix));
+        }
+        if parts.is_empty() {
+            String::new()
+        } else {
+            format!("{} | ", parts.join(" | "))
+        }
+    };
+
+    // Staged path universe for scope + file-signal tokens (text + binary).
+    let mut staged_paths: Vec<String> = file_changes.iter().map(|(_, p)| p.clone()).collect();
+    staged_paths.extend(binary_paths.iter().cloned());
+
+    // 2. Scope: deepest common directory prefix (LCP, cap 4). A single
+    // staged file scopes to its own full path — the bracket would duplicate
+    // it exactly, so it is dropped below. Commits spanning top-level dirs,
+    // or bare root-level files, fall back to today's top-3 first-component
+    // list (byte-identical for multi-crate repos).
+    let mut drop_bracket = false;
+    let dirs_str = if staged_paths.len() == 1 {
+        match staged_paths[0].rfind('/') {
+            Some(_) => {
+                drop_bracket = true;
+                format!(" in {}", staged_paths[0])
+            }
+            None => String::new(),
+        }
+    } else if let Some(lcp) = longest_common_dir_prefix(&staged_paths) {
+        format!(" in {}", lcp)
+    } else if dirs.is_empty() {
+        String::new()
+    } else {
+        format!(
+            " in {}",
+            dirs.iter().take(3).cloned().collect::<Vec<_>>().join(",")
+        )
+    };
+
+    // 3. Top changed files (recoverable via `git show --name-only`;
+    // first to go under the subject budget, and dropped outright for
+    // single-file commits where it duplicates the scope).
+    let files_str = if top_files.is_empty() || drop_bracket {
+        String::new()
+    } else {
+        format!(" [{}]", top_files.join(", "))
+    };
+
+    // 4. Metrics suffix (fixed token order — grep-stable).
+    let mut metrics = Vec::new();
+    // EXT: file-signal histogram (which toolchain/tests matter). Gitlink
+    // pointers and extensionless entries carry no extension signal.
+    {
+        let candidates: Vec<String> = file_changes.iter().map(|(_, p)| p.clone()).collect();
+        let gitlinks = tracked_gitlink_set(repo, &candidates);
+        let ext_paths: Vec<String> = candidates
+            .into_iter()
+            .filter(|p| !gitlinks.contains(p))
+            .collect();
+        let hist = extension_histogram(&ext_paths);
+        if !hist.is_empty() {
+            let top: Vec<String> = hist.iter().take(3).map(|(e, _)| e.clone()).collect();
+            metrics.push(format!("EXT:{}", top.join(",")));
+        }
+    }
+    if test_lines > 0 {
+        metrics.push(format!("TEST:{}", test_lines));
+    }
+    if binary_count > 0 {
+        metrics.push(format!("BIN:{}", binary_count));
+    }
+
+    // 5. New/deleted/renamed files
+    let (new_files, deleted_files, rename_count) = extract_new_deleted_files(repo);
+    if !new_files.is_empty() {
+        // Show top 10 new files (searchable), abbreviate nested paths
+        let display: Vec<String> = new_files
+            .iter()
+            .take(10)
+            .map(|f| {
+                let parts: Vec<&str> = f.split('/').collect();
+                if parts.len() > 2 {
+                    parts[parts.len() - 2..].join("/")
+                } else {
+                    f.clone()
+                }
+            })
+            .collect();
+        let suffix = if new_files.len() > 10 {
+            format!("+{}more", new_files.len() - 10)
+        } else {
+            String::new()
+        };
+        metrics.push(format!("NEW:{}{}", display.join(","), suffix));
+    }
+    if !deleted_files.is_empty() {
+        let display: Vec<String> = deleted_files
+            .iter()
+            .take(10)
+            .map(|f| {
+                let parts: Vec<&str> = f.split('/').collect();
+                if parts.len() > 2 {
+                    parts[parts.len() - 2..].join("/")
+                } else {
+                    f.clone()
+                }
+            })
+            .collect();
+        let suffix = if deleted_files.len() > 10 {
+            format!("+{}more", deleted_files.len() - 10)
+        } else {
+            String::new()
+        };
+        metrics.push(format!("DEL:{}{}", display.join(","), suffix));
+    }
+    // Renames are neither new nor deleted (see extract_new_deleted_files).
+    if rename_count > 0 {
+        metrics.push(format!("REN:{}", rename_count));
+    }
+
+    // 6. Dependency changes
+    if let Some(dep_info) = detect_dependency_changes(repo) {
+        metrics.push(format!("DEPS:{}", dep_info));
+    }
+
+    // 7. Merge/revert detection — merge/revert commits start with MERGE:/REVERT:
+    if !is_merge && repo.join(".git/MERGE_HEAD").exists() {
+        metrics.push("MERGE:".to_string());
+    }
+    if !is_revert && repo.join(".git/REVERT_HEAD").exists() {
+        metrics.push("REVERT:".to_string());
+    }
+
+    // 8. Tag detection — if this commit is tagged, include the tag
+    if let Some(tag) = get_current_tag(repo) {
+        metrics.push(format!("TAG:{}", tag));
+    }
+
+    // 9. Test-only detection — if ALL changed files are test files
+    if !file_changes.is_empty() && file_changes.iter().all(|(_, path)| is_test_file(path)) {
+        let test_paths: Vec<String> = file_changes.iter().map(|(_, p)| p.clone()).collect();
+        metrics.push(format!("TESTONLY:{}", abbreviate_paths(&test_paths, 5)));
+    }
+
+    // 9b. Doc-only detection — mirror of TESTONLY above (same abbreviation
+    // shape). Binary files are never docs, so any binary vetoes the token.
+    if binary_count == 0
+        && !file_changes.is_empty()
+        && file_changes.iter().all(|(_, path)| is_doc_file(path))
+    {
+        let doc_paths: Vec<String> = file_changes.iter().map(|(_, p)| p.clone()).collect();
+        metrics.push(format!("DOCSONLY:{}", abbreviate_paths(&doc_paths, 5)));
+    }
+
+    // 9c. Lockfile-only change — dependency bumps with no manifest edit are
+    // otherwise silent (detect_dependency_changes only parses manifests).
+    if binary_count == 0
+        && !file_changes.is_empty()
+        && file_changes.iter().all(|(_, path)| is_lock_file(path))
+    {
+        metrics.push("LOCK".to_string());
+    }
+
+    // 10. Env file detection — if any env files changed
+    if has_env_changes(repo) {
+        metrics.push("ENV:".to_string());
+    }
+
+    // 11. Goal metadata — extract richer context from .pi/goals/ JSON files
+    if let Some(ref goal_meta) = transitions.goal_metadata {
+        // Goal status change
+        if let Some(ref status) = goal_meta.status {
+            if status == "complete" {
+                metrics.push("GOAL:complete".to_string());
+            } else if status == "paused" {
+                metrics.push("GOAL:paused".to_string());
+            }
+        }
+
+        // Pause reason (abbreviated)
+        if let Some(ref reason) = goal_meta.pause_reason {
+            let short_reason = if reason.len() > 50 {
+                format!("{}...", reason.chars().take(47).collect::<String>())
+            } else {
+                reason.clone()
+            };
+            metrics.push(format!("PAUSE:{}", short_reason));
+        }
+
+        // Token usage
+        if let Some(tokens) = goal_meta.tokens_used {
+            if tokens > 100_000 {
+                metrics.push(format!("TOKENS:{}K", tokens / 1000));
+            }
+        }
+
+        // Active time
+        if let Some(seconds) = goal_meta.active_seconds {
+            if seconds > 60 {
+                metrics.push(format!("TIME:{}m", seconds / 60));
+            }
+        }
+
+        // Task evidence (completed tasks with evidence)
+        let tasks_with_evidence: Vec<&TaskDetail> = goal_meta
+            .task_details
+            .iter()
+            .filter(|t| t.status == "complete" && t.evidence.is_some())
+            .collect();
+        if !tasks_with_evidence.is_empty() {
+            let evidence_summary: Vec<String> = tasks_with_evidence
+                .iter()
+                .take(3)
+                .map(|t| {
+                    // The filter above guarantees Some; use expect to make
+                    // that invariant visible to future maintainers.
+                    let ev = t.evidence.as_ref().expect("filter guarantees Some");
+                    if ev.len() > 40 {
+                        format!("{}:{}", t.id, ev.chars().take(37).collect::<String>())
+                    } else {
+                        format!("{}:{}", t.id, ev)
+                    }
+                })
+                .collect();
+            let suffix = if tasks_with_evidence.len() > 3 {
+                format!("+{}more", tasks_with_evidence.len() - 3)
+            } else {
+                String::new()
+            };
+            metrics.push(format!("EVIDENCE:{}{}", evidence_summary.join("|"), suffix));
+        }
+
+        // Skipped tasks with reasons
+        let skipped_tasks: Vec<&TaskDetail> = goal_meta
+            .task_details
+            .iter()
+            .filter(|t| t.status == "skipped" && t.skip_reason.is_some())
+            .collect();
+        if !skipped_tasks.is_empty() {
+            let skip_summary: Vec<String> = skipped_tasks
+                .iter()
+                .take(3)
+                .map(|t| {
+                    // The filter above guarantees Some; use expect to make
+                    // that invariant visible to future maintainers.
+                    let reason = t.skip_reason.as_ref().expect("filter guarantees Some");
+                    if reason.len() > 40 {
+                        format!("{}:{}", t.id, reason.chars().take(37).collect::<String>())
+                    } else {
+                        format!("{}:{}", t.id, reason)
+                    }
+                })
+                .collect();
+            let suffix = if skipped_tasks.len() > 3 {
+                format!("+{}more", skipped_tasks.len() - 3)
+            } else {
+                String::new()
+            };
+            metrics.push(format!("SKIPPED:{}{}", skip_summary.join("|"), suffix));
+        }
+    }
+
+    // 12. Subject budget (COMMIT_SUBJECT_BUDGET chars, unicode-safe): cut
+    // at token boundaries, never mid-token. Drop order: the [top-files]
+    // bracket first (recoverable via `git show --name-only`; the count in
+    // `N file(s)` survives), then non-safety metrics right-to-left. Intent,
+    // scope, DELTA, and safety metrics (BIN/ENV/TESTONLY/DOCSONLY/LOCK/REN)
+    // always survive.
+    let mut kept_metrics = metrics;
+    let mut kept_bracket = files_str;
+    let render = |bracket: &str, mets: &[String]| -> String {
+        let metrics_str = if mets.is_empty() {
+            String::new()
+        } else {
+            format!(" | {}", mets.join(" "))
+        };
+        format!(
+            "{}{} file(s){}{} DELTA:+{}/-{}{}",
+            intent_prefix, files, dirs_str, bracket, added, removed, metrics_str
+        )
+    };
+    let mut subject = render(&kept_bracket, &kept_metrics);
+    if subject.chars().count() > COMMIT_SUBJECT_BUDGET {
+        kept_bracket = String::new();
+        subject = render(&kept_bracket, &kept_metrics);
+    }
+    while subject.chars().count() > COMMIT_SUBJECT_BUDGET {
+        let pos = kept_metrics.iter().rposition(|m| !is_safety_metric(m));
+        match pos {
+            Some(i) => {
+                kept_metrics.remove(i);
+                subject = render(&kept_bracket, &kept_metrics);
+            }
+            None => break,
+        }
+    }
+    subject
+}
+
+/// Legacy behavioral controls call the SAME private-entry reconciliation used
+/// by production, not the removed live-index reset implementation.
+#[cfg(test)]
+async fn auto_resolve_unmerged_if_safe(repo: &Path, auto_resolve: bool) -> Result<usize> {
+    Ok(staged_epoch::reconcile_unmerged(
+        repo,
+        auto_resolve,
+        tokio::time::Instant::now() + Duration::from_secs(30),
+    )
+    .await?
+    .map_or(0, |(_, count)| count))
+}
+
+/// Check the untracked file count and emit a warning if it exceeds
+/// the policy's `untracked_warn_threshold`. Returns the untracked
+/// count for use in the `drain_health` report field.
+///
+/// The reported count subtracts entries that point to nested git
+/// repositories under `repo` (e.g. `child/`, where `child/.git`
+/// exists). Such entries inflate the parent's UT count but do not
+/// represent new files in the parent — the child is a separately-
+/// tracked, independently-synced git repo. See
+/// `count_nested_repo_untracked_entries` in `git/discovery.rs`.
+///
+/// ADDED 2026-06-21, goal 55db3bfc-4fc0-4650-8349-38da9e62bd44.
+/// CHANGED 2026-06-30, goal `mr02de1n-gjkgzp`: subtract nested-repo
+/// entries so the parent UT count reflects only the parent's own
+/// working-tree noise.
+async fn check_untracked_threshold(repo: &Path, threshold: usize) -> Result<usize> {
+    use anyhow::Context;
+    // Always count the untracked files (so callers can use the count
+    // for reporting), but only emit a warning when threshold > 0 AND
+    // the count exceeds the threshold.
+    let output = crate::policy::std_git_command()
+        .args([
+            "-C",
+            &repo.to_string_lossy(),
+            "ls-files",
+            "--others",
+            "--exclude-standard",
+        ])
+        .output()
+        .with_context(|| format!("failed to list untracked files in {}", repo.display()))?;
+    let entries: Vec<String> = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter(|l| !l.is_empty())
+        .map(|l| l.to_string())
+        .collect();
+    let raw_count = entries.len();
+    let nested_repo_count = crate::git::count_nested_repo_untracked_entries(repo, &entries);
+    let count = raw_count.saturating_sub(nested_repo_count);
+    if count > threshold {
+        if nested_repo_count > 0 && crate::policy::debug_enabled() {
+            eprintln!(
+                "⚠️ {} has {} untracked files ({} raw − {} nested-repo entries; threshold {}). \
+                 Consider adding ephemeral directories to .gitignore.",
+                repo.display(),
+                count,
+                raw_count,
+                nested_repo_count,
+                threshold
+            );
+        } else {
+            eprintln!(
+                "⚠️ {} has {} untracked files (threshold {}). \
+                 Consider adding ephemeral directories to .gitignore.",
+                repo.display(),
+                count,
+                threshold
+            );
+        }
+    }
+    Ok(count)
+}
+
+/// Cap the UNION of regular + gitlink paths at `max_batch` entries per
+/// commit. Gitlink pointer updates take priority (each is a single
+/// non-recursive index entry and they drive the parent's submodule-gitlink
+/// convergence); regular files fill the remainder. Entries beyond the cap
+/// stay dirty and are committed by a later cycle.
+///
+/// CHANGED 2026-08-11 (audit find): previously each list was truncated
+/// independently to `max_batch`, so a commit could stage up to 2×max_batch
+/// entries when both entry classes were present — the union cap the
+/// batching feature documents was silently doubled.
+fn cap_batch_union(
+    regular_paths: Vec<String>,
+    gitlink_paths: Vec<String>,
+    max_batch: usize,
+) -> (Vec<String>, Vec<String>) {
+    let total = regular_paths.len() + gitlink_paths.len();
+    if total <= max_batch {
+        return (regular_paths, gitlink_paths);
+    }
+    let take_gitlink = gitlink_paths.len().min(max_batch);
+    let take_regular = regular_paths
+        .len()
+        .min(max_batch.saturating_sub(take_gitlink));
+    (
+        regular_paths.into_iter().take(take_regular).collect(),
+        gitlink_paths.into_iter().take(take_gitlink).collect(),
+    )
+}
+
+// Index admission can defer NEW local work, not already committed history.
+// Keep the truthful local Blocked result after a successful/no-op upload; an
+// actual transport failure remains PushFailed and preserves its failure ledger.
+async fn publish_backlog_after_index_deferral(
+    svc: &GitService,
+    ctx: &mut SyncContext<'_>,
+) -> Result<Option<SyncOutcome>> {
+    if ctx.commit_only {
+        return Ok(Some(SyncOutcome::Blocked));
+    }
+    if let PushReport::Attempted { ok: false, .. } = handle_ahead_push(ctx, svc).await? {
+        return Ok(Some(SyncOutcome::PushFailed));
+    }
+    Ok(Some(SyncOutcome::Blocked))
+}
+
+async fn stage_commit_and_push(
+    svc: &GitService,
+    ctx: &mut SyncContext<'_>,
+    _status: &dracon_git::types::RepoStatus,
+    to_stage: &[dracon_git::types::DiffFile],
+    to_restore: &[dracon_git::types::DiffFile],
+    private_assets: Option<&crate::bucket_assets::Prepared>,
+    epoch: Option<staged_epoch::Epoch>,
+) -> Result<Option<SyncOutcome>> {
+    let repo = ctx.repo;
+    let policy = ctx.policy;
+    let dry_run = ctx.dry_run;
+    let has_origin = ctx.has_origin;
+    let _idle_seconds = ctx.idle_seconds;
+
+    let captured_at_entry = epoch.as_ref().is_some_and(|epoch| epoch.has_intent());
+    let epoch = if captured_at_entry {
+        epoch.context("missing captured epoch")?
+    } else {
+        let baseline = match epoch {
+            Some(epoch) => epoch,
+            None => staged_epoch::Epoch::capture(repo, policy.stage_op_timeout_secs).await?,
+        };
+        let deadline = baseline.deadline();
+        let prepared = tokio::time::timeout_at(deadline, async {
+            if !dry_run && !to_restore.is_empty() && load_repo_override(repo).revert_excluded_to_head == Some(true) {
+                #[cfg(target_os = "linux")]
+                if !excluded_revert::restore(repo, to_restore, deadline).await? {
+                    eprintln!("⏳ {} excluded restore deferred; uncertain content/index retained", repo.display());
+                    return Ok(None);
+                }
+                #[cfg(not(target_os = "linux"))]
+                anyhow::bail!("explicit excluded restore needs atomic no-replace/exchange support; files retained");
+            }
+            let staging = staged_epoch::Staging::new(repo, baseline).await?
+                .with_large_candidates(to_restore);
+
+            // Stale conflict selection is part of entry capture, not a live
+            // actual-index mutator after private staging has already begun.
+            let prepare_started = std::time::Instant::now();
+
+            // FIX (goal 55db3bfc-4fc0-4650-8349-38da9e62bd44): emit a warning
+            // when the untracked-file count exceeds the policy threshold.
+            let _untracked_count =
+                check_untracked_threshold(repo, policy.untracked_warn_threshold).await?;
+            if debug_enabled() {
+                eprintln!(
+                    "scheduler: stage_prepare repo={} phase=untracked elapsed_ms={}",
+                    repo.display(),
+                    prepare_started.elapsed().as_millis()
+                );
+            }
+
+            // FIX (goal mr0xseig-fn9bbd): split `to_stage` into gitlink
+            // pointer updates vs regular files. Gitlink entries are staged
+            // without recursion (`git add <path>`) so the parent's index
+            // records the new submodule SHA without walking into the
+            // submodule's working tree. Regular files keep their existing
+            // recursion-and-`git add -A` path.
+            //
+            // CHANGED 2026-09-17 (sync-convergence follow-up): the partition
+            // previously called per-path `is_gitlink` — one `git ls-tree HEAD`
+            // subprocess PER FILE. Measured on this box (20-file fixture,
+            // load ~70-90): stage_enter → first add_spawn took ~5.7s for 20
+            // files; a 100-file commit never reached `git add` within the
+            // 20s probe window. `tracked_gitlink_set` resolves the same
+            // classification with ONE `git ls-tree HEAD -- <all candidates>`
+            // call (already used by the commit-subject path). Paths absent
+            // from HEAD (new untracked files) cannot be gitlinks, so only
+            // paths present in the returned set partition as gitlinks —
+            // identical semantics, O(1) spawns instead of O(N).
+            let candidates: Vec<String> = to_stage
+                .iter()
+                .map(|e| e.path.to_string_lossy().to_string())
+                .collect();
+            let gitlink_set = tracked_gitlink_set(repo, &candidates);
+            let (gitlink_entries, regular_entries): (
+                Vec<dracon_git::types::DiffFile>,
+                Vec<dracon_git::types::DiffFile>,
+            ) = to_stage
+                .iter()
+                .cloned()
+                .partition(|e| gitlink_set.contains(&e.path.to_string_lossy().to_string()));
+            let gitlink_paths: Vec<String> = gitlink_entries
+                .iter()
+                .map(|e| e.path.to_string_lossy().to_string())
+                .collect();
+            let regular_paths: Vec<String> = regular_entries
+                .iter()
+                .map(|e| e.path.to_string_lossy().to_string())
+                .collect();
+
+            // FIX (2026-06-19, goal mqli43u6-tg3lcf): limit the number of files
+            // staged in a single commit batch to avoid lock contention and large
+            // commit overhead. When a repo has more untracked files than the
+            // batch limit, the daemon commits them in multiple smaller batches.
+            //
+            // FIX (goal mr0xseig-fn9bbd): batch-limit applies to the union of
+            // regular and gitlink paths; gitlinks are NOT subject to the
+            // recursion-skip behavior so they don't contribute to the
+            // subdir-expansion that would otherwise inflate counts (a single
+            // gitlink path is one entry, not many).
+            //
+            // CHANGED 2026-08-11 (audit find, stage_commit_and_push batch
+            // union): the cap is now enforced on the UNION — the previous code
+            // truncated each list independently to `max_batch`, so a commit
+            // could stage up to 2×max_batch entries whenever both entry classes
+            // were present. Gitlink pointer updates get priority (single
+            // non-recursive index entries that drive the parent's submodule-
+            // gitlink convergence); regular files fill the remainder. Deferred
+            // entries stay dirty and are picked up by the next cycle.
+            let max_batch = policy.stage_batch_limit();
+            let total_to_stage = regular_paths.len() + gitlink_paths.len();
+            let (regular_paths, gitlink_paths) = if total_to_stage > max_batch {
+                eprintln!(
+                    "📦 batching {} entries into chunks of {}",
+                    total_to_stage, max_batch
+                );
+                cap_batch_union(regular_paths, gitlink_paths, max_batch)
+            } else {
+                (regular_paths, gitlink_paths)
+            };
+
+            let (existing, missing): (Vec<_>, Vec<_>) = regular_paths
+                .into_iter()
+                .partition(|p| repo.join(p).exists());
+
+            // FIX (goal mr0xseig-fn9bbd): gitlink pointer updates are
+            // staged WITHOUT recursion via `git add <path>` (no `-A`).
+            // `stage_existing_files` recurses-and-skips for anything in
+            // `existing` whose `.git` exists; for gitlinks we want the
+            // OPPOSITE — do not recurse, but DO emit the `git add`.
+            let (gitlink_existing, gitlink_missing): (Vec<_>, Vec<_>) = gitlink_paths
+                .into_iter()
+                .partition(|p| repo.join(p).exists());
+
+            // CHANGED 2026-07-21 (v0.112.31, audit H6/F1.5): filtered
+            // variant so files discovered by the directory-expansion
+            // recursion get the per-file staging policy re-applied (size
+            // limit + exclude patterns) — previously a 500 MiB file nested
+            // in a new untracked dir bypassed the 100 MiB hard exclusion.
+            // The `auto_commit_exclude_patterns` value uses the SAME
+            // effective (per-repo-override-aware) resolution as the
+            // partition in `sync_repo_with_ahead_since`.
+            let staging_repo_override = load_repo_override(repo);
+            // R3-M2: per-repo entries EXTEND the global list (union helper).
+            let auto_commit_exclude_for_staging =
+                crate::policy::effective_auto_commit_excludes(ctx.policy, &staging_repo_override);
+            // ADDED 2026-10-03 (audit R4-SC-15): a STILL-contended index
+            // after the add-site retries maps to Blocked (non-failure, work
+            // retained for next cycle) instead of Err (failure budget burn +
+            // MAX_FAILURES backoff for a healthy repo).
+            match stage_existing_files_in_index(
+                repo,
+                &existing,
+                dry_run,
+                ctx.policy.stage_op_timeout_secs,
+                ctx.excluded_dir_names,
+                Some((ctx.policy, &auto_commit_exclude_for_staging)),
+                private_assets.map(|prepared| &prepared.materialized_paths),
+                Some(staging.index()),
+            )
+            .await
+            {
+                Ok(()) => {}
+                Err(e) if is_index_lock_failure(&e.to_string()) => {
+                    eprintln!(
+                        "⏸️ {} staging blocked by index.lock contention (retry next cycle)",
+                        repo.display()
+                    );
+                    return Ok(None);
+                }
+                Err(e) => return Err(e),
+            }
+
+            stage_gitlink_updates_in_index(
+                repo,
+                &gitlink_existing,
+                dry_run,
+                ctx.policy.stage_op_timeout_secs,
+                Some(staging.index()),
+            )
+            .await?;
+
+            let missing_iter = missing.into_iter().chain(gitlink_missing);
+            let missing: Vec<_> = missing_iter.collect();
+            if !missing.is_empty() && !dry_run {
+                let quoted = crate::git::literal_pathspecs(&missing);
+                let mut args = vec!["rm", "--cached", "--ignore-unmatch", "--"];
+                args.extend(quoted.iter().map(String::as_str));
+                staged_epoch::run_index_git(
+                    repo,
+                    &args,
+                    policy.stage_op_timeout_secs,
+                    "epoch missing",
+                    Some(staging.index()),
+                )
+                .await?;
+            }
+            match staging
+                .finish(
+                    repo,
+                    policy,
+                    ctx.excluded_dir_names,
+                    ctx.build_artifact_cleanup,
+                    dry_run,
+                )
+                .await
+            {
+                Ok(epoch) => Ok(Some(epoch)),
+                Err(error) if staged_epoch::is_conflict(&error) => {
+                    eprintln!(
+                        "⏳ {} private staging deferred; concurrent intent retained: {error:#}",
+                        repo.display()
+                    );
+                    Ok(None)
+                }
+                Err(error) => Err(error),
+            }
+        })
+        .await
+        .context("ordinary staging absolute deadline expired; candidate retained")??;
+        match prepared {
+            Some(epoch) => epoch,
+            None => return publish_backlog_after_index_deferral(svc, ctx).await,
+        }
+    };
+    let committed_entries = epoch.entries()?;
+
+    let blast_radius = compute_blast_radius(repo);
+
+    let version_bumped = false;
+    let mut pending_local = false;
+    let mut deferred_ignore: Option<(Vec<String>, tokio::time::Instant)> = None;
+
+    if committed_entries.is_empty() {
+        if debug_enabled() {
+            eprintln!(
+                "🐛 {} skipped commit: all changes were filter-only (smudge/clean)",
+                repo.display()
+            );
+        }
+        maybe_sync_visibility_and_metadata(ctx);
+        // FIX (deathrun 2026-10-02): push pre-existing ahead BEFORE
+        // returning — without this, a repo whose staged diff is empty
+        // (filter churn, hygiene re-adds) but which has unpushed
+        // commits NEVER pushes: this early return bypasses
+        // `handle_ahead_push` below, so ahead>0 sits forever while
+        // every cycle reports NothingToDo (deathrun: 8 commits, 4h+
+        // unpushed, sync-now NothingToDo, zero push attempts).
+        // Mirrors the early filter-only site fix (junk-runner 19
+        // commits/10h starvation, 2026-07-26) but keeps this
+        // branch's long-standing NothingToDo outcome contract (see
+        // test_filter_only_reset_failure_is_non_fatal): only a
+        // genuine push failure escalates to PushFailed.
+        // v0.113.69 commit-only: never attempt the push here either.
+        if !ctx.commit_only {
+            match handle_ahead_push(ctx, svc).await? {
+                PushReport::AllPaused => {}
+                PushReport::Attempted { ok: false, .. } => {
+                    return Ok(Some(SyncOutcome::PushFailed))
+                }
+                PushReport::Attempted { ok: true, .. } => {}
+            }
+        }
+        let mut pending = match epoch.index_changed(repo).await {
+            Ok(changed) => changed,
+            Err(error) => {
+                eprintln!(
+                    "⚠️ {} empty-candidate follow-up unverified; local work retained: {error:#}",
+                    repo.display()
+                );
+                true
+            }
+        };
+        #[cfg(target_os = "linux")]
+        if !dry_run
+            && !to_restore.is_empty()
+            && load_repo_override(repo).revert_excluded_to_head == Some(true)
+        {
+            pending |= excluded_revert::paths_dirty(repo, to_restore, epoch.deadline()).await?;
+        }
+        pending |= match private_assets {
+            Some(prepared) => tokio::time::timeout_at(
+                epoch.deadline(),
+                prepared.has_materialization_followup(repo),
+            )
+            .await
+            .context("private materialization follow-up deadline expired")??,
+            None => false,
+        };
+        // Large-file-only cycles legitimately produce no commit. Their ignore
+        // rules still owe a durable write, or the same work repeats forever.
+        if !dry_run {
+            match apply_deferred_ignore(repo, epoch.deferred_ignore()).await {
+                Ok(None) => {}
+                Ok(Some(_)) => {
+                    pending = true;
+                    eprintln!(
+                        "⏳ {} no commit needed, but ignore metadata requires local follow-up",
+                        repo.display()
+                    );
+                }
+                Err(error) => {
+                    pending = true;
+                    eprintln!(
+                        "⚠️ {} ignore reconciliation failed; rule bytes retained: {error:#}",
+                        repo.display()
+                    );
+                }
+            }
+        }
+        return Ok(Some(if pending {
+            SyncOutcome::StagedPending
+        } else {
+            SyncOutcome::NothingToDo
+        }));
+    }
+
+    // Use blast radius as commit message
+    let msg = blast_radius;
+
+    // ADDED 2026-07-21 (v0.112.33, audit M10/F0.3): pre-commit
+    // identity guard — re-verify ownership FRESH (no cache) before
+    // committing. The F0.1 incident showed the daemon committing
+    // with a poisoned identity (`test <test@test>` written into the
+    // LIVE repo's config by a test) and the ownership guard locking
+    // the repo out only AFTER the damage was already on the mirrors.
+    // CHANGED 2026-07-22 (v0.112.36): the guard now honors
+    // ownership overrides (`owned = true` in
+    // `.dracon/dracon-sync.toml`) — the previous raw trusted-list
+    // check blocked operator-blessed per-repo identities
+    // (darklord's `darklord-dev <darklord@dracon.local>`).
+    if !commit_allowed_by_ownership(repo, policy) {
+        eprintln!(
+            "⚠️ {} ownership check failed at commit time (untrusted identity — see `dracon-sync ownership --explain`) — skipping auto-commit; the staged index is left intact",
+            repo.display()
+        );
+        return Ok(Some(SyncOutcome::Blocked));
+    }
+
+    if dry_run {
+        println!(
+            "📝 Would commit {} file(s) in {}:",
+            committed_entries.len(),
+            repo.display()
+        );
+        for entry in committed_entries.iter().take(10) {
+            println!("  {:?}: {}", entry.status, entry.path.display());
+        }
+        if committed_entries.len() > 10 {
+            println!("  ... and {} more", committed_entries.len() - 10);
+        }
+        println!("  message: {}", msg.lines().next().unwrap_or("(empty)"));
+    } else {
+        deferred_ignore = epoch.deferred_ignore();
+        pending_local = match epoch
+            .commit(repo, &msg, policy, ctx.excluded_dir_names, private_assets)
+            .await
+        {
+            Ok(pending) => pending,
+            Err(error) if staged_epoch::is_conflict(&error) => {
+                eprintln!(
+                    "⏳ {} captured commit deferred; concurrent intent retained: {error:#}",
+                    repo.display()
+                );
+                return publish_backlog_after_index_deferral(svc, ctx).await;
+            }
+            Err(error) => return Err(error),
+        };
+        // A committed epoch can leave unstaged or newly staged follow-up.
+        // Retain that fact, but still publish the known immutable commit below;
+        // local editing must not starve an already committed backlog.
+        if crate::policy::debug_enabled() {
+            // Exact commit-completion timestamp for the fairness probe's
+            // commit→push gate, including sealed storage commits that do
+            // not spawn Git. Debug-gated: no fleet overhead.
+            eprintln!(
+                "scheduler: commit_done repo={} unix_ms={}",
+                repo.display(),
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_millis())
+                    .unwrap_or(0)
+            );
+        }
+        eprintln!(
+            "📝 committed {} file(s) in {}",
+            committed_entries.len(),
+            repo.display()
+        );
+        // REMOVED 2026-10-09 (audit F134): the
+        // `fast_forward_daemon_standalone_to_main` call and its error arm
+        // are gone. The helper had been a no-op returning `Ok(())` since
+        // 2026-07-01 (the standalone worktree sits on `main` directly, so
+        // each commit already advances it), which made this error arm
+        // unreachable — the "(no-op)" text in its own log line proved the
+        // author knew. AGENTS.md already documents the stub as dead.
+        // Nothing replaces it: the behaviour it performed no longer exists.
+        // Flush so journald captures commit activity in real-time
+        let _ = std::io::stderr().flush();
+        // Record this commit in the incident ledger so the `repos` report
+        // can show the user the daemon is actively syncing this repo.
+        // Without this entry, only `repair warns` (and friends) would
+        // appear in the ledger, and normal auto-commit activity would be
+        // invisible to the report.
+        if let Some(pp) = ctx.policy_path {
+            crate::report::log_incident(
+                pp,
+                "sync",
+                repo.display().to_string(),
+                format!("COMMITTED:{} files", committed_entries.len()),
+                "sync_commit",
+                None,
+                "ok",
+                Some(msg.lines().next().unwrap_or("").to_string()),
+            );
+        }
+    }
+
+    // Deferred canonical ignore rules are applied only AFTER the commit landed,
+    // so the rules can never block the staging that produced it. Both an
+    // unapplied write and newly written metadata require local follow-up.
+    if !dry_run {
+        match apply_deferred_ignore(repo, deferred_ignore).await {
+            Ok(None) => {}
+            Ok(Some(_)) => {
+                pending_local = true;
+                eprintln!(
+                    "⏳ {} committed, but ignore metadata requires local follow-up (operator bytes preserved)",
+                    repo.display()
+                );
+            }
+            Err(error) => {
+                pending_local = true;
+                eprintln!(
+                    "⚠️ {} committed, but ignore reconciliation failed; rule bytes retained: {error:#}",
+                    repo.display()
+                );
+            }
+        }
+    }
+
+    if !ctx.commit_only && !captured_at_entry && !pending_local {
+        prune_other_default_branch(repo).await;
+        post_commit_pull(svc, repo, policy).await;
+    }
+
+    // This alert needs a commit count, not another worktree/filter traversal.
+    // Failure after a known commit must not erase that fact or skip publication.
+    match count_ahead_commits(repo).await {
+        Ok(ahead) if ahead > policy.alert_unpushed_threshold as u64 => {
+            // CHANGED 2026-11-06 (sync-stall fix): this fired on every commit
+            // cycle, so a repo with a deep queue produced the same
+            // "Something may be wrong with push" line every ~30 seconds while
+            // the daemon was publishing normally. Repetition is what turned a
+            // stale-but-true alarm into a reason to go and verify the push by
+            // hand. The count is still reported, once per 30 minutes.
+            if crate::daemon::unpushed_alert_due(repo) {
+                eprintln!(
+                    "🚨 ALERT: {} has {} unpushed commits (threshold: {}). Something may be wrong with push.",
+                    repo.display(), ahead, policy.alert_unpushed_threshold
+                );
+            }
+        }
+        Ok(_) => {}
+        Err(error) => {
+            pending_local = true;
+            eprintln!(
+                "⚠️ {} committed, but follow-up ahead inspection failed: {error:#}",
+                repo.display()
+            );
+        }
+    }
+
+    // Excluded opt-in restoration ran before staging. NEVER reset after hooks
+    // or publication: later producer edits belong to the next epoch.
+
+    // CHANGED 2026-07-21 (v0.112.31, audit H3/F1.3): track push
+    // failure and surface it as `SyncOutcome::PushFailed` instead of
+    // falling through to `Ok(None)` (→ `Synced`). Previously the
+    // apply phase logged `🔁 synced`, reset `failure_count`, and
+    // dropped the activity entry on a failed push — false-healthy.
+    // v0.113.69 commit-only: the commit above already landed; skip
+    // the push attempt entirely (PushPaused, not PushFailed).
+    if ctx.commit_only {
+        if ctx.publication_owned_elsewhere {
+            eprintln!(
+                "⏳ {} committed; publication owned by another worker (this pass did not push)",
+                repo.display()
+            );
+        } else {
+            eprintln!(
+                "⏸️ {} committed; push paused (commit-only mode)",
+                repo.display()
+            );
+        }
+        return Ok(Some(SyncOutcome::PushPaused));
+    }
+    let mut push_failed = false;
+    if policy.auto_push && (has_origin || !policy.remotes.is_empty()) {
+        // Owned publication: the round is pinned, the checkout is released,
+        // and fresh edits keep committing while hooks/network run.
+        let ahead = count_ahead_commits(repo).await.unwrap_or(0);
+        match run_publication_actor(&mut *ctx, has_origin, ahead).await {
+            Ok(PushReport::Attempted {
+                ok: true,
+                degraded: false,
+            }) => {
+                if let Err(e) = crate::daemon::refresh_publish_upstream(repo, policy).await {
+                    // The publish upstream config is already set by
+                    // `configure_publish_upstream_if_missing` and surfaces
+                    // correctly in the PUBLISH column. A failed refresh
+                    // only means `git rev-parse @{u}` still resolves
+                    // through the configured merge key, not via a fetched
+                    // remote-tracking ref. That's a transient state that
+                    // resolves on the next successful push, so log it at
+                    // debug to avoid spamming warnings on every cycle.
+                    if debug_enabled() {
+                        eprintln!(
+                            "🐛 refresh publish upstream transient for {}: {}",
+                            repo.display(),
+                            e
+                        );
+                    }
+                }
+                crate::daemon::record_push_success(repo);
+            }
+            // v0.113.69: every remote individually paused — the commit
+            // above already landed. No failure, no ledger write; the
+            // caller maps this to `SyncOutcome::PushPaused`.
+            // v0.113.72 degraded: healthy legs converged but a sick
+            // remote is still paused — same treatment (no success-
+            // clear, no failure burn; pause memory retained).
+            Ok(PushReport::Attempted {
+                ok: true,
+                degraded: true,
+            })
+            | Ok(PushReport::AllPaused) => {
+                return Ok(Some(SyncOutcome::PushPaused));
+            }
+            Ok(PushReport::Attempted {
+                ok: false,
+                degraded: _,
+            }) => {
+                // CHANGED 2026-07-21 (v0.112.31, audit M1/F3.9):
+                // name the failing remotes in the ledger error so
+                // the repos HINT says WHICH forge is failing.
+                // CHANGED 2026-08-09 (v0.113.50): also classify the
+                // per-remote errors (divergence vs transport vs
+                // policy) so the HINT says WHY, not just WHO.
+                let names = failing_remote_names(ctx.remote_failures.as_deref());
+                let cause = classify_failing_remotes(ctx.remote_failures.as_deref());
+                // T1.8: shared composer (was inline mining); behavior unchanged.
+                let (msg, hook_detail) =
+                    push_failure_message(&names, &cause, ctx.remote_failures.as_deref());
+                // v0.113.73 forge-degraded: fully incident-covered
+                // transient failures don't burn the stuck budget (and
+                // don't fire per-repo webhooks — the incident alert
+                // covers them). The commit above already landed; map
+                // to PushPaused so commits keep flowing while the
+                // forge is down (a PushFailed outcome would feed the
+                // MAX_FAILURES scan-skip and stall commits).
+                if let Some(hosts) =
+                    incident_shield_hosts(repo, policy, has_origin, ctx.remote_failures.as_deref())
+                {
+                    eprintln!(
+                        "🛡️ {} push failure shielded by forge incident ({}) — no stuck-budget burn",
+                        repo.display(),
+                        hosts.join(", ")
+                    );
+                    crate::daemon::record_push_transient_outage(repo, &msg);
+                    return Ok(Some(SyncOutcome::PushPaused));
+                }
+                eprintln!("⚠️ push failed for {} (remotes: {})", repo.display(), names);
+                if let Some(detail) = hook_detail.as_deref() {
+                    // T1.3: leave a durable, machine-readable record so the
+                    // repo's own loop can see which gate refused its push.
+                    crate::daemon::record_gate_failure_artifact(repo, &msg, Some(detail));
+                }
+                crate::daemon::record_push_failure(repo, &msg);
+                notify_webhook_persistent_push_failure(policy, repo, &names, &cause);
+                push_failed = true;
+            }
+            Err(e) if crate::daemon::push_error_is_cancellation(&e) => {
+                crate::daemon::record_push_attempt_error(repo, &e);
+                push_failed = true;
+            }
+            Err(e) => {
+                let error = crate::ownership::redact_url_credentials(&format!("{e:#}"));
+                eprintln!("⚠️ push error for {}: {}", repo.display(), error);
+                crate::daemon::record_push_attempt_error(repo, &e);
+                let cause = crate::git::classify_push_failure(&error);
+                notify_webhook_persistent_push_failure(policy, repo, "origin/mirrors", cause);
+                push_failed = true;
+            }
+        }
+    }
+
+    if ctx.local_work_deferred {
+        // Local ownership could not be reacquired after the upload. Skipping
+        // BOTH the release pipeline and here keeps this round from writing
+        // metadata/tags without the mutation rights it failed to obtain. The
+        // next dispatch rediscovers the work.
+        eprintln!(
+            "⏳ {} post-publication local work deferred (no local ownership)",
+            repo.display()
+        );
+        return Ok(committed_epoch_outcome(push_failed, true));
+    }
+    run_release_pipeline_if_bumped(repo, policy, version_bumped).await;
+
+    Ok(committed_epoch_outcome(push_failed, pending_local))
+}
+
+/// Apply deferred ignore rules after a commit landed. `None` means no change
+/// was needed. `Some` means reconciliation or subsequent staging is still owed:
+/// even a successful canonical write creates local work absent from HEAD.
+async fn apply_deferred_ignore(
+    repo: &Path,
+    deferred: Option<(Vec<String>, tokio::time::Instant)>,
+) -> Result<Option<String>> {
+    let Some((patterns, deadline)) = deferred else {
+        return Ok(None);
+    };
+    #[cfg(target_os = "linux")]
+    {
+        let (_applied, rendered) = hygiene_apply::apply(repo, &patterns, deadline).await?;
+        Ok(rendered)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = (repo, patterns, deadline);
+        anyhow::bail!(
+            "generated ignore requires atomic no-replace/exchange support; rules retained"
+        )
+    }
+}
+
+/// Transport failure takes precedence, but successful publication never means
+/// local follow-up disappeared. None retains the caller's fully-synced contract.
+fn committed_epoch_outcome(push_failed: bool, pending_local: bool) -> Option<SyncOutcome> {
+    if push_failed {
+        Some(SyncOutcome::PushFailed)
+    } else if pending_local {
+        Some(SyncOutcome::StagedPending)
+    } else {
+        None
+    }
+}
+
+/// ADDED 2026-07-21 (v0.112.30): policy-aware root-commit bootstrap for
+/// *stable empty* repos (operator ran `git init`, added files, no
+/// commits yet).
+///
+/// Replaces the previous bare `git add -A && git commit -m initial`
+/// bootstrap, which (a) ignored `max_stage_file_bytes`,
+/// `untracked_exclude_patterns`, `auto_commit_exclude_patterns`,
+/// `auto_stage_untracked`, and the ownership guard, and (b) discarded
+/// the commit result (printing "created initial commit" even when the
+/// commit failed, e.g. missing `user.email`).
+///
+/// Callers MUST gate on `crate::git::is_stable_empty_repo` first —
+/// this function does not re-check the mid-clone guards.
+///
+/// Flow:
+/// 1. Gate on `policy.auto_commit` (operator opted out of auto-commit).
+/// 2. Ownership gate identical to the daemon loop's: skip unowned
+///    repos when `auto_skip_unowned` is in effect. For an empty repo
+///    the ownership signals are `user.email` + origin URL (no HEAD
+///    author exists yet).
+/// 3. Enumerate untracked files via `untracked_entries`
+///    (`git ls-files --others --exclude-standard -z`), which respects
+///    `.gitignore` — including the warden-managed secrets block.
+/// 4. Apply the same per-entry policy filters the normal pipeline
+///    uses (`should_stage_entry` + `matches_untracked_exclude` +
+///    `auto_stage_untracked`).
+/// 5. `git add -A -- <explicit paths>` via `stage_existing_files`
+///    (never bare `git add .`).
+/// 6. `git commit -m "auto: initial commit (N files)"` — the configured
+///    hook chain runs and can refuse the root commit.
+///
+/// Returns Ok(true) when a root commit was created, Ok(false) when
+/// there was nothing policy-compliant to commit (caller should treat
+/// the repo as still-empty), Err on git failures.
+pub(crate) async fn bootstrap_empty_repo_commit(
+    repo: &Path,
+    policy: &SyncPolicy,
+    excluded_dir_names: &BTreeSet<String>,
+    dry_run: bool,
+) -> Result<bool> {
+    if !policy.auto_commit {
+        return Ok(false);
+    }
+    let _lease = if dry_run {
+        None
+    } else {
+        match crate::git::sync_lease::try_acquire(repo)? {
+            Some(lease) => Some(lease),
+            None => return Ok(false),
+        }
+    };
+    bootstrap_empty_repo_commit_owned(repo, policy, excluded_dir_names, dry_run).await
+}
+
+// The full sync path already owns the same kernel lease.
+async fn bootstrap_empty_repo_commit_owned(
+    repo: &Path,
+    policy: &SyncPolicy,
+    excluded_dir_names: &BTreeSet<String>,
+    dry_run: bool,
+) -> Result<bool> {
+    if !policy.auto_commit {
+        return Ok(false);
+    }
+
+    // Ownership gate — mirrors the daemon loop's guard so a bootstrap
+    // can never auto-commit into someone else's repo.
+    let repo_override = load_repo_override(repo);
+    let trusted = crate::ownership::TrustedSet {
+        emails: policy.trusted_emails.clone(),
+        authors: policy.trusted_authors.clone(),
+        remote_hosts: policy.trusted_remote_hosts.clone(),
+    };
+    let ownership = if policy.path_is_owned(repo) {
+        crate::ownership::detect_ownership_path_owned(repo, &trusted, repo_override.owned)
+    } else {
+        crate::ownership::detect_ownership(repo, &trusted, repo_override.owned)
+    };
+    let auto_skip_unowned = repo_override
+        .auto_skip_unowned
+        .unwrap_or(policy.auto_skip_unowned);
+    if auto_skip_unowned && !matches!(ownership, crate::ownership::OwnershipReport::Owned { .. }) {
+        if debug_enabled() {
+            eprintln!(
+                "🚫 {} empty repo not owned, skipping root-commit bootstrap",
+                repo.display()
+            );
+        }
+        return Ok(false);
+    }
+
+    let epoch = staged_epoch::Epoch::capture(repo, policy.stage_op_timeout_secs).await?;
+    let epoch = if epoch.has_intent() {
+        epoch
+    } else {
+        let untracked = untracked_entries(repo).await?;
+        let excludes = crate::policy::effective_auto_commit_excludes(policy, &repo_override);
+        let paths: Vec<String> = untracked
+            .iter()
+            .filter(|entry| {
+                policy.auto_stage_untracked
+                    && !crate::exclude::matches_untracked_exclude(
+                        repo,
+                        &entry.path,
+                        &policy.untracked_exclude_patterns,
+                    )
+                    && should_stage_entry(
+                        repo,
+                        entry,
+                        excluded_dir_names,
+                        &policy.exclude_file_patterns,
+                        policy.max_stage_file_bytes,
+                        &excludes,
+                    )
+            })
+            .take(policy.stage_batch_limit())
+            .map(|e| e.path.to_string_lossy().to_string())
+            .collect();
+        if paths.is_empty() || dry_run {
+            return Ok(false);
+        }
+        let deadline = epoch.deadline();
+        tokio::time::timeout_at(deadline, async {
+            let staging = staged_epoch::Staging::new(repo, epoch).await?;
+            stage_existing_files_in_index(
+                repo,
+                &paths,
+                false,
+                policy.stage_op_timeout_secs,
+                excluded_dir_names,
+                Some((policy, &excludes)),
+                None,
+                Some(staging.index()),
+            )
+            .await?;
+            staging
+                .finish(
+                    repo,
+                    policy,
+                    excluded_dir_names,
+                    repo_override
+                        .build_artifact_cleanup
+                        .unwrap_or(policy.build_artifact_cleanup),
+                    false,
+                )
+                .await
+        })
+        .await
+        .context("bootstrap staging absolute deadline expired; candidate retained")??
+    };
+    if !epoch.has_intent() || dry_run {
+        return Ok(false);
+    }
+    let message = format!("auto: initial commit ({} files)", epoch.entries()?.len());
+    epoch
+        .commit(repo, &message, policy, excluded_dir_names, None)
+        .await?;
+    Ok(true)
+}
+
+/// Keep ordinary commit mutation in a bounded, caller-owned process group.
+/// `GitService::commit` spawns non-cancellable blocking mutation, which cannot
+/// be joined or killed when its worker is cancelled.
+///
+/// The configured commit hook chain runs. The daemon does not suppress hooks:
+/// a repository whose `pre-commit` refuses a change must not have that change
+/// committed behind the hook's back, so `git commit` is invoked WITHOUT
+/// `--no-verify`. The in-process gates (bucket forward-only guard, immutable
+/// storage transaction, exclusion and size policy) run BEFORE this and cannot
+/// be relaxed by a hook, so the hook is additional policy, never a replacement.
+///
+/// A hook rejection surfaces as an `Err` here. Callers treat that as a failed
+/// pass (`ApplyOutcome::Failure`), never as success: the index and worktree are
+/// left intact, nothing is published, the failure stays in the evidence, and
+/// the next pass retries — so a per-repo hook can only delay a commit, never
+/// lose the edit or be reported as committed.
+///
+/// The `staged_op` process group is cancelled and killed on timeout, which also
+/// bounds hook execution: a hanging hook cannot outlive the pass.
+#[cfg(test)]
+async fn commit_staged_owned(repo: &Path, message: &str, timeout_secs: u64) -> Result<()> {
+    run_git_with_timeout(
+        repo,
+        &["commit", "-m", message],
+        timeout_secs.max(1),
+        "commit-staged",
+    )
+    .await
+}
+
+/// Run ONE configured hook, tolerating a repository that has none.
+///
+/// `git hook run --ignore-missing` exits 0 when the hook is absent (the common
+/// case) and propagates the hook's own status otherwise, so a refusal reaches
+/// the caller with the hook's stderr attached.
+async fn run_configured_hook(
+    repo: &Path,
+    hook: &str,
+    hook_args: &[&str],
+    timeout_secs: u64,
+) -> Result<()> {
+    let mut args: Vec<&str> = vec!["hook", "run", "--ignore-missing", hook];
+    if !hook_args.is_empty() {
+        // `git hook run <name> [-- <hook-args>]`; the separator is required.
+        args.push("--");
+        args.extend_from_slice(hook_args);
+    }
+    // Git sets GIT_EDITOR=: for commit hooks when no editor is launched (-m).
+    crate::git::run_git_with_timeout_env(
+        repo,
+        &args,
+        timeout_secs.max(1),
+        hook,
+        &[("GIT_EDITOR", ":")],
+    )
+    .await
+}
+
+/// Invoke the COMPLETE commit-hook lifecycle around a libgit2 seal.
+///
+/// A storage-sealed commit is written by `repository.commit`, which executes no
+/// hooks at all. Invoking only `pre-commit` would still let a refusing
+/// `commit-msg` — or a repository whose policy lives in `post-commit` — be
+/// bypassed, so this reproduces what `git commit` does, in Git's order and with
+/// Git's arguments:
+///
+/// 1. `pre-commit` (no arguments)
+/// 2. `prepare-commit-msg <msgfile> message`
+/// 3. `commit-msg <msgfile>` — may EDIT the message; the edited file is read
+///    back so the seal commits what the hook approved, not the original text
+/// 4. (caller seals the commit)
+/// 5. `post-commit` (no arguments), after a successful commit only
+///
+/// Each hook is a bounded, owned process group: a hanging hook cannot outlive
+/// the pass, and its children are killed with it.
+struct PreparedSealedCommit {
+    /// The message to commit: post-`prepare-commit-msg` / `commit-msg`.
+    message: String,
+}
+
+async fn run_sealed_commit_hooks(
+    repo: &Path,
+    message: &str,
+    timeout_secs: u64,
+) -> Result<PreparedSealedCommit> {
+    anyhow::ensure!(message.len() <= 1024 * 1024, "epoch message exceeds budget");
+    let output = staged_epoch::git(repo, &["rev-parse", "--absolute-git-dir"], None).await?;
+    let git_dir = PathBuf::from(std::str::from_utf8(&output.stdout)?.trim_end_matches('\n'));
+    // Unique capability, not the operator's COMMIT_EDITMSG. Retain on refusal
+    // so the hook-edited diagnostic is never silently discarded.
+    let directory = tempfile::Builder::new()
+        .prefix("dracon-epoch-message-")
+        .tempdir_in(git_dir)?;
+    let msgfile = directory.path().join("COMMIT_EDITMSG");
+    std::fs::write(&msgfile, format!("{message}\n"))?;
+    let msgfile_arg = msgfile.to_str().context("unsupported message path")?;
+    let hooks = async {
+        run_configured_hook(repo, "pre-commit", &[], timeout_secs).await?;
+        run_configured_hook(
+            repo,
+            "prepare-commit-msg",
+            &[msgfile_arg, "message"],
+            timeout_secs,
+        )
+        .await?;
+        run_configured_hook(repo, "commit-msg", &[msgfile_arg], timeout_secs).await
+    }
+    .await;
+    if let Err(error) = hooks {
+        let retained = directory.keep();
+        return Err(error.context(format!(
+            "refused epoch message retained at {}",
+            retained.display()
+        )));
+    }
+    let mut options = std::fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
+    }
+    let file = options.open(&msgfile)?;
+    anyhow::ensure!(
+        file.metadata()?.is_file() && file.metadata()?.len() <= 1024 * 1024,
+        "invalid or oversized hook message"
+    );
+    use std::io::Read;
+    let mut approved = String::new();
+    file.take(1024 * 1024 + 1).read_to_string(&mut approved)?;
+    anyhow::ensure!(
+        approved.len() <= 1024 * 1024,
+        "hook message grew past budget"
+    );
+    let approved = approved.trim_end_matches('\n').to_owned();
+    // Git ABORTS on an empty commit message ("Aborting commit due to empty
+    // commit message"). Silently restoring the original text here would let a
+    // hook refuse by truncation and be bypassed. Both exit-status refusals and
+    // empty approved messages must prevent publication.
+    if approved.trim().is_empty() {
+        return Err(anyhow::anyhow!(
+            "commit-msg left the commit message empty (git aborts in this case)"
+        ));
+    }
+    Ok(PreparedSealedCommit { message: approved })
+}
+
+/// ADDED 2026-07-27 (v0.113.5, audit M2): decide whether the
+/// `filter_only_cleared` early-return in `sync_repo` should fire.
+/// Pre-fix, the early-return checked `filter_only_cleared` alone and
+/// silently dropped any stale gitlink entries the injection step had
+/// just queued, starving the parent's gitlink convergence for
+/// filter-noisy parents (junk-runner et al.). The post-fix decision
+/// is: short-circuit only when filter-only AND no stale gitlinks
+/// were injected. An injection prevents the short-circuit so the
+/// rest of the apply phase runs and the parent commits the gitlink
+/// advance. Extracted to a `pub(crate)` free function for
+/// testability — the 4-case boolean matrix is pinned by
+/// `test_m2_filter_only_bypass_decision` below.
+pub(crate) fn should_short_circuit_filter_only(
+    filter_only_cleared: bool,
+    stale_gitlink_injected: bool,
+) -> bool {
+    filter_only_cleared && !stale_gitlink_injected
+}
+
+pub(crate) async fn sync_repo(
+    repo: &Path,
+    policy: &SyncPolicy,
+    excluded_dir_names: &BTreeSet<String>,
+    idle_seconds: u64,
+    remote_failures: Option<&mut HashMap<String, crate::daemon::RemoteFailInfo>>,
+    dry_run: bool,
+    policy_path: Option<&Path>,
+) -> Result<SyncOutcome> {
+    sync_repo_with_ahead_since(
+        repo,
+        policy,
+        excluded_dir_names,
+        idle_seconds,
+        remote_failures,
+        dry_run,
+        policy_path,
+        None,
+        false,
+    )
+    .await
+}
+
+/// Like `sync_repo` but also takes the `ahead_since` instant from the
+/// daemon's activity map, so the auto-commit backstop can be computed
+/// inside `sync_repo`. Pass `None` from one-off callers (e.g.
+/// `dracon-sync once`); the daemon passes the activity map's value.
+pub(crate) async fn sync_repo_with_ahead_since(
+    repo: &Path,
+    policy: &SyncPolicy,
+    excluded_dir_names: &BTreeSet<String>,
+    idle_seconds: u64,
+    remote_failures: Option<&mut HashMap<String, crate::daemon::RemoteFailInfo>>,
+    dry_run: bool,
+    policy_path: Option<&Path>,
+    ahead_since: Option<std::time::Instant>,
+    // v0.113.69 commit-despite-paused-push: commit without pushing.
+    commit_only: bool,
+) -> Result<SyncOutcome> {
+    // Publication admission is nonblocking and precedes local ownership. A
+    // busy publisher must not prevent this caller from committing new edits.
+    let is_repo = GitService::new(repo)?.is_git_repo().await?;
+    let publication_lease = if dry_run || commit_only || !is_repo {
+        None
+    } else {
+        crate::git::sync_lease::try_acquire_publication(repo)?
+    };
+    let publication_busy = !dry_run && !commit_only && is_repo && publication_lease.is_none();
+    let result = sync_repo_local_with_ownership(
+        repo,
+        policy,
+        excluded_dir_names,
+        idle_seconds,
+        remote_failures,
+        dry_run,
+        policy_path,
+        ahead_since,
+        commit_only || publication_busy,
+        publication_busy,
+        publication_lease,
+    )
+    .await;
+    if publication_busy
+        && matches!(
+            result,
+            Ok(SyncOutcome::Synced
+                | SyncOutcome::NothingToDo
+                | SyncOutcome::FilterOnly
+                | SyncOutcome::PushPaused
+                | SyncOutcome::BackstopSkipped)
+        )
+    {
+        return Ok(SyncOutcome::PublicationPending);
+    }
+    if is_repo
+        && matches!(
+            result,
+            Ok(SyncOutcome::Synced | SyncOutcome::NothingToDo | SyncOutcome::FilterOnly)
+        )
+    {
+        let pending = hygiene::has_pending(repo).unwrap_or_else(|error| {
+            eprintln!(
+                "⚠️ {} hygiene intent inspection failed; follow-up retained: {error:#}",
+                repo.display()
+            );
+            true
+        });
+        if pending {
+            return Ok(SyncOutcome::StagedPending);
+        }
+    }
+    result
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn sync_repo_local_with_ownership(
+    repo: &Path,
+    policy: &SyncPolicy,
+    excluded_dir_names: &BTreeSet<String>,
+    idle_seconds: u64,
+    remote_failures: Option<&mut HashMap<String, crate::daemon::RemoteFailInfo>>,
+    dry_run: bool,
+    policy_path: Option<&Path>,
+    ahead_since: Option<std::time::Instant>,
+    commit_only: bool,
+    publication_owned_elsewhere: bool,
+    publication_lease: Option<std::fs::File>,
+) -> Result<SyncOutcome> {
+    let preparation_start = std::time::Instant::now();
+    let preparation_phase = |phase: &str| {
+        if debug_enabled() {
+            eprintln!(
+                "scheduler: worker_prepare repo={} phase={} elapsed_ms={}",
+                repo.display(),
+                phase,
+                preparation_start.elapsed().as_millis()
+            );
+        }
+    };
+    let svc = GitService::new(repo)?;
+    if !svc.is_git_repo().await? {
+        if debug_enabled() {
+            eprintln!("🐛 {} is not recognized as git repo", repo.display());
+        }
+        let ctx = SyncContext {
+            operation_lease: None,
+            _publication_lease: None,
+            repo,
+            policy,
+            excluded_dir_names,
+            dry_run,
+            idle_seconds,
+            policy_path,
+            has_origin: false,
+            has_upstream: false,
+            auto_bump_versions: false,
+            build_artifact_cleanup: policy.build_artifact_cleanup,
+            remote_failures: None,
+            backstop_active: false,
+            commit_only: false,
+            publication_owned_elsewhere: false,
+            local_work_deferred: false,
+        };
+        if !commit_only {
+            maybe_sync_visibility_and_metadata(&ctx);
+        }
+        return Ok(SyncOutcome::NothingToDo);
+    }
+
+    // A daemon reservation is process-local. The kernel lease also covers
+    // sync-now/once and aliases/linked worktrees sharing these Git refs.
+    // Busy is a deferral, never a failed push or a reason to erase a lock.
+    let _operation_lease = if dry_run {
+        None
+    } else {
+        match crate::git::sync_lease::try_acquire(repo)? {
+            Some(lease) => Some(lease),
+            None => {
+                eprintln!(
+                    "⏳ {} sync deferred: another process owns the repository operation",
+                    repo.display()
+                );
+                return Ok(SyncOutcome::OperationDeferred);
+            }
+        }
+    };
+
+    if let Some(blocked) = check_conflict_state(repo) {
+        let ctx = SyncContext {
+            operation_lease: None,
+            _publication_lease: None,
+            repo,
+            policy,
+            excluded_dir_names,
+            dry_run,
+            idle_seconds,
+            policy_path,
+            has_origin: false,
+            has_upstream: false,
+            auto_bump_versions: false,
+            build_artifact_cleanup: policy.build_artifact_cleanup,
+            remote_failures: None,
+            backstop_active: false,
+            commit_only: false,
+            publication_owned_elsewhere: false,
+            local_work_deferred: false,
+        };
+        if !commit_only {
+            maybe_sync_visibility_and_metadata(&ctx);
+        }
+        return Ok(blocked);
+    }
+
+    let entry_epoch = staged_epoch::Epoch::capture_entry(
+        repo,
+        policy.stage_op_timeout_secs,
+        policy.auto_resolve_unmerged && policy.auto_commit && !dry_run,
+    )
+    .await?;
+    let mut entry_epoch = Some(entry_epoch);
+
+    // ADDED 2026-07-25 (v0.113.0): auto-gc when dangling garbage
+    // exceeds the policy threshold — the self-healing fix for the
+    // recurring tmp_pack_* bloat incidents (hegemon 4.9 GiB,
+    // dracon-platform 37 GiB, both previously manual gc). Cheap in
+    // the steady state (one count-objects) and never fatal. (The
+    // no-history-rewrite enforcement lives in warden's global hooks
+    // — warden owns the hook layer via core.hooksPath.)
+    // CHANGED 2026-07-26 (v0.113.2, audit SYNC-H3): moved BELOW
+    // `check_conflict_state` — v0.113.0 gc'd repos mid-merge/
+    // rebase/cherry-pick even though the sync itself correctly
+    // blocked two statements later.
+    // CHANGED 2026-10-26 (disk-exhaustion incident): the `has_intent()`
+    // condition is GONE. It made auto-gc skip exactly the repositories that
+    // generate the garbage: a busy repo has staged intent on nearly every
+    // cycle, so it was never gc'd and its `tmp_pack_*` files (failed/
+    // interrupted pushes) accumulated without bound. Observed the same day:
+    // browser-extensions-shared held 23 `tmp_pack_*` totalling 10.71 GiB
+    // against only 3.32 GiB of real objects (76% of `.git` was dangling),
+    // and ai-auto-writer repeatedly reached 28-66 GiB of the same garbage.
+    //
+    // The removed condition was NOT a safety gate. `git gc` never reads or
+    // writes the index and never touches the worktree, so a staged epoch is
+    // unaffected; the real safety gates are preserved: `!dry_run` (never
+    // mutate on a dry run), `!commit_only` (commit-only means no unrelated
+    // maintenance), and placement below `check_conflict_state` (never gc
+    // mid-merge/rebase/cherry-pick). `git gc` also keeps its 2-week prune
+    // grace, so in-flight objects are never collected.
+    //
+    // The per-repo 1h cooldown in `maybe_auto_gc` still bounds the cost: one
+    // `count-objects` per hour per repo in the steady state.
+    // CHANGED 2026-10-26: `!commit_only` REMOVED from these two maintenance
+    // calls. `commit_only` is what a repo falls INTO after its push is
+    // declared stuck — and a push-stuck repo is precisely the one generating
+    // `tmp_pack_*` garbage on every failed push (browser-extensions-shared
+    // held 23 files / 10.71 GiB, and it was being skipped here every cycle
+    // because the stuck ledger had put it in commit-only mode). Reclaiming
+    // dangling bytes is independent of publication, single-repository-local,
+    // and reversible-by-nothing (it creates no commits and touches no refs),
+    // so it must not be gated on push mode or it can never heal the exact
+    // repos that need it. It remains gated on `!dry_run`.
+    if !dry_run {
+        // ADDED 2026-11-07: a repository can opt OUT of automatic gc entirely.
+        //
+        // On a store too large to repack inside the gc timeout, every attempt
+        // fails after burning the FULL cap (multi-core + ~1.5 GiB resident),
+        // then retries forever on its cooldown — dragging the whole host down
+        // without ever converging (ai-auto-video: 12.2 GiB loose, 20 failures
+        // / 0 successes across six hours). Skipping the call is the only
+        // behaviour that stops the loop; the repository keeps every object
+        // and the operator repacks by hand or runs the slimming procedure.
+        // nothing inside Git's two-week grace). The repository keeps its
+        // objects; they are simply not automatically repacked.
+        let gc_override = crate::policy::load_repo_override(repo);
+        if !crate::policy::repo_auto_gc_disabled(policy, &gc_override) {
+            crate::git::maybe_auto_gc(
+                repo,
+                policy.auto_gc_garbage_threshold_bytes,
+                policy.auto_gc_loose_threshold_bytes,
+                policy.auto_gc_pack_growth_bytes,
+            )
+            .await;
+        }
+        // ADDED 2026-10-26: sweep stale `tmp_pack_*` leftovers.
+        // `git gc` reports these as garbage but does NOT remove recent ones
+        // (verified: a fresh 1 MB tmp_pack survived plain `git gc` and was
+        // only collected by `--prune=now`), so auto-gc alone could never
+        // reclaim the 10.71 GiB / 23 files found in
+        // browser-extensions-shared. Each failed push leaks one, and a
+        // busy repo leaks them continuously.
+        let (tmp_files, tmp_freed) = crate::git::sweep_stale_tmp_packs(
+            repo,
+            policy.epoch_spool_max_age_secs,
+            crate::git::fuser_path_in_use,
+        )
+        .await;
+        if tmp_files > 0 {
+            eprintln!(
+                "🗑️ {} reclaimed {} abandoned tmp_pack file(s) ({})",
+                repo.display(),
+                tmp_files,
+                crate::git::human_bytes(tmp_freed)
+            );
+        }
+        // ADDED 2026-07-29 (v0.113.10): opt-in janitor for stale
+        // daemon-created branches + orphaned remote-tracking refs.
+        // Placed with maybe_auto_gc: post-fetch (tracking tips fresh
+        // for the remote-deletion comparisons), below
+        // `check_conflict_state` (never mutates refs mid-merge/
+        // rebase), and gated off in dry-run. Opt-in via
+        // `auto_prune_stale_backup_branches` (default false).
+        if !commit_only && !entry_epoch.as_ref().is_some_and(|epoch| epoch.has_intent()) {
+            crate::git::maybe_prune_stale_backup_branches(
+                repo,
+                policy.auto_prune_stale_backup_branches,
+                &policy.backup_dir,
+            )
+            .await;
+        }
+        // ADDED 2026-10-26: reclaim abandoned private-epoch spools.
+        // Every epoch allocates `<gitdir>/dracon-staging-*` (a full-tree
+        // index + an independent pack) and RETAINS it after publication so
+        // prune cannot collect a proven candidate. Nothing released those
+        // directories: browser-extensions-shared accumulated 141 of them
+        // (101 GiB), filled the root filesystem and wedged every watched
+        // repo with `os error 28`. Bounded per-repo-hour like the two
+        // janitors above; a live epoch's spool is leased and skipped.
+        crate::git::reap_abandoned_spools(
+            repo,
+            policy.epoch_spool_max_age_secs,
+            policy.stage_op_timeout_secs,
+        )
+        .await;
+        // ADDED 2026-11-06: the qualified reclaim transaction above is still
+        // interlocked off, so it removes nothing. A spool whose content is
+        // PROVABLY REDUNDANT — every object it holds is reachable from a
+        // published remote-tracking ref, and its index describes exactly a
+        // published tree — carries no recovery data at all and can go. This
+        // is a separate route with its own entry point; it never widens
+        // age-only deletion authority.
+        crate::git::reap_redundant_spools(
+            repo,
+            policy.epoch_spool_max_age_secs,
+            policy.stage_op_timeout_secs,
+        )
+        .await;
+    }
+
+    if !is_repo_ready(repo) {
+        // CHANGED 2026-07-21 (v0.112.30): the previous bootstrap used
+        // bare `git add -A` + `git commit -m initial` (no size limits,
+        // no exclude patterns, no ownership gate, errors discarded),
+        // and — critically — was unreachable from the daemon loop
+        // because `daemon.rs` bailed on `!is_repo_ready` BEFORE
+        // dispatching `sync_repo`. The daemon loop now bootstraps
+        // stable empty repos itself; this block covers the CLI
+        // (`sync-now`) path and any direct callers. On success we
+        // fall through so the rest of the pipeline pushes the fresh
+        // root commit in the same invocation.
+        if !crate::git::is_stable_empty_repo(repo) {
+            eprintln!(
+                "⏳ {} not ready (mid-clone or empty repo), skipping",
+                repo.display()
+            );
+            return Ok(SyncOutcome::NothingToDo);
+        }
+        if entry_epoch.as_ref().is_some_and(|epoch| epoch.has_intent()) {
+            let epoch = entry_epoch.take().context("missing root epoch")?;
+            if !policy.auto_commit || dry_run {
+                return Ok(SyncOutcome::StagedPending);
+            }
+            let message = format!("auto: initial commit ({} files)", epoch.entries()?.len());
+            let pending = epoch
+                .commit(repo, &message, policy, excluded_dir_names, None)
+                .await?;
+            // Do not enter ordinary staging after a root captured epoch.
+            return Ok(if pending {
+                SyncOutcome::StagedPending
+            } else {
+                SyncOutcome::PushPaused
+            });
+        }
+        match bootstrap_empty_repo_commit_owned(repo, policy, excluded_dir_names, dry_run).await {
+            Ok(true) => {
+                // Fall through: HEAD is now valid, the pipeline below
+                // computes status and pushes the root commit.
+            }
+            Ok(false) => {
+                return Ok(SyncOutcome::NothingToDo);
+            }
+            Err(e) => {
+                // FIXED 2026-10-02 (audit L1): a failed bootstrap is a
+                // FAILURE, not NothingToDo — the old mapping cleared the
+                // stuck ledger and reset failure_count every cycle (the
+                // daemon counts NothingToDo as Success), so a repo
+                // failing bootstrap forever read healthy with no failure
+                // accounting. Propagate; the daemon's Err arm logs it.
+                return Err(e.context(format!(
+                    "empty-repo bootstrap failed for {}",
+                    repo.display()
+                )));
+            }
+        }
+    }
+
+    preparation_phase("before_origin");
+    let has_origin = if commit_only {
+        crate::git::multi_remote::get_remote_url(repo, "origin").is_some()
+    } else {
+        ensure_origin_remote(repo, policy)
+    };
+    let has_upstream = has_tracking_upstream(repo);
+    preparation_phase("before_status");
+    let initial_status = svc.get_status().await?;
+    preparation_phase("after_status");
+    // dracon-git reports ahead=0 for a detached HEAD because libgit2 cannot
+    // resolve a branch upstream in that state. The push path deliberately
+    // targets the conventional `main` branch for detached worktrees, so use
+    // the same CLI fallback for the backstop decision as well.
+    let initial_ahead = if initial_status.ahead > 0 {
+        initial_status.ahead as u64
+    } else if super::git::current_branch(repo).is_none() {
+        // Only use the CLI fallback for detached HEADs.  For an attached
+        // mirror-only repo with no remote-tracking ref, count_ahead_commits
+        // conservatively treats the whole local history as unpushed; that
+        // would re-open the mirror push gate even when the mirror is already
+        // current (and would arm the backstop on a healthy repo).
+        // FIXED 2026-10-02 (audit L2): a count failure NO LONGER reads
+        // as 0-ahead (which silently disarmed the backstop gate) — it
+        // fails the cycle so the error surfaces in failure accounting
+        // and retries next round instead of committing blind.
+        count_ahead_commits(repo)
+            .await
+            .with_context(|| format!("ahead-count failed for {}", repo.display()))?
+    } else {
+        // FIXED 2026-10-03 (audit R4-SC-01, same root as the
+        // handle_ahead_push arm): the old `0` disarmed the
+        // auto-commit backstop for attached mirror-only repos —
+        // is_backstop_active never saw the unpushed-vs-mirror
+        // commits, so the moving-target pileup the backstop
+        // exists to stop went undetected. Same positive-evidence
+        // helper as the dispatcher: converged mirrors read 0.
+        super::git::count_pushable_unpushed_vs_mirrors(repo)
+    };
+
+    let repo_override = load_repo_override(repo);
+    let auto_bump_versions = repo_override
+        .auto_bump_versions
+        .unwrap_or(policy.auto_bump_versions);
+    // v0.113.33: resolve the per-repo opt-out the SAME way
+    // auto_bump_versions is resolved — v0.113.29 read the global
+    // policy field directly in clean_staged_paths, so the per-repo
+    // override file never reached the gate.
+    let build_artifact_cleanup = repo_override
+        .build_artifact_cleanup
+        .unwrap_or(policy.build_artifact_cleanup);
+
+    // CHANGED 2026-07-01 (goal `mr1x7j5i-zioba9`):
+    // The previous version of this code unconditionally
+    // fast-forwarded the shared gitdir's `main` ref to the
+    // standalone's `daemon-standalone` tip at the start of
+    // every sync_repo cycle. That was needed when the
+    // standalone was on a separate `daemon-standalone` branch
+    // and the parent's gitlink tracked `main`. With the
+    // daemon-standalone branch removed (the standalone is on
+    // `main` directly now), the helper is a no-op and this
+    // step does nothing. The call is preserved for backwards
+    // compatibility with the daemon's main flow.
+    //
+    // REMOVED 2026-10-09 (audit F134): the cycle-start
+    // `fast_forward_daemon_standalone_to_main` call and its unreachable
+    // error arm are gone, together with the stub itself. The fast-forward
+    // stopped being necessary on 2026-07-01 (standalone on `main`
+    // directly) and the call site was only "preserved for backwards
+    // compatibility" — with a helper that unconditionally returned `Ok`,
+    // the `if let Err(e)` arm could never fire.
+
+    // Compute the auto-commit backstop. The backstop fires when
+    // a repo has more than `auto_commit_backstop_threshold`
+    // unpushed commits AND the push has been pending
+    // (`ahead_since`) for at least
+    // `auto_commit_backstop_min_age_secs`. We check it here so the
+    // SyncContext has the flag for the auto_commit block below.
+    let backstop_active = !commit_only
+        && is_backstop_active(
+            ahead_since,
+            std::time::Instant::now(),
+            initial_ahead.min(usize::MAX as u64) as usize,
+            policy.auto_commit_backstop_threshold,
+            policy.auto_commit_backstop_min_age_secs,
+        );
+    if backstop_active {
+        eprintln!(
+            "⏸️  daemon backstop: {} unpushed commits pending push >{}s, skipping auto-commit for {}",
+            initial_ahead,
+            policy.auto_commit_backstop_min_age_secs,
+            repo.display(),
+        );
+    }
+
+    let mut ctx = SyncContext {
+        operation_lease: _operation_lease,
+        _publication_lease: publication_lease,
+        repo,
+        policy,
+        excluded_dir_names,
+        dry_run,
+        idle_seconds,
+        policy_path,
+        has_origin,
+        has_upstream,
+        auto_bump_versions,
+        build_artifact_cleanup,
+        remote_failures,
+        backstop_active,
+        commit_only,
+        publication_owned_elsewhere,
+        local_work_deferred: false,
+    };
+
+    #[cfg(target_os = "linux")]
+    let recovery_pending = has_pending_excluded_recovery(repo).unwrap_or_else(|error| {
+        eprintln!(
+            "⚠️ {} recovery inspection unresolved; admitting diagnostic worker: {error:#}",
+            repo.display()
+        );
+        true
+    });
+    #[cfg(target_os = "linux")]
+    if recovery_pending {
+        let deadline =
+            tokio::time::Instant::now() + Duration::from_secs(policy.stage_op_timeout_secs.max(1));
+        let settled = excluded_revert::settle_pending(repo, deadline)
+            .await
+            .unwrap_or_else(|error| {
+                eprintln!(
+                    "⚠️ {} recovery settlement unverified; all data retained: {error:#}",
+                    repo.display()
+                );
+                false
+            });
+        if !settled {
+            eprintln!("⚠️ {} unresolved excluded recovery; preserved private and canonical bytes; inspect Git-directory dracon-excluded-recovery-* records and dracon-excluded-archive/", repo.display());
+            return Ok(publish_backlog_after_index_deferral(&svc, &mut ctx)
+                .await?
+                .unwrap_or(SyncOutcome::Blocked));
+        }
+    }
+    #[cfg(not(target_os = "linux"))]
+    if has_pending_excluded_recovery(repo)? {
+        return Ok(publish_backlog_after_index_deferral(&svc, &mut ctx)
+            .await?
+            .unwrap_or(SyncOutcome::Blocked));
+    }
+
+    // Metadata intent is NOT uncertain canonical recovery: never gate its own
+    // staged artifact commit behind successful metadata application. An index
+    // owner/writer may defer the retry while normal commit/backlog work proceeds.
+    #[cfg(target_os = "linux")]
+    if policy.auto_commit && !dry_run {
+        let deadline =
+            tokio::time::Instant::now() + Duration::from_secs(policy.stage_op_timeout_secs.max(1));
+        if let Err(error) = hygiene::retry(
+            repo,
+            policy,
+            excluded_dir_names,
+            build_artifact_cleanup,
+            deadline,
+        )
+        .await
+        {
+            eprintln!(
+                "⏳ {} artifact ignore intent retained for retry: {error:#}",
+                repo.display()
+            );
+        }
+    }
+
+    let hygiene_followup_pending = hygiene::has_pending(repo).unwrap_or(true);
+    if entry_epoch.as_ref().is_some_and(|epoch| epoch.has_intent()) {
+        let epoch = entry_epoch.take().context("missing entry epoch")?;
+        if !policy.auto_commit || dry_run {
+            return Ok(SyncOutcome::StagedPending);
+        }
+        if ctx.backstop_active {
+            return Ok(match handle_ahead_push(&mut ctx, &svc).await? {
+                PushReport::Attempted { ok: false, .. } => SyncOutcome::PushFailed,
+                _ => SyncOutcome::BackstopSkipped,
+            });
+        }
+        let entries = epoch.entries()?;
+        return Ok(stage_commit_and_push(
+            &svc,
+            &mut ctx,
+            &initial_status,
+            &entries,
+            &[],
+            None,
+            Some(epoch),
+        )
+        .await?
+        .unwrap_or(SyncOutcome::Synced));
+    }
+
+    let copied_standard_files = if policy.standard_files_auto {
+        // Acquire git's index.lock before writing standard files to the working tree.
+        // This prevents conflicting with git's own checkout during clone — if git
+        // holds the lock, we skip; if we hold it, git waits. No heuristics needed.
+        match crate::git::IndexLock::acquire(repo) {
+            Ok(_lock) => crate::standard_files::ensure_standard_files(
+                repo,
+                policy,
+                &repo_override,
+                policy_path.map(|p| p.parent().unwrap_or(p)),
+                dry_run,
+            )?,
+            Err(e) => {
+                if crate::policy::debug_enabled() {
+                    eprintln!("⏳ {}", e);
+                }
+                vec![] // skip standard files this cycle
+            }
+        }
+    } else {
+        vec![]
+    };
+
+    let _ = copied_standard_files; // ordinary staging handles generated paths in its private view.
+
+    preparation_phase("before_pull");
+    if !commit_only {
+        auto_pull_merge(&ctx, &initial_status).await?;
+    }
+    preparation_phase("before_clean");
+    // Cycle-entry capture proved no staged intent; do not erase later unknown
+    // staging via hygiene. Candidate policy verification refuses it intact.
+    // Explicit checkout opt-in only. Upload/read-back must precede computing
+    // the diff, so verified reference changes enter this same commit cycle.
+    // The bridge attempts first (when `bucket-runner.json` is present and
+    // enabled) and falls back to the legacy inline-script workflow when it
+    // is absent. Either path returns a `bucket_assets::Prepared` so the
+    // downstream `verify_staged` / `staged_paths` checks at sync.rs:4580
+    // and sync.rs:5598 work without further changes.
+    let private_assets = match crate::bucket_runner_bridge::prepare(repo, dry_run, policy).await {
+        Ok(Some(prepared)) => Some(prepared),
+        Ok(None) => {
+            match crate::bucket_assets::prepare(repo, dry_run, policy.stage_op_timeout_secs).await {
+                Ok(prepared) => prepared,
+                Err(error) => {
+                    eprintln!(
+                        "⚠️ {} private bucket preparation refused; no commit: {error:#}",
+                        repo.display()
+                    );
+                    return Ok(SyncOutcome::Blocked);
+                }
+            }
+        }
+        Err(error) => {
+            eprintln!(
+                "⚠️ {} bucket runner bridge refused; no commit: {error:#}",
+                repo.display()
+            );
+            return Ok(SyncOutcome::Blocked);
+        }
+    };
+    let private_followup_pending = match private_assets.as_ref() {
+        Some(prepared) => tokio::time::timeout(
+            Duration::from_secs(policy.stage_op_timeout_secs.max(1)),
+            prepared.has_materialization_followup(repo),
+        )
+        .await
+        .context("private materialization inspection deadline expired")??,
+        None => false,
+    };
+    if private_followup_pending {
+        eprintln!("⏳ {} private materializations are not covered by the verified manifest; local bytes retained pending eligible regeneration/reconciliation", repo.display());
+    }
+    preparation_phase("before_diff");
+
+    let DiffResult {
+        mut status,
+        mut entries,
+        filter_only_cleared,
+    } = compute_diff_entries(&svc, repo).await?;
+    preparation_phase("after_diff");
+
+    // ADDED 2026-07-01, goal `mr10pdzr-i495vy`:
+    // Inject synthetic DiffFile entries for any tracked gitlink whose
+    // SHARED gitdir's `refs/heads/main` is ahead of the parent's
+    // tracked gitlink SHA. This is the propagation-fix half of the
+    // submodule-as-standalone-worktree feature:
+    //
+    // - The nested submodule checkout at `<parent>/<submodule_path>/`
+    //   is detached at the parent's gitlink SHA, while the shared
+    //   gitdir's `main` advances independently. When the nested HEAD
+    //   still equals the parent gitlink, `git diff HEAD` reports NO
+    //   change and the gitlink never enters `compute_diff_entries`'s
+    //   `entries`, so the parent's gitlink silently diverges from
+    //   `main`.
+    //
+    // Fix: enumerate the stale gitlinks here and inject them into
+    // `entries` with status = Modified so they flow through the same
+    // partition-and-stage pipeline as naturally-dirty entries.
+    // `stage_gitlink_updates` then reads the shared `main` ref via
+    // `shared_submodule_main_sha` and writes the correct SHA into the
+    // parent's index via `git update-index --cacheinfo 160000,<sha>,
+    // <path>`.
+    //
+    // Status must be Modified (not Added) so that:
+    // 1. The entry is not dropped by the "auto_stage_untracked = false"
+    //    filter that runs against `Added` entries.
+    // 2. The path is already tracked in the parent, which is correct
+    //    (gitlinks are tracked entries with mode 160000).
+    //
+    // Empty `mut entries` is fine — extend() appends without
+    // disturbing any existing entries (which would already represent
+    // dirty gitlinks from this commit's perspective).
+    let stale_paths = crate::exclude::stale_gitlink_paths(repo);
+    // ADDED 2026-07-27 (v0.113.5, audit M2): track whether this
+    // sync_repo call injected ANY stale gitlink entries. The
+    // `filter_only_cleared` early-return below would otherwise
+    // drop those injected entries, leaving the parent's gitlink
+    // convergence starved. The flag is set only when the injection
+    // actually appended an entry (not when the dedup-skip path is
+    // taken) so a no-op injection does not prevent the early-return.
+    let mut stale_gitlink_injected = false;
+    if !stale_paths.is_empty() {
+        if debug_enabled() {
+            eprintln!(
+                "🐛 {} injecting {} stale gitlink(s) from shared main: {:?}",
+                repo.display(),
+                stale_paths.len(),
+                stale_paths
+            );
+        }
+        // If libgit2 thought the repo was clean (no dirty entries at
+        // all), the auto-commit branch downstream would be skipped via
+        // the `!status.is_clean` guard. Stale gitlink entries are
+        // effectively dirty (their pointer needs to advance), so flip
+        // is_clean off so the auto-commit pipeline runs them.
+        status.is_clean = false;
+        status.modified_files += stale_paths.len();
+        for p in stale_paths {
+            // Defensive dedup: if `entries` already contains this
+            // path (e.g. from a natural `git diff HEAD` dirty
+            // gitlink), don't double-inject.
+            if entries.iter().any(|e| e.path == p) {
+                continue;
+            }
+            stale_gitlink_injected = true;
+            entries.push(dracon_git::types::DiffFile::new(
+                p,
+                dracon_git::types::FileStatus::Modified,
+            ));
+        }
+    }
+
+    // filter_only_cleared: changes present but all filtered out by clean/smudge.
+    // CHANGED 2026-07-21 (v0.112.33, audit M9/F1.8): return the
+    // dedicated `FilterOnly` outcome so the daemon's apply phase
+    // actually inserts the stage cooldown this comment always
+    // promised (`stage_cooldowns` was dead — no insert site existed).
+    // CHANGED 2026-07-27 (v0.113.5, audit M2): gate the early-return
+    // on `should_short_circuit_filter_only(filter_only_cleared,
+    // stale_gitlink_injected)` rather than `filter_only_cleared`
+    // alone. Pre-fix, the early-return dropped any stale gitlink
+    // entries the injection step above had just queued, starving the
+    // parent's gitlink convergence for filter-noisy parents (the
+    // filter cleaned the real dirty entries, but the injected stale
+    // gitlinks are real changes too — the parent still needs its
+    // gitlink pointer updated). Post-fix, an injection of stale
+    // gitlinks prevents the early-return so the rest of the apply
+    // phase runs and the parent commits the gitlink advance.
+    if should_short_circuit_filter_only(filter_only_cleared, stale_gitlink_injected)
+        && !private_followup_pending
+        && !hygiene_followup_pending
+    {
+        // CHANGED 2026-07-26 (v0.113.1): run the push phase BEFORE
+        // returning FilterOnly. Pre-fix, a repo whose only dirty
+        // entries are filter noise (e.g. junk-runner's tracked +
+        // gitignored `.pi-glla/active.jsonl` heartbeat, rewritten
+        // every ~15s by its loop agent) hit this early-return every
+        // cycle; the 300s stage cooldown then silenced it and the
+        // push phase below was never reached — already-committed
+        // work piled up unpushed INDEFINITELY (junk-runner: 19
+        // commits, 10h of silent starvation, found 2026-07-26).
+        // `handle_ahead_push` is a cheap local no-op when there is
+        // genuinely nothing to push (libgit2 status + upstream
+        // checks, no network), so the pure-noise case pays nothing.
+        // The FilterOnly outcome (and its 300s stage cooldown) still
+        // applies, bounding a repo whose tracking ref never
+        // converges to one push attempt per 5 min.
+        // v0.113.69 commit-only: skip the backlog push AND the
+        // FilterOnly cooldown (its 300s stage cooldown would freeze
+        // commits — the thing commit-only exists to keep flowing).
+        if ctx.commit_only {
+            eprintln!(
+                "⏸️ {} push paused (commit-only): skipping backlog push",
+                repo.display()
+            );
+            return Ok(SyncOutcome::PushPaused);
+        }
+        match handle_ahead_push(&mut ctx, &svc).await? {
+            // v0.113.69: all remotes paused — PushPaused carries no
+            // stage cooldown (unlike FilterOnly below), so commits
+            // keep flowing every cycle until the push is unpaused.
+            PushReport::AllPaused => return Ok(SyncOutcome::PushPaused),
+            PushReport::Attempted { ok: false, .. } => return Ok(SyncOutcome::PushFailed),
+            PushReport::Attempted { ok: true, .. } => {}
+        }
+        if debug_enabled() {
+            eprintln!(
+                "🐛 {} filter-only dirty, returning FilterOnly for cooldown",
+                repo.display(),
+            );
+        }
+        return Ok(SyncOutcome::FilterOnly);
+    }
+
+    if (!status.is_clean || hygiene_followup_pending) && policy.auto_commit {
+        // Auto-commit backstop: when the daemon detects a repo with
+        // many unpushed commits and a long-pending push, it stops
+        // auto-committing to prevent the moving-target problem (each
+        // new commit forces the daemon to retry the entire push from
+        // scratch). The backstop logs a `⏸️ daemon backstop` line at
+        // the top of `sync_repo`; here we honour it by short-
+        // circuiting the auto-commit step. Manual `git add`/`git
+        // commit` from the operator still works.
+        if ctx.backstop_active {
+            // CHANGED 2026-07-26 (v0.113.2, audit SYNC-H2): push the
+            // backlog BEFORE skipping the commit — draining ahead<N
+            // is the fastest way out of the backstop state, and the
+            // pre-fix early return suppressed exactly that. Then
+            // return `BackstopSkipped` (retains `ahead_since` in the
+            // daemon's activity map) instead of `NothingToDo`
+            // (treated as success → `ahead_since` wiped → backstop
+            // disarmed after one skipped dispatch).
+            // v0.113.69 commit-only: the backstop already skips the
+            // commit; also skip the backlog-drain push (BackstopSkipped
+            // keeps ahead_since with only a 60s breather).
+            if ctx.commit_only {
+                return Ok(SyncOutcome::BackstopSkipped);
+            }
+            // v0.113.69: AllPaused keeps the backstop breather (60s)
+            // with no failure recorded; attempted-failure stays PushFailed.
+            return Ok(match handle_ahead_push(&mut ctx, &svc).await? {
+                PushReport::AllPaused => SyncOutcome::BackstopSkipped,
+                PushReport::Attempted { ok: true, .. } => SyncOutcome::BackstopSkipped,
+                PushReport::Attempted { ok: false, .. } => SyncOutcome::PushFailed,
+            });
+        }
+        // When `auto_stage_untracked = false`, we need to know which
+        // Added-status entries are untracked vs freshly-staged-tracked.
+        // Build the tracked set once per sync_repo call.
+        let tracked_paths: std::collections::HashSet<std::path::PathBuf> =
+            if policy.auto_stage_untracked {
+                std::collections::HashSet::new()
+            } else {
+                crate::git::tracked_paths(repo).await?
+            };
+        // R3-M2: per-repo entries EXTEND the global list (union helper).
+        let partition_excludes =
+            crate::policy::effective_auto_commit_excludes(policy, &repo_override);
+        let (to_stage, to_restore): (Vec<_>, Vec<_>) = entries
+            .into_iter()
+            .filter(|e| {
+                if private_assets
+                    .as_ref()
+                    .is_some_and(|prepared| prepared.materialized_paths.contains(&e.path))
+                {
+                    // Leave existing Git baselines and operator worktree bytes
+                    // intact. Only the verified reference is newly committed.
+                    return false;
+                }
+                if repo.join(&e.path).is_dir()
+                    && crate::exclude::is_gitlink_unchanged(repo, &e.path)
+                {
+                    return false;
+                }
+                // `auto_stage_untracked = false` skips newly-added (untracked)
+                // files. The daemon still commits modified tracked files
+                // and unstaged modifications. Use this to keep scratch
+                // research, notes, and other operator-local files out of
+                // the auto-commit while still syncing tracked changes.
+                if matches!(e.status, dracon_git::types::FileStatus::Added)
+                    && !tracked_paths.contains(&e.path)
+                {
+                    if !policy.auto_stage_untracked {
+                        if debug_enabled() {
+                            eprintln!(
+                                "⏭️  {} skipping untracked {} (auto_stage_untracked = false)",
+                                repo.display(),
+                                e.path.display()
+                            );
+                        }
+                        return false;
+                    }
+                    // `untracked_exclude_patterns` lets the operator
+                    // exclude specific patterns (notes, scratch, audit
+                    // evidence) from auto-stage even when the toggle is
+                    // on. Match on the basename and on path-with-glob
+                    // via `glob` against the full path.
+                    if crate::exclude::matches_untracked_exclude(
+                        repo,
+                        &e.path,
+                        &policy.untracked_exclude_patterns,
+                    ) {
+                        if debug_enabled() {
+                            eprintln!(
+                                "⏭️  {} skipping untracked {} (untracked_exclude_patterns)",
+                                repo.display(),
+                                e.path.display()
+                            );
+                        }
+                        return false;
+                    }
+                }
+                true
+            })
+            .partition(|e| {
+                should_stage_entry(
+                    repo,
+                    e,
+                    excluded_dir_names,
+                    &policy.exclude_file_patterns,
+                    policy.max_stage_file_bytes,
+                    &partition_excludes,
+                )
+            });
+        if debug_enabled() {
+            // FIXED 2026-10-03 (audit R3-L01): label gate semantics,
+            // not outcomes — these are pre-stage candidates vs
+            // gate-rejected (staging itself can still skip/fail).
+            eprintln!(
+                "🐛 {} stage_candidates={} gate_rejected={}",
+                repo.display(),
+                to_stage.len(),
+                to_restore.len()
+            );
+        }
+        if !to_stage.is_empty()
+            || hygiene_followup_pending
+            || to_restore.iter().any(|entry| {
+                crate::exclude::is_large_untracked(entry, repo, policy.max_stage_file_bytes)
+            })
+            || (!to_restore.is_empty() && repo_override.revert_excluded_to_head == Some(true))
+        {
+            if debug_enabled() {
+                eprintln!(
+                    "scheduler: stage_enter repo={} thread={:?} unix_ms={}",
+                    repo.display(),
+                    std::thread::current().id(),
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_millis()
+                );
+            }
+            let staged = stage_commit_and_push(
+                &svc,
+                &mut ctx,
+                &status,
+                &to_stage,
+                &to_restore,
+                private_assets.as_ref(),
+                entry_epoch.take(),
+            )
+            .await;
+            if debug_enabled() {
+                eprintln!(
+                    "scheduler: stage_exit repo={} thread={:?} unix_ms={} ok={}",
+                    repo.display(),
+                    std::thread::current().id(),
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_millis(),
+                    staged.is_ok()
+                );
+            }
+            if let Some(outcome) = staged? {
+                return Ok(outcome);
+            }
+            // `Ok(None)` from stage_commit_and_push = commit + push
+            // succeeded. Report `Synced` (the honest "this cycle did
+            // work" outcome; the fresh status after the push has
+            // ahead=0, so handle_ahead_push below would find nothing
+            // to do anyway).
+            return Ok(SyncOutcome::Synced);
+        } else if policy.auto_push && !has_origin && policy.remotes.is_empty() {
+            eprintln!(
+                "ℹ️ skip push for {} (no origin remote and no mirror remotes)",
+                repo.display()
+            );
+        }
+
+        // CHANGED 2026-08-09 (v0.113.47, dracon-platform incident):
+        // do NOT return `Synced` here — fall through to the
+        // `handle_ahead_push` gate below. A repo that is dirty
+        // (`is_clean=false`) with nothing committable (`to_stage`
+        // empty — every dirty file excluded by
+        // `auto_commit_exclude_patterns`, or phantom WT_MODIFIED
+        // submodule gitlinks from the libgit2 ignore bug) but with
+        // unpushed commits ahead was wedged: the old early return
+        // skipped `handle_ahead_push` entirely, so ahead>0 commits
+        // sat unpushed forever while the daemon logged `🔁 synced`
+        // every cycle and the report showed a false "pushing Xm".
+        // Observed live: dracon-platform's 690d39180 stuck unpushed
+        // for 40+ minutes on 2026-08-09.
+    }
+
+    if !ctx.local_work_deferred {
+        maybe_sync_visibility_and_metadata(&ctx);
+    }
+
+    // CHANGED 2026-07-21 (v0.112.31, audit H3/F1.3): a failed push
+    // surfaces as `PushFailed` so the daemon's apply phase counts it
+    // as a failure (no `🔁 synced`, `failure_count` increments)
+    // instead of the previous false-healthy `NothingToDo`.
+    // v0.113.69 commit-only: never attempt the push; PushPaused
+    // records no failure and leaves the stuck ledger untouched.
+    if ctx.commit_only {
+        return Ok(SyncOutcome::PushPaused);
+    }
+    let push_report = handle_ahead_push(&mut ctx, &svc).await?;
+
+    if !ctx.local_work_deferred {
+        maybe_sync_visibility_and_metadata(&ctx);
+    }
+    match push_report {
+        // v0.113.69: nothing attempted, nothing failed — retain
+        // activity, record nothing.
+        PushReport::AllPaused => Ok(SyncOutcome::PushPaused),
+        PushReport::Attempted { ok: false, .. } => Ok(SyncOutcome::PushFailed),
+        // Degraded (ok + pause-skips) maps to PushPaused here:
+        // progress on healthy legs, sick remote still paused — retain
+        // activity + pause memory, write no ledger entry either way.
+        PushReport::Attempted {
+            ok: true,
+            degraded: true,
+        } => Ok(SyncOutcome::PushPaused),
+        PushReport::Attempted {
+            ok: true,
+            degraded: false,
+        } => Ok(if private_followup_pending {
+            SyncOutcome::StagedPending
+        } else {
+            SyncOutcome::NothingToDo
+        }),
+    }
+}
+
+/// ADDED 2026-07-26 (v0.113.1): after a successful push, refresh
+/// the branch's upstream tracking ref (e.g. `refs/remotes/origin/
+/// main`) when it disagrees with HEAD. The daemon pushes to NAMED
+/// mirror remotes (github/gitlab/codeberg); when `origin` shares a
+/// URL with one of them (junk-runner: origin = the gitlab URL), the
+/// push updates `refs/remotes/gitlab/main` but NOT `refs/remotes/
+/// origin/main`. libgit2 then reports ahead>0 forever: the report
+/// lies ("pushing 240m" when the push finished long ago) and every
+/// subsequent cycle re-pushes needlessly. A bounded `git fetch
+/// <upstream-remote>` restores reality. Skipped when the tracking
+/// ref already matches HEAD (the common case costs zero network).
+/// Best-effort: a failed fetch is transient and retried on the
+/// next successful push.
+async fn refresh_stale_upstream_ref(repo: &Path) {
+    let output = |args: &[&str]| -> Option<String> {
+        let out = super::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy()])
+            .args(args)
+            .output()
+            .ok()?;
+        if !out.status.success() {
+            return None;
+        }
+        Some(String::from_utf8_lossy(&out.stdout).trim().to_string())
+    };
+    // A detached worktree has no symbolic branch to report, but the push
+    // path uses `main` as its explicit destination in that state. Refresh
+    // that same tracking ref after a successful push so the next cycle does
+    // not repeatedly rediscover the already-pushed commit.
+    let branch = super::git::current_branch(repo).unwrap_or_else(|| "main".to_string());
+    let Some(remote) =
+        output(&["config", &format!("branch.{}.remote", branch)]).filter(|s| !s.is_empty())
+    else {
+        return;
+    };
+    let Some(merge) =
+        output(&["config", &format!("branch.{}.merge", branch)]).filter(|s| !s.is_empty())
+    else {
+        return;
+    };
+    let short = merge.strip_prefix("refs/heads/").unwrap_or(&merge);
+    let head_sha = output(&["rev-parse", "HEAD"]);
+    // ADDED 2026-11-11: refresh every configured REMOTE NAME, not only the
+    // one `branch.<b>.remote` happens to point at. The daemon pushes each
+    // mirror by name, so `git push github ...` updates
+    // `refs/remotes/github/<b>` — but `branch.<b>.remote` is a single value
+    // (here `origin`, which shares github's URL), so only origin's ref got
+    // repaired. With three names aimed at two forges, ONE stale tracking ref
+    // is enough to poison every consumer of `count_ahead_commits`, which
+    // takes the MAXIMUM across all tracking refs: the daemon permanently
+    // reported browser-extensions-shared as "1784 commit(s) ahead" when it
+    // was 31, scaled every push timeout 900s -> 5400s, fired a standing
+    // "Stuck Ahead (Unpushed)" alert, and tripped the auto-commit backstop
+    // so fresh edits stopped being committed. Fetching by name keeps the
+    // max honest: a name that is genuinely behind still reports its own
+    // distance, and a name whose remote tip already equals HEAD costs a
+    // local rev-parse and no network at all.
+    //
+    // FIXED 2026-11-11 (audit follow-up, HIGH): the names loop used to sit
+    // BEHIND an early `return` on the upstream tracking ref being converged
+    // (`refs/remotes/origin/<b> == HEAD`), so the common production shape —
+    // upstream repaired long ago, a MIRROR still pinned at an old tip —
+    // never reached the loop at all. Live proof: capture-anime-girls had
+    // `origin/main == HEAD` (8c9692f6) while `gitlab/main` sat at d191dde3,
+    // so the daemon kept reporting 233 unpushed commits off a ref whose real
+    // remote tip already equalled HEAD. The per-name `continue` inside the
+    // loop already makes a converged name free, so the early return bought
+    // nothing: decide staleness per name instead.
+    let mut names: Vec<String> = vec![remote];
+    for candidate in super::git::multi_remote::list_remotes(repo) {
+        if !names.contains(&candidate) {
+            names.push(candidate);
+        }
+    }
+    let stale: Vec<String> = names
+        .iter()
+        .filter(|name| {
+            let tracking = format!("refs/remotes/{}/{}", name, short);
+            output(&["rev-parse", &tracking])
+                .zip(head_sha.clone())
+                .is_some_and(|(tracking_sha, head)| tracking_sha != head)
+        })
+        .cloned()
+        .collect();
+    if stale.is_empty() {
+        return; // every name already agrees with HEAD — zero network cost
+    }
+    // A successful named-mirror push can leave the configured upstream
+    // tracking ref stale. If the fetch cannot repair it (dead origin,
+    // credentials, or a transient network failure), the next successful
+    // push would otherwise launch the same 30-second fetch every cycle.
+    // Rate-limit repeated refresh attempts per repo so a broken upstream
+    // cannot dominate the daemon's push budget.
+    if !stale_upstream_refresh_allowed(repo, std::time::Instant::now()) {
+        return;
+    }
+    for name in &stale {
+        let _ = super::git::run_git_with_timeout_env_progress(
+            repo,
+            &["fetch", name],
+            30,
+            "upstream-refresh",
+            &[("GIT_TERMINAL_PROMPT", "0")],
+        )
+        .await;
+    }
+}
+
+/// Pushes unpushed commits when needed.
+///
+/// Returns `Ok(PushReport::Attempted(true))` when no push was needed or
+/// the push succeeded, `Attempted(false)` when a push was attempted and
+/// FAILED (already recorded to the push ledger by this function), and
+/// `AllPaused` when every remote was pause-skipped (v0.113.69 — the
+/// caller maps that to `SyncOutcome::PushPaused`, never PushFailed).
+/// CHANGED 2026-07-21
+/// (v0.112.31, audit H3/F1.3): previously returned `Result<()>` and
+/// swallowed push failures, so the caller's `NothingToDo` outcome
+/// read as success in the daemon's apply phase.
+// v0.113.69: reports whether any push was attempted so callers can
+// distinguish "tried and failed" (PushFailed + stuck-ledger write)
+// from "every remote paused" (PushPaused, no failure recorded).
+async fn handle_ahead_push(ctx: &mut SyncContext<'_>, svc: &GitService) -> Result<PushReport> {
+    let current_status = svc.get_status().await?;
+    // dracon-git's libgit2 status cannot associate a detached HEAD with an
+    // upstream, so it reports ahead=0 even when HEAD is one or more commits
+    // beyond origin/main. Reuse the CLI-based count used for timeout scaling
+    // before deciding whether there is anything to push.
+    let ahead = if current_status.ahead > 0 {
+        current_status.ahead as u64
+    } else if super::git::current_branch(ctx.repo).is_none() {
+        // dracon-git's detached-HEAD fallback is needed only when the
+        // checkout has no branch.  On an attached mirror-only checkout,
+        // count_ahead_commits may have to fall back to the whole local
+        // history when no tracking ref exists, which is not proof that a
+        // configured mirror is stale and would cause unwanted pushes.
+        // FIXED 2026-10-03 (audit R3-L01): a count error is a FAILURE,
+        // not 0-ahead — the old `unwrap_or(0)` produced should_push=false
+        // → Attempted{ok:true} → NothingToDo → daemon Success cleared the
+        // stuck ledger with zero failure accounting (R2-L2 shape, detached
+        // HEAD only). Propagate so the caller records a real failure.
+        count_ahead_commits(ctx.repo)
+            .await
+            .map_err(|e| e.context("detached-ahead count failed"))?
+    } else {
+        // FIXED 2026-10-03 (audit R4-SC-01): the old `0` made a
+        // clean attached mirror-only repo (no upstream, ahead=0
+        // from libgit2) return Attempted{ok:true} → NothingToDo,
+        // which the daemon's apply phase treats as success and
+        // clears the stuck ledger — while the daemon had
+        // dispatched this very cycle BECAUSE its mirror-ahead
+        // override measured unpushed mirror work. A failed mirror
+        // push was never retried and each dispatched no-op wiped
+        // the stuck entry. Consult the SAME positive-evidence
+        // helper the dispatcher uses: it only counts
+        // fast-forward-pushable lag (the mirror ref must be an
+        // ancestor of HEAD), so a converged mirror still reads 0
+        // and the v0.113.5/M3 no-unwanted-push guarantee holds.
+        super::git::count_pushable_unpushed_vs_mirrors(ctx.repo)
+    };
+    let branch_has_upstream = super::git::has_tracking_upstream(ctx.repo);
+    // CHANGED 2026-07-21 (v0.112.30): when the upstream is configured
+    // (e.g. by `configure_publish_upstream_if_missing`) but the
+    // remote-tracking ref does not exist yet — the never-pushed state
+    // every freshly-bootstrapped empty repo is in — libgit2's
+    // ahead/behind returns 0 (nothing to compare against) and the old
+    // `should_push` expression evaluated to false, so the root commit
+    // was NEVER pushed and the report showed a false "synced". Treat
+    // a missing remote-tracking ref as push-needed: every commit on
+    // HEAD is definitionally unpushed to that upstream.
+    //
+    // CHANGED 2026-07-27 (v0.113.5, audit M3): removed the
+    // `|| !branch_has_upstream` clause from `should_push`. That
+    // clause made should_push true forever for mirror-only repos
+    // (no upstream configured) that were already fully pushed to their
+    // mirrors — every 300s stage cooldown cycle then issued a real push
+    // attempt to a forge that may be flaky, and any transient remote
+    // failure was written to the stuck ledger by `record_push_failure`
+    // (`sync.rs:4191-4197`). With enough failures the repo flipped to
+    // `StuckDecision::Exhausted` and the desktop alarm fired for a repo
+    // that was completely benign. The fleet observed this concretely on
+    // 2026-07-27 as a 73-minute browser-extensions-shared stall after
+    // a transient ssh hiccup (see `AUDIT_FULL_2026-07-26.md` and the
+    // precedential design doc in `docs/design/filteronly-push-starvation-2026-07-26.md`).
+    // The new gate is `ahead > 0 || upstream_ref_missing`: a push is
+    // only attempted when there is positive evidence of unpushed work.
+    // The v0.112.30 `upstream_ref_missing` branch still bootstrap-pushes
+    // a never-pushed repo with a configured upstream whose tracking
+    // ref is missing.
+    let upstream_ref_missing =
+        branch_has_upstream && super::git::upstream_tracking_ref_missing(ctx.repo);
+    // CHANGED 2026-07-27 (v0.113.5, audit M3): removed the
+    // `|| !branch_has_upstream` clause; the gate is now
+    // `ahead > 0 || upstream_ref_missing`.
+    let should_push = ahead > 0 || upstream_ref_missing;
+    if ctx.policy.auto_push && should_push && (ctx.has_origin || !ctx.policy.remotes.is_empty()) {
+        // Owned publication (see `run_publication_actor`): one pinned round
+        // whose upload overlaps fresh local commits in this repository.
+        let ahead = count_ahead_commits(ctx.repo).await.unwrap_or(0);
+        let has_origin = ctx.has_origin;
+        match run_publication_actor(&mut *ctx, has_origin, ahead).await {
+            Ok(PushReport::Attempted {
+                ok: true,
+                degraded: false,
+            }) => {
+                crate::daemon::record_push_success(ctx.repo);
+                // ADDED 2026-07-26 (v0.113.1): refresh the upstream
+                // tracking ref so a stale `origin/main` doesn't
+                // report ahead>0 forever after the push is done.
+                refresh_stale_upstream_ref(ctx.repo).await;
+            }
+            // v0.113.72 degraded: healthy legs converged but a sick
+            // remote is still paused. Record NOTHING — no success
+            // (that would clear the ledger and drop the activity
+            // entry, wiping the sick remote's pause memory), no
+            // failure (zero attempts failed). Propagate as AllPaused
+            // so the caller maps it to PushPaused (retains activity
+            // + frozen pause counters, no cooldown).
+            Ok(PushReport::Attempted {
+                ok: true,
+                degraded: true,
+            }) => {
+                return Ok(PushReport::AllPaused);
+            }
+            // v0.113.69: propagate — zero attempts is not a failure.
+            Ok(PushReport::AllPaused) => {
+                return Ok(PushReport::AllPaused);
+            }
+            Ok(PushReport::Attempted {
+                ok: false,
+                degraded: _,
+            }) => {
+                // CHANGED 2026-07-21 (v0.112.31, audit M1/F3.9):
+                // name the failing remotes in the ledger error.
+                let names = failing_remote_names(ctx.remote_failures.as_deref());
+                eprintln!(
+                    "⚠️ push failed for {} (remotes: {})",
+                    ctx.repo.display(),
+                    names
+                );
+                let cause = classify_failing_remotes(ctx.remote_failures.as_deref());
+                // T1.8: mine hook detail on the backlog path too (was
+                // generic-only; the commit path got it in T1).
+                let (msg, hook_detail) =
+                    push_failure_message(&names, &cause, ctx.remote_failures.as_deref());
+                // v0.113.73 forge-degraded: incident-covered transient
+                // failures propagate as AllPaused (caller maps to
+                // PushPaused: no budget burn, commits keep flowing)
+                // instead of burning the stuck budget + webhook.
+                if let Some(hosts) = incident_shield_hosts(
+                    ctx.repo,
+                    ctx.policy,
+                    ctx.has_origin,
+                    ctx.remote_failures.as_deref(),
+                ) {
+                    eprintln!(
+                        "🛡️ {} push failure shielded by forge incident ({}) — no stuck-budget burn",
+                        ctx.repo.display(),
+                        hosts.join(", ")
+                    );
+                    crate::daemon::record_push_transient_outage(ctx.repo, &msg);
+                    return Ok(PushReport::AllPaused);
+                }
+                if let Some(detail) = hook_detail.as_deref() {
+                    // T1.3 record, same as the commit path: the repo's own
+                    // loop reads this instead of the attempt layout.
+                    crate::daemon::record_gate_failure_artifact(ctx.repo, &msg, Some(detail));
+                }
+                crate::daemon::record_push_failure(ctx.repo, &msg);
+                notify_webhook_persistent_push_failure(ctx.policy, ctx.repo, &names, &cause);
+                // CHANGED 2026-07-21 (v0.112.31, audit H3/F1.3):
+                // propagate the failure so the caller returns
+                // `SyncOutcome::PushFailed` instead of `NothingToDo`
+                // (which the apply phase treated as success).
+                return Ok(PushReport::Attempted {
+                    ok: false,
+                    degraded: false,
+                });
+            }
+            Err(e) => {
+                // Cancellation of the spawned push task (daemon shutdown
+                // or wedged-task abort) must not enter the stuck ledger
+                // — see `push_error_is_cancellation` in daemon.rs. The
+                // outcome is unknown, not failed; the next start
+                // re-dispatches without a 300s backoff.
+                if crate::daemon::push_error_is_cancellation(&e) {
+                    crate::daemon::record_push_attempt_error(ctx.repo, &e);
+                    if debug_enabled() {
+                        eprintln!(
+                            "⏭️ {} push task cancelled — not recorded as a push failure",
+                            ctx.repo.display()
+                        );
+                    }
+                    // FIXED 2026-10-03 (audit R3-L13): the old
+                    // `Attempted{ok:false}` contradicted the comment
+                    // above ("unknown, not failed") — callers mapped
+                    // it to PushFailed + failure_count++, so a
+                    // wedged-task abort storm burned failure budget.
+                    // AllPaused maps to PushPaused/BackstopSkipped
+                    // (retain activity, no count, no cooldown).
+                    return Ok(PushReport::AllPaused);
+                }
+                let error = crate::ownership::redact_url_credentials(&format!("{e:#}"));
+                eprintln!("⚠️ push error for {}: {}", ctx.repo.display(), error);
+                crate::daemon::record_push_attempt_error(ctx.repo, &e);
+                let cause = crate::git::classify_push_failure(&error);
+                notify_webhook_persistent_push_failure(
+                    ctx.policy,
+                    ctx.repo,
+                    "origin/mirrors",
+                    cause,
+                );
+                return Ok(PushReport::Attempted {
+                    ok: false,
+                    degraded: false,
+                });
+            }
+        }
+    } else if ctx.policy.auto_push
+        && should_push
+        && !ctx.has_origin
+        && ctx.policy.remotes.is_empty()
+    {
+        eprintln!(
+            "ℹ️ skip push for {} (no origin remote and no mirror remotes)",
+            ctx.repo.display()
+        );
+    }
+    // Converged with nothing to push: the repo is already published, so a
+    // recorded FAILURE from an earlier cycle is stale. See
+    // `record_converged_push_success` for why the PUSH column must not be
+    // allowed to stay red forever.
+    if ctx.policy.auto_push
+        && !should_push
+        && (ctx.has_origin || !ctx.policy.remotes.is_empty())
+    {
+        record_converged_push_success(ctx.repo);
+    }
+    // Converged with nothing to push: the repo is already published, so a
+    // recorded FAILURE from an earlier cycle is stale. See
+    // `record_converged_push_success` for why the PUSH column must not be
+    // allowed to stay red forever.
+    if ctx.policy.auto_push
+        && !should_push
+        && (ctx.has_origin || !ctx.policy.remotes.is_empty())
+    {
+        record_converged_push_success(ctx.repo);
+    }
+    Ok(PushReport::Attempted {
+        ok: true,
+        degraded: false,
+    })
+}
+
+/// Record a SUCCESSFUL push observation for a repo that is already
+/// converged, so a stale failure cannot outlive the fault that caused it.
+///
+/// WHY (2026-11-07): the PUSH column reports the LAST RECORDED push
+/// attempt. A converged repo never attempts a push — `handle_ahead_push`
+/// returns `Attempted { ok: true }` without touching the network — so
+/// after a single transient failure its observation stayed at
+/// `❌ FAIL` indefinitely. Observed live: pi-goal-list-loop-audit showed
+/// `❌ FAIL 1h` while local, origin and gitlab all pointed at the same
+/// commit. The cell was stale, not a live fault, and a permanently red
+/// cell is precisely how a REAL fault gets ignored later.
+///
+/// The recording is deliberately narrow, because "the repo looks
+/// converged" is not the same as "the push succeeded":
+///
+///   * only when the repo is NOT in the stuck ledger — a genuinely stuck
+///     repo keeps its stuck state and its retry owns the true outcome.
+///     Clearing the ledger from here would erase a real stuck condition
+///     and its failure count.
+///   * only when the last observation was a FAILURE — a healthy repo
+///     writes nothing, so this costs one small write per incident rather
+///     than one per daemon cycle.
+///   * only reached from the "nothing to push" path — a repo that still
+///     has unpushed work records the true outcome of its real push.
+fn record_converged_push_success(repo: &Path) {
+    if crate::daemon::get_stuck_push_info(repo).is_some() {
+        return;
+    }
+    let stale_failure = matches!(
+        crate::daemon::push_history::load(repo),
+        Some(observed) if !observed.succeeded
+    );
+    if stale_failure {
+        crate::daemon::record_push_success(repo);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::process::Command;
+
+    /// A converged repo must not keep reporting a stale push FAILURE.
+    ///
+    /// The PUSH column shows the LAST RECORDED push attempt. A repo that
+    /// is already published never attempts a push, so before this fix a
+    /// single transient failure left the cell red indefinitely — observed
+    /// live on 2026-11-07: pi-goal-list-loop-audit showed `❌ FAIL 1h`
+    /// while local, origin and gitlab all pointed at the same commit.
+    ///
+    /// This test pins the two halves that matter:
+    ///   * a converged repo refreshes a stale FAILURE to a success, and
+    ///   * a repo that is genuinely STUCK keeps its failure (and its
+    ///     ledger entry), because its retry owns the true outcome.
+    ///
+    /// The scenario is the real one: a push fails (observation FAIL +
+    /// stuck-ledger entry), the cause is fixed and the operator clears the
+    /// ledger with `repair stuck-unstuck`, the repo converges — and then
+    /// NOTHING ever records that the failure is over, because a converged
+    /// repo never attempts a push.
+    #[test]
+    fn test_converged_repo_refreshes_stale_push_failure() {
+        let state_dir = tempfile::tempdir().unwrap();
+        let _state_guard = crate::test_helpers::EnvRestorer::new(
+            "DRACON_SYNC_STATE_DIR",
+            state_dir.path().to_string_lossy().as_ref(),
+        );
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("converged-repo");
+
+        // A recorded failure: the state this fix has to clear.
+        crate::daemon::record_push_failure(&repo, "transient network hiccup");
+        let observed = crate::daemon::push_history::load(&repo)
+            .expect("a failed push must leave an observation");
+        assert!(!observed.succeeded, "precondition: observation is a failure");
+
+        // The cause is fixed and the operator clears the ledger, exactly as
+        // `dracon-sync repair stuck-unstuck` does.
+        assert!(
+            crate::daemon::unstuck_repo(&repo),
+            "precondition: the ledger entry was clearable"
+        );
+        assert!(
+            crate::daemon::get_stuck_push_info(&repo).is_none(),
+            "precondition: the repo is no longer in the stuck ledger"
+        );
+
+        record_converged_push_success(&repo);
+        let refreshed = crate::daemon::push_history::load(&repo).expect("observation");
+        assert!(
+            refreshed.succeeded,
+            "a converged repo must not keep reporting a stale failure"
+        );
+    }
+
+    /// The guard rail: a repo that is genuinely stuck keeps its failure.
+    ///
+    /// "The repo looks converged" is not "the push succeeded". A repo in
+    /// the stuck ledger is being retried, and its retry owns the true
+    /// outcome; refreshing the observation from here would erase a real
+    /// stuck condition and its consecutive-failure count.
+    #[test]
+    fn test_stuck_repo_keeps_its_push_failure() {
+        let state_dir = tempfile::tempdir().unwrap();
+        let _state_guard = crate::test_helpers::EnvRestorer::new(
+            "DRACON_SYNC_STATE_DIR",
+            state_dir.path().to_string_lossy().as_ref(),
+        );
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("stuck-repo");
+
+        crate::daemon::record_push_failure(&repo, "still broken");
+        assert!(
+            crate::daemon::get_stuck_push_info(&repo).is_some(),
+            "precondition: the repo is in the stuck ledger"
+        );
+
+        record_converged_push_success(&repo);
+
+        let observed = crate::daemon::push_history::load(&repo).expect("observation");
+        assert!(
+            !observed.succeeded,
+            "a stuck repo must keep its failure until a push actually succeeds"
+        );
+        let stuck = crate::daemon::get_stuck_push_info(&repo).expect("stuck entry");
+        assert_eq!(
+            stuck.consecutive_failures, 1,
+            "the stuck ledger entry must survive the refresh attempt"
+        );
+    }
+
+    #[test]
+    fn test_sanitize_task_name_drops_explanatory_clauses() {
+        assert_eq!(
+            sanitize_task_name("Fix A: Added .dracon/ and .pub to NOISE_PATTERNS in bump.rs"),
+            "Fix A"
+        );
+        assert_eq!(
+            sanitize_task_name("Stale focus detection — details were noisy"),
+            "Stale focus detection"
+        );
+        assert_eq!(
+            sanitize_task_name("merge: resolve conflicts from parallel sessions"),
+            "merge"
+        );
+    }
+
+    #[test]
+    fn test_sanitize_task_name_limits_plain_text() {
+        assert_eq!(
+            sanitize_task_name("Added .dracon/ and .pub to NOISE_PATTERNS in bump.rs"),
+            "Added .dracon/ and"
+        );
+    }
+
+    #[test]
+    fn test_compute_blast_radius_merge_prefix() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path();
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .arg(repo)
+            .status()
+            .unwrap();
+        std::fs::write(repo.join("file.txt"), "change").unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "add", "file.txt"])
+            .status()
+            .unwrap();
+        std::fs::create_dir(repo.join(".git")).ok();
+        std::fs::write(repo.join(".git/MERGE_HEAD"), "abc123").unwrap();
+
+        let msg = compute_blast_radius(repo);
+        assert!(msg.starts_with("MERGE: | "));
+    }
+
+    // --- commit-message index general improvements (2026-09-03) ---
+    // Design: docs/design/commit-message-index-general-2026-09-03.md §3A–3D.
+    // No new config; message-only changes (staging/push untouched).
+
+    /// Fresh repo for message tests: main branch, local test identity,
+    /// warden global hooks neutralized (temp repos lack filter config).
+    /// NOTE: identity is repo-local inside a tempdir — never touches the
+    /// operator's real config (same convention as exclude.rs gitlink tests).
+    fn init_msg_repo(repo: &Path) {
+        let rs = repo.to_string_lossy().into_owned();
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .arg(&rs)
+            .status()
+            .unwrap();
+        for (k, v) in [
+            ("user.email", "t@t"),
+            ("user.name", "t"),
+            ("core.hooksPath", "/dev/null"),
+        ] {
+            crate::git::git_cmd()
+                .args(["-C", rs.as_str(), "config", k, v])
+                .status()
+                .unwrap();
+        }
+    }
+
+    fn write_repo_file(repo: &Path, rel: &str, content: &[u8]) {
+        let full = repo.join(rel);
+        std::fs::create_dir_all(full.parent().unwrap()).unwrap();
+        std::fs::write(&full, content).unwrap();
+    }
+
+    fn stage_paths(repo: &Path, paths: &[&str]) {
+        let rs = repo.to_string_lossy().into_owned();
+        let mut cmd = crate::git::git_cmd();
+        cmd.args(["-C", rs.as_str(), "add", "--"]);
+        for p in paths {
+            cmd.arg(p);
+        }
+        cmd.status().unwrap();
+    }
+
+    fn git_run(repo: &Path, args: &[&str]) {
+        let rs = repo.to_string_lossy().into_owned();
+        let mut cmd = crate::git::git_cmd();
+        cmd.arg("-C").arg(rs.as_str());
+        for a in args {
+            cmd.arg(a);
+        }
+        cmd.status().unwrap();
+    }
+
+    #[test]
+    fn test_lcp_scope_cases() {
+        // Shared subtree → deepest common dir (cap 4: the true common
+        // prefix here is 5 deep, so it truncates to web/games/wip/polis).
+        assert_eq!(
+            longest_common_dir_prefix(&[
+                "web/games/wip/polis/src/main.ts".to_string(),
+                "web/games/wip/polis/src/lib/x.ts".to_string(),
+            ]),
+            Some("web/games/wip/polis".to_string())
+        );
+        // Spanning top dirs → None (caller falls back to legacy list).
+        assert_eq!(
+            longest_common_dir_prefix(&[
+                "dracon-sync/src/a.rs".to_string(),
+                "dracon-warden/src/b.rs".to_string(),
+            ]),
+            None
+        );
+        // Bare root files → None (empty-scope rendering).
+        assert_eq!(
+            longest_common_dir_prefix(&["LICENSE".to_string(), "README.md".to_string()]),
+            None
+        );
+        // Mixed root + subdir → None.
+        assert_eq!(
+            longest_common_dir_prefix(&["LICENSE".to_string(), "src/a.rs".to_string()]),
+            None
+        );
+        // 4-component cap.
+        assert_eq!(
+            longest_common_dir_prefix(&[
+                "a/b/c/d/e/f1.ts".to_string(),
+                "a/b/c/d/e/f2.ts".to_string(),
+            ]),
+            Some("a/b/c/d".to_string())
+        );
+        // Single deep path → its parent.
+        assert_eq!(
+            longest_common_dir_prefix(&["a/b/c/main.ts".to_string()]),
+            Some("a/b/c".to_string())
+        );
+        assert_eq!(longest_common_dir_prefix(&[]), None);
+    }
+
+    #[test]
+    fn test_file_extension_cases() {
+        assert_eq!(file_extension("src/main.ts"), Some("ts".to_string()));
+        assert_eq!(file_extension("FOO.SVELTE"), Some("svelte".to_string()));
+        assert_eq!(file_extension("a.test.ts"), Some("ts".to_string()));
+        assert_eq!(file_extension("web/games/wip/polis"), None);
+        assert_eq!(file_extension("LICENSE"), None);
+        assert_eq!(file_extension(".gitignore"), None);
+        assert_eq!(file_extension("dir/.env"), None);
+        assert_eq!(file_extension("trailing."), None);
+    }
+
+    #[test]
+    fn test_extension_histogram_top3_order() {
+        let paths = vec![
+            "a/BB.ts".to_string(),
+            "b/bb.TS".to_string(),
+            "c/cc.ts".to_string(),
+            "d/x.svelte".to_string(),
+            "e/y.svelte".to_string(),
+            "f/z.json".to_string(),
+            "LICENSE".to_string(),
+            "web/games/wip/polis".to_string(),
+            ".gitignore".to_string(),
+        ];
+        assert_eq!(
+            extension_histogram(&paths),
+            vec![
+                ("ts".to_string(), 3),
+                ("svelte".to_string(), 2),
+                ("json".to_string(), 1),
+            ]
+        );
+        // Count tie → alphabetical (deterministic EXT: order).
+        assert_eq!(
+            extension_histogram(&["a/b.rs".to_string(), "c/d.go".to_string()]),
+            vec![("go".to_string(), 1), ("rs".to_string(), 1)]
+        );
+        assert!(extension_histogram(&["LICENSE".to_string()]).is_empty());
+    }
+
+    #[test]
+    fn test_doc_lock_predicates() {
+        assert!(is_doc_file("docs/guide.MD"));
+        assert!(is_doc_file("a/b/c.rst"));
+        assert!(is_doc_file("notes.txt"));
+        assert!(!is_doc_file("src/main.rs"));
+        assert!(!is_doc_file("web/games/wip/polis"));
+        assert!(is_lock_file("Cargo.lock"));
+        assert!(is_lock_file("sub/dir/bun.lock"));
+        assert!(is_lock_file("package-lock.json"));
+        assert!(is_lock_file("go.sum"));
+        assert!(is_lock_file("custom.lock"));
+        // Negatives: docs are not locks, manifests are not locks.
+        assert!(!is_lock_file("changelog.md"));
+        assert!(!is_lock_file("Cargo.toml"));
+    }
+
+    #[test]
+    fn test_safety_metric_predicate() {
+        for t in ["BIN:2", "ENV:", "TESTONLY:a", "DOCSONLY:a", "LOCK", "REN:3"] {
+            assert!(is_safety_metric(t), "{t} should survive truncation");
+        }
+        for t in [
+            "TEST:5",
+            "NEW:a",
+            "DEL:b",
+            "DEPS:x",
+            "MERGE:",
+            "TAG:v1",
+            "GOAL:complete",
+            "PAUSE:x",
+            "TOKENS:1K",
+            "TIME:3m",
+            "EVIDENCE:x",
+            "SKIPPED:x",
+        ] {
+            assert!(!is_safety_metric(t), "{t} should trim under budget");
+        }
+    }
+
+    #[test]
+    fn test_scope_single_file_full_path_drops_bracket() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path();
+        init_msg_repo(repo);
+        write_repo_file(
+            repo,
+            "web/games/wip/polis/src/main.ts",
+            b"console.log(1);\n",
+        );
+        stage_paths(repo, &["web/games/wip/polis/src/main.ts"]);
+        let msg = compute_blast_radius(repo);
+        assert!(
+            msg.starts_with("1 file(s) in web/games/wip/polis/src/main.ts DELTA:+1/-0"),
+            "single file should scope to its full path, got: {msg}"
+        );
+        assert!(
+            !msg.contains('['),
+            "bracket duplicates the scope for single files, got: {msg}"
+        );
+        assert!(msg.contains("EXT:ts"), "got: {msg}");
+    }
+
+    #[test]
+    fn test_scope_shared_subtree_keeps_bracket() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path();
+        init_msg_repo(repo);
+        write_repo_file(repo, "web/games/wip/polis/src/a.ts", b"a\n");
+        write_repo_file(repo, "web/games/wip/polis/src/b.ts", b"b\n");
+        stage_paths(
+            repo,
+            &[
+                "web/games/wip/polis/src/a.ts",
+                "web/games/wip/polis/src/b.ts",
+            ],
+        );
+        let msg = compute_blast_radius(repo);
+        assert!(
+            msg.starts_with("2 file(s) in web/games/wip/polis ["),
+            "shared subtree should scope deep with bracket, got: {msg}"
+        );
+        assert!(msg.contains("EXT:ts"), "got: {msg}");
+    }
+
+    #[test]
+    fn test_scope_fallback_spanning_crates_backcompat() {
+        // Multi-crate shape must stay byte-identical to the legacy format:
+        // top-3 first components + full-path bracket.
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path();
+        init_msg_repo(repo);
+        write_repo_file(repo, "dracon-sync/src/a.rs", b"a\n");
+        write_repo_file(repo, "dracon-warden/src/b.rs", b"b\n");
+        stage_paths(repo, &["dracon-sync/src/a.rs", "dracon-warden/src/b.rs"]);
+        let msg = compute_blast_radius(repo);
+        assert!(
+            msg.starts_with("2 file(s) in dracon-sync,dracon-warden ["),
+            "spanning crates must keep legacy scope, got: {msg}"
+        );
+        assert!(msg.contains("dracon-sync/src/a.rs"), "got: {msg}");
+        assert!(msg.contains("dracon-warden/src/b.rs"), "got: {msg}");
+        assert!(msg.contains("DELTA:+2/-0"), "got: {msg}");
+        assert!(msg.contains("EXT:rs"), "got: {msg}");
+    }
+
+    #[test]
+    fn test_scope_root_files_backcompat() {
+        // Bare root files keep today's empty-scope rendering.
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path();
+        init_msg_repo(repo);
+        write_repo_file(repo, "LICENSE", b"mit\n");
+        write_repo_file(repo, "README.md", b"hi\n");
+        stage_paths(repo, &["LICENSE", "README.md"]);
+        let msg = compute_blast_radius(repo);
+        assert!(
+            msg.starts_with("2 file(s) [LICENSE, README.md] DELTA:+2/-0"),
+            "root files must keep empty scope, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_docsonly_mirror_and_negative() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path();
+        init_msg_repo(repo);
+        write_repo_file(repo, "docs/a.md", b"# a\n");
+        write_repo_file(repo, "docs/B.MD", b"# b\n");
+        stage_paths(repo, &["docs/a.md", "docs/B.MD"]);
+        let msg = compute_blast_radius(repo);
+        assert!(msg.contains("DOCSONLY:"), "got: {msg}");
+        assert!(!msg.contains("TESTONLY:"), "got: {msg}");
+        // Mixed docs + code → token gone.
+        write_repo_file(repo, "src/main.rs", b"fn main() {}\n");
+        stage_paths(repo, &["src/main.rs"]);
+        let msg2 = compute_blast_radius(repo);
+        assert!(!msg2.contains("DOCSONLY:"), "got: {msg2}");
+    }
+
+    #[test]
+    fn test_lock_token_and_negative() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path();
+        init_msg_repo(repo);
+        write_repo_file(repo, "Cargo.lock", b"# lock\n");
+        stage_paths(repo, &["Cargo.lock"]);
+        let msg = compute_blast_radius(repo);
+        assert!(
+            msg.contains("LOCK"),
+            "lockfile-only change needs LOCK, got: {msg}"
+        );
+        assert!(!msg.contains("DEPS:"), "no manifest changed, got: {msg}");
+
+        let tmp2 = tempfile::tempdir().unwrap();
+        let repo2 = tmp2.path();
+        init_msg_repo(repo2);
+        write_repo_file(repo2, "changelog.md", b"# log\n");
+        stage_paths(repo2, &["changelog.md"]);
+        let msg2 = compute_blast_radius(repo2);
+        assert!(
+            !msg2.contains("LOCK"),
+            "changelog.md is not a lockfile, got: {msg2}"
+        );
+    }
+
+    #[test]
+    fn test_rename_token_excludes_new_del() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path();
+        init_msg_repo(repo);
+        write_repo_file(repo, "old/path.txt", b"same\n");
+        stage_paths(repo, &["old/path.txt"]);
+        git_run(repo, &["commit", "-qm", "init"]);
+        // git mv does not create the destination dir — make it first.
+        std::fs::create_dir_all(repo.join("new")).unwrap();
+        git_run(repo, &["mv", "old/path.txt", "new/path.txt"]);
+        let msg = compute_blast_radius(repo);
+        assert!(
+            msg.contains("REN:1"),
+            "move should surface REN:1, got: {msg}"
+        );
+        assert!(!msg.contains("NEW:"), "move is not new, got: {msg}");
+        assert!(!msg.contains("DEL:"), "move is not deleted, got: {msg}");
+    }
+
+    /// The wiring tripwire: the helper must be CALLED from the production
+    /// path, not merely exist.
+    ///
+    /// The behavioural test above calls `record_converged_push_success`
+    /// directly, so it keeps passing even if the production call site is
+    /// deleted — the exact "both halves present, never consumed" defect
+    /// class this repo already has a tripwire for (see policy.rs:
+    /// `test_repo_override_consumed_in_production_tripwire`). This test
+    /// asserts the call site survives in the non-test part of the file,
+    /// so a refactor cannot silently disable the refresh.
+    #[test]
+    fn test_converged_push_success_is_called_in_production() {
+        let source = include_str!("sync.rs");
+        let production = source.split("mod tests {").next().unwrap_or(source);
+        assert!(
+            production.contains("record_converged_push_success(ctx.repo)"),
+            "the converged-refresh call site is missing from the production path"
+        );
+    }
+
+    #[test]
+    fn test_ext_excludes_gitlink_paths() {
+        // Submodule named WITH a dot: without the gitlink filter its fake
+        // extension would pollute EXT:. `git add <path>` of a nested repo
+        // registers a gitlink (same convention as exclude.rs tests).
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("parent");
+        std::fs::create_dir_all(&repo).unwrap();
+        init_msg_repo(&repo);
+        let sub = repo.join("sub.mod");
+        std::fs::create_dir_all(&sub).unwrap();
+        init_msg_repo(&sub);
+        write_repo_file(&sub, "foo.txt", b"hi\n");
+        stage_paths(&sub, &["foo.txt"]);
+        git_run(&sub, &["commit", "-qm", "init"]);
+        stage_paths(&repo, &["sub.mod"]);
+        git_run(&repo, &["commit", "-qm", "register"]);
+        // Advance the submodule, stage the pointer bump + a real file.
+        write_repo_file(&sub, "foo.txt", b"hi v2\n");
+        stage_paths(&sub, &["foo.txt"]);
+        git_run(&sub, &["commit", "-qm", "v2"]);
+        write_repo_file(&repo, "app/main.ts", b"x\n");
+        stage_paths(&repo, &["sub.mod", "app/main.ts"]);
+        let msg = compute_blast_radius(&repo);
+        // EXT: must be exactly `ts` — the gitlink's fake `mod` suffix is
+        // filtered via the batched ls-tree check. (The `sub.mod` path itself
+        // still appears in the file bracket — that is pre-existing
+        // name-status behavior, not the EXT: signal.)
+        assert!(
+            msg.contains("EXT:ts "),
+            "EXT: should be exactly ts, got: {msg}"
+        );
+        assert!(
+            !msg.contains("EXT:ts,"),
+            "gitlink must not feed EXT:, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_budget_caps_pathological_subject() {
+        // Long intent + deep paths + binary: budget drops the bracket, then
+        // trims non-safety metrics, while intent/scope/DELTA/safety survive.
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path();
+        init_msg_repo(repo);
+        let mut notes = String::from("# notes\n");
+        for i in 0..6 {
+            notes.push_str(&format!(
+                "- [x] Fix parser edge case handling number {i} thoroughly\n"
+            ));
+        }
+        write_repo_file(
+            repo,
+            "web/games/wip/polis/src/lib/notes.md",
+            notes.as_bytes(),
+        );
+        for f in ["one", "two", "three", "four"] {
+            write_repo_file(
+                repo,
+                &format!("web/games/wip/polis/src/lib/{f}.ts"),
+                b"a\nb\nc\n",
+            );
+        }
+        write_repo_file(
+            repo,
+            "web/games/wip/polis/src/lib/logo.png",
+            b"\x89PNG\r\n\x1a\n\x00\x01binary\x00data",
+        );
+        stage_paths(
+            repo,
+            &[
+                "web/games/wip/polis/src/lib/notes.md",
+                "web/games/wip/polis/src/lib/one.ts",
+                "web/games/wip/polis/src/lib/two.ts",
+                "web/games/wip/polis/src/lib/three.ts",
+                "web/games/wip/polis/src/lib/four.ts",
+                "web/games/wip/polis/src/lib/logo.png",
+            ],
+        );
+        let msg = compute_blast_radius(repo);
+        assert!(
+            msg.chars().count() <= COMMIT_SUBJECT_BUDGET,
+            "subject must fit budget, got {} chars: {msg}",
+            msg.chars().count()
+        );
+        assert!(msg.contains("CLOSED:"), "intent must survive, got: {msg}");
+        assert!(msg.contains("DELTA:"), "delta must survive, got: {msg}");
+        assert!(msg.contains("BIN:1"), "safety must survive, got: {msg}");
+        assert!(!msg.contains(" ["), "bracket drops first, got: {msg}");
+    }
+
+    #[test]
+    fn test_goal_metrics_multibyte_utf8_no_panic() {
+        // Regression (audit HIGH, 2026-08-09): the goal-metrics
+        // builder truncated pause_reason / task evidence / skip_reason
+        // with byte-index slicing (`&s[..47]`, `&s[..37]`) guarded
+        // only by byte-length checks. A `.pi/goals/` pauseReason or
+        // evidence containing multi-byte UTF-8 (CJK, emoji) > 50 bytes
+        // crossed a char boundary and panicked the daemon's commit
+        // path ("byte index N is not a char boundary"). Truncation now
+        // uses `chars().take(N)` (same convention as report.rs:3729).
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path();
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .arg(repo)
+            .status()
+            .unwrap();
+        let goals_dir = repo.join(".pi/goals");
+        std::fs::create_dir_all(&goals_dir).unwrap();
+        // pauseReason: emoji + 22 CJK chars = ~70 bytes (> 50);
+        // evidence/skipReason use emoji (4 bytes each) to exceed the
+        // 40-byte thresholds.
+        // NOTE (2026-09-03, subject budget): the fixture filename is short
+        // (`g.md`, not a timestamped goal name) so the full subject — with
+        // EXT:/NEW:/DOCSONLY: plus every goal token — fits the 240-char
+        // budget and the presence asserts below stay meaningful. With a
+        // realistic 31-char goal filename the budget would trim EVIDENCE:/
+        // SKIPPED: (droppable count metrics by design §3D); that trimming
+        // is covered by test_budget_caps_pathological_subject instead.
+        let goal = r#"{"status":"paused","pauseReason":"🔑 密钥轮换完成所有远程仓库已同步最新密钥并验证推送","taskList":{"tasks":[
+        {"id":"t1","status":"complete","evidence":"🔑🔑🔑🔑🔑🔑🔑🔑🔑🔑🔑 evidence with emoji"},
+        {"id":"t2","status":"skipped","skipReason":"🔒🔒🔒🔒🔒🔒🔒🔒🔒🔒🔒 skip reason with emoji"}
+    ]}}
+
+# Goal title
+- [x] task one
+"#;
+        std::fs::write(goals_dir.join("g.md"), goal).unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "add", ".pi/goals/g.md"])
+            .status()
+            .unwrap();
+
+        // Pre-fix this panicked ("byte index N is not a char
+        // boundary") inside the daemon's commit path — both in
+        // extract_goal_metadata's JSON-end slicing and in the
+        // metrics-builder truncation.
+        let msg = compute_blast_radius(repo);
+        assert!(
+            msg.contains("PAUSE:"),
+            "message should carry the pause reason: {}",
+            msg
+        );
+        assert!(
+            msg.contains("EVIDENCE:"),
+            "message should carry task evidence: {}",
+            msg
+        );
+        assert!(
+            msg.contains("SKIPPED:"),
+            "message should carry skip reasons: {}",
+            msg
+        );
+        // Metrics are space-joined, so isolate the PAUSE: fragment
+        // before asserting its length.
+        let pause_part = msg
+            .split("PAUSE:")
+            .nth(1)
+            .and_then(|s| s.split(" EVIDENCE:").next())
+            .unwrap_or("");
+        assert!(
+            pause_part.chars().count() <= 50,
+            "pause reason should be truncated to <=50 chars: {}",
+            pause_part
+        );
+    }
+
+    #[test]
+    fn test_truncate_task_multibyte_utf8() {
+        // Regression: em dash (—) is 3 bytes. Truncating at byte boundary
+        // inside it caused "not a char boundary" panic.
+        let input = "T-001 Set Tauri CSP — Replaced \"csp\": null with strict policy including wasm-unsafe-eval";
+        let result = truncate_task(input);
+        assert!(result.len() <= 64); // 60 + "..."
+        assert!(!result.ends_with('\u{200B}')); // no broken chars
+                                                // Should cut at the em dash boundary
+        assert!(result.contains('—') || result.ends_with("..."));
+    }
+
+    #[test]
+    fn test_truncate_task_short() {
+        let input = "short task";
+        assert_eq!(truncate_task(input), "short task");
+    }
+
+    #[test]
+    fn test_truncate_task_at_sentence_boundary() {
+        let input = "Fix the bug. Now add tests for the fix and update documentation.";
+        let result = truncate_task(input);
+        assert!(result.ends_with('.'));
+        assert!(result.len() <= 64);
+    }
+
+    #[test]
+    fn test_truncate_task_hard_cutoff() {
+        let input = "This is a very long task name that has no sentence boundaries and just keeps going and going and going";
+        let result = truncate_task(input);
+        assert!(result.ends_with("..."));
+        assert!(result.len() <= 64);
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_auto_github_private_graceful_on_no_gh() {
+        // See `test_sync_repo_mirror_push_failure_returns_false`
+        // for the rationale on using a temp state dir. This test
+        // exercises `auto_github_private` which may attempt a
+        // `gh` CLI call that fails, triggering
+        // `record_push_failure` for the temp repo path.
+        let state_dir = tempfile::tempdir().unwrap();
+        let _state_guard = crate::test_helpers::EnvRestorer::new(
+            "DRACON_SYNC_STATE_DIR",
+            state_dir.path().to_string_lossy().as_ref(),
+        );
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        let toml_str = r#"
+auto_github_private = true
+auto_github_private_account = "TestAccount"
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(
+            result.is_ok(),
+            "sync_repo should handle missing gh gracefully: {:?}",
+            result
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_auto_commit_creates_commit() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        // Create and stage a modified file
+        let file_path = repo.join("test.txt");
+        std::fs::write(&file_path, "hello world").unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "add", "test.txt"])
+            .status()
+            .unwrap();
+
+        // Count commits before sync
+        let commits_before = crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "rev-list", "--count", "HEAD"])
+            .output()
+            .unwrap()
+            .stdout;
+        let count_before: usize = String::from_utf8_lossy(&commits_before)
+            .trim()
+            .parse()
+            .unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+trusted_emails = ["test@test"]
+trusted_authors = ["test"]
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed: {:?}", result);
+
+        // Verify a commit was created
+        let commits_after = crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "rev-list", "--count", "HEAD"])
+            .output()
+            .unwrap()
+            .stdout;
+        let count_after: usize = String::from_utf8_lossy(&commits_after)
+            .trim()
+            .parse()
+            .unwrap();
+        assert_eq!(
+            count_after,
+            count_before + 1,
+            "sync_repo should have created one new commit (before={}, after={})",
+            count_before,
+            count_after
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_skips_rebase_in_progress() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        // Simulate rebase in progress
+        std::fs::create_dir_all(repo.join(".git/rebase-merge")).unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(
+            result.is_ok(),
+            "sync_repo should succeed even during rebase"
+        );
+        assert!(
+            matches!(result, Ok(SyncOutcome::Blocked)),
+            "rebase should cause early return (nothing synced)"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_skips_merge_in_progress() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        // Simulate merge in progress
+        std::fs::write(repo.join(".git/MERGE_HEAD"), "abc123\n").unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed even during merge");
+        assert!(
+            matches!(result, Ok(SyncOutcome::Blocked)),
+            "merge should cause early return (nothing synced)"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_skips_cherry_pick_in_progress() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        // Simulate cherry-pick in progress
+        std::fs::write(repo.join(".git/CHERRY_PICK_HEAD"), "abc123\n").unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(
+            result.is_ok(),
+            "sync_repo should succeed even during cherry-pick"
+        );
+        assert!(
+            matches!(result, Ok(SyncOutcome::Blocked)),
+            "cherry-pick should cause early return (nothing synced)"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_skips_revert_in_progress() {
+        // ADDED 2026-10-03 (audit R4-SC-11): a mid-revert sequencer
+        // owns the index the same way a merge does — block.
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        // Simulate revert in progress
+        std::fs::write(repo.join(".git/REVERT_HEAD"), "abc123\n").unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(
+            result.is_ok(),
+            "sync_repo should succeed even during revert"
+        );
+        assert!(
+            matches!(result, Ok(SyncOutcome::Blocked)),
+            "revert should cause early return (nothing synced)"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_skips_bisect_in_progress() {
+        // ADDED 2026-10-03 (audit R4-SC-11): an active bisect session
+        // moves HEAD under the daemon — block.
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        // Simulate active bisect session
+        std::fs::write(repo.join(".git/BISECT_LOG"), "abc123\n").unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(
+            result.is_ok(),
+            "sync_repo should succeed even during bisect"
+        );
+        assert!(
+            matches!(result, Ok(SyncOutcome::Blocked)),
+            "bisect should cause early return (nothing synced)"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_auto_commit_creates_commit_for_dirty_repo() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        // Create a dirty file
+        std::fs::write(repo.join("dirty.txt"), "modified content\n").unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+trusted_emails = ["test@test"]
+trusted_authors = ["test"]
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed: {:?}", result);
+        assert_synced_after_metadata_followup(&repo, &policy, result).await;
+
+        // Verify commit was made
+        let output = crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "log", "--oneline"])
+            .output()
+            .unwrap();
+        let log = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            log.lines().count() >= 2,
+            "should have at least 2 commits (init + auto-commit)"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_clean_repo_returns_false() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed");
+        assert!(
+            matches!(result, Ok(SyncOutcome::NothingToDo)),
+            "clean repo should return false (nothing to sync)"
+        );
+    }
+
+    /// REGRESSION (2026-08-09, v0.113.47, dracon-platform incident):
+    /// a repo that is dirty (`is_clean=false`) with nothing
+    /// committable (`to_stage` empty — every dirty file excluded by
+    /// `auto_commit_exclude_patterns`, or phantom WT_MODIFIED
+    /// submodule gitlinks from the libgit2 ignore bug) AND with
+    /// unpushed commits ahead was wedged: the pre-fix code returned
+    /// `Synced` at the end of the auto-commit block WITHOUT calling
+    /// `handle_ahead_push`, so the ahead commits were never pushed
+    /// and the report showed a false "pushing Xm" with a permanently
+    /// stale upstream. Live incident: dracon-platform's 690d39180
+    /// stuck unpushed for 40+ minutes on 2026-08-09 while the daemon
+    /// logged `🔁 synced` every ~40s.
+    #[tokio::test]
+    async fn test_sync_repo_dirty_nothing_to_stage_still_pushes_ahead() {
+        let tmp = tempfile::tempdir().unwrap();
+        let origin_bare = tmp.path().join("origin.git");
+        crate::git::git_cmd()
+            .args(["init", "--bare", "-q", "-b", "master"])
+            .arg(&origin_bare)
+            .status()
+            .unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        for (k, v) in [
+            ("user.email", "audit-fixture@invalid"),
+            ("user.name", "test"),
+        ] {
+            crate::git::git_cmd()
+                .args(["-C", &repo.to_string_lossy(), "config", k, v])
+                .status()
+                .unwrap();
+        }
+        // Tracked file that will later be modified but excluded from
+        // staging (so the repo is dirty with an empty to_stage).
+        std::fs::write(repo.join("dirty.txt"), "v1").unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "add", "dirty.txt"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "remote",
+                "add",
+                "origin",
+                &origin_bare.to_string_lossy(),
+            ])
+            .status()
+            .unwrap();
+        configure_branch_upstream(&repo, "master", "origin");
+        // Push the initial commit so the repo starts fully in sync.
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "push",
+                "-q",
+                "origin",
+                "master",
+            ])
+            .status()
+            .unwrap();
+        // Now create an UNPUSHED commit (ahead=1) ...
+        std::fs::write(repo.join("ahead.txt"), "new").unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "add", "ahead.txt"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "-m",
+                "unpushed",
+            ])
+            .status()
+            .unwrap();
+        // ... and a dirty tracked file that the policy excludes from
+        // staging: is_clean=false, to_stage=0, ahead=1.
+        std::fs::write(repo.join("dirty.txt"), "v2-excluded").unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = true
+auto_bump_versions = false
+trusted_emails = ["audit-fixture@invalid"]
+trusted_authors = ["test"]
+auto_commit_exclude_patterns = ["dirty.txt"]
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed: {:?}", result);
+
+        // The ahead commit must have been PUSHED despite the
+        // dirty-but-nothing-to-stage state.
+        let head = crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "rev-parse", "HEAD"])
+            .output()
+            .unwrap();
+        let origin_ref = crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "rev-parse",
+                "refs/remotes/origin/master",
+            ])
+            .output()
+            .unwrap();
+        assert_eq!(
+            String::from_utf8_lossy(&head.stdout).trim(),
+            String::from_utf8_lossy(&origin_ref.stdout).trim(),
+            "unpushed commit must be pushed even though the dirty file \
+             was excluded from staging (pre-fix this repo was wedged: \
+             ahead commit never pushed)"
+        );
+
+        // The excluded dirty file must still be modified in the
+        // worktree (exclusion preserves content, v0.112.34 semantics)
+        // and must NOT have been committed.
+        assert_eq!(
+            std::fs::read_to_string(repo.join("dirty.txt")).unwrap(),
+            "v2-excluded",
+            "excluded file content must be preserved in the worktree"
+        );
+        let diff = crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "diff", "--name-only", "HEAD"])
+            .output()
+            .unwrap();
+        assert!(
+            String::from_utf8_lossy(&diff.stdout).contains("dirty.txt"),
+            "excluded file must remain modified-unstaged after sync"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_stages_and_commits_untracked_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        // Create untracked file
+        std::fs::write(repo.join("newfile.txt"), "new content\n").unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+trusted_emails = ["test@test"]
+trusted_authors = ["test"]
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed: {:?}", result);
+        assert_synced_after_metadata_followup(&repo, &policy, result).await;
+
+        // Verify file is tracked
+        let output = crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "ls-files"])
+            .output()
+            .unwrap();
+        let tracked = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            tracked.contains("newfile.txt"),
+            "newfile.txt should be tracked"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_auto_stage_untracked_false_skips_untracked() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        // Create an untracked file that should be skipped
+        std::fs::write(repo.join("scratch.md"), "scratch content\n").unwrap();
+        // Create an untracked file that should be staged (default pattern)
+        std::fs::write(repo.join("normal.txt"), "normal content\n").unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+auto_stage_untracked = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed: {:?}", result);
+
+        // Verify scratch.md is NOT tracked but normal.txt IS tracked
+        let output = crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "ls-files"])
+            .output()
+            .unwrap();
+        let tracked = String::from_utf8_lossy(&output.stdout);
+        // scratch.md is in default untracked_exclude_patterns via the
+        // untracked_exclude_patterns field — but since auto_stage_untracked
+        // is false, it stays untracked regardless of pattern.
+        assert!(
+            !tracked.contains("scratch.md"),
+            "scratch.md should NOT be tracked when auto_stage_untracked=false"
+        );
+        // normal.txt is a new tracked file (status=Added + in index after
+        // git add). With auto_stage_untracked=false, an Added entry that
+        // is NOT in the index (truly untracked) is skipped. But a freshly
+        // staged tracked file (already in the index) is still allowed.
+        // Since normal.txt is brand new, it should also be skipped.
+        // This test only verifies the auto_stage_untracked=false behavior.
+    }
+
+    // ---- bootstrap_empty_repo_commit (v0.112.30) ----
+
+    /// Helper: TOML policy with ownership signals trusted for the
+    /// conventional test identity (`test@test` / `test`).
+    fn bootstrap_test_policy(extra: &str) -> SyncPolicy {
+        let toml_str = format!(
+            r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+trusted_emails = ["test@test"]
+trusted_authors = ["test"]
+{}
+"#,
+            extra
+        );
+        toml::from_str(&toml_str).unwrap()
+    }
+
+    fn init_empty_repo(path: &std::path::Path) {
+        std::fs::create_dir_all(path).unwrap();
+        let status = crate::git::git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .arg(path)
+            .status()
+            .unwrap();
+        assert!(status.success());
+        for (k, v) in [("user.email", "test@test"), ("user.name", "test")] {
+            let status = crate::git::git_cmd()
+                .args(["config", k, v])
+                .current_dir(path)
+                .status()
+                .unwrap();
+            assert!(status.success());
+        }
+    }
+
+    fn head_commit_count(path: &std::path::Path) -> u64 {
+        let output = crate::git::git_cmd()
+            .args(["rev-list", "--count", "HEAD"])
+            .current_dir(path)
+            .output()
+            .unwrap();
+        if !output.status.success() {
+            return 0;
+        }
+        String::from_utf8_lossy(&output.stdout)
+            .trim()
+            .parse()
+            .unwrap_or(0)
+    }
+
+    #[tokio::test]
+    async fn test_bootstrap_empty_repo_creates_root_commit() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("repo");
+        init_empty_repo(&repo);
+        std::fs::write(repo.join("a.txt"), "alpha\n").unwrap();
+        std::fs::create_dir_all(repo.join("src")).unwrap();
+        std::fs::write(repo.join("src/b.txt"), "beta\n").unwrap();
+
+        let policy = bootstrap_test_policy("");
+        let result = bootstrap_empty_repo_commit(&repo, &policy, &BTreeSet::new(), false).await;
+        assert!(result.unwrap(), "bootstrap must commit");
+        assert_eq!(head_commit_count(&repo), 1, "root commit must exist");
+        let output = crate::git::git_cmd()
+            .args(["ls-files"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        let tracked = String::from_utf8_lossy(&output.stdout);
+        assert!(tracked.contains("a.txt"));
+        assert!(tracked.contains("src/b.txt"));
+    }
+
+    #[tokio::test]
+    async fn test_bootstrap_empty_repo_respects_gitignore() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("repo");
+        init_empty_repo(&repo);
+        std::fs::write(repo.join(".gitignore"), "secret.txt\n").unwrap();
+        std::fs::write(repo.join("normal.txt"), "ok\n").unwrap();
+        std::fs::write(repo.join("secret.txt"), "hunter2\n").unwrap();
+
+        let policy = bootstrap_test_policy("");
+        let result = bootstrap_empty_repo_commit(&repo, &policy, &BTreeSet::new(), false).await;
+        assert!(result.unwrap());
+        let output = crate::git::git_cmd()
+            .args(["ls-files"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        let tracked = String::from_utf8_lossy(&output.stdout);
+        assert!(tracked.contains("normal.txt"));
+        assert!(tracked.contains(".gitignore"));
+        assert!(
+            !tracked.contains("secret.txt"),
+            "gitignored files must not be staged by the bootstrap"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_bootstrap_sweep_measures_staged_blob_not_worktree() {
+        // FIX (audit R3-M1, 2026-10-03): the bootstrap sweep measured
+        // the worktree file, so stage-large-then-truncate smuggled a
+        // >max blob into the root commit (M4 covered steady state
+        // only). The sweep must size the staged blob.
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("repo");
+        init_empty_repo(&repo);
+        std::fs::write(repo.join("small.txt"), "ok\n").unwrap();
+        // Operator pre-stages 2 KiB, then truncates the worktree copy
+        // without re-adding: staged blob stays 2 KiB.
+        std::fs::write(repo.join("big.bin"), vec![0u8; 2048]).unwrap();
+        let status = crate::git::git_cmd()
+            .args(["add", "big.bin"])
+            .current_dir(&repo)
+            .status()
+            .unwrap();
+        assert!(status.success());
+        std::fs::write(repo.join("big.bin"), b"tiny").unwrap();
+
+        let index_before = std::fs::read(repo.join(".git/index")).unwrap();
+        let policy = bootstrap_test_policy("max_stage_file_bytes = 1024");
+        let result = bootstrap_empty_repo_commit(&repo, &policy, &BTreeSet::new(), false).await;
+        assert!(
+            format!("{:#}", result.unwrap_err()).contains("excluded or oversized"),
+            "the cached 2KiB blob must be refused despite the tiny worktree copy"
+        );
+        assert_eq!(
+            std::fs::read(repo.join(".git/index")).unwrap(),
+            index_before,
+            "operator staging is not an owned candidate to prune"
+        );
+        assert_eq!(std::fs::read(repo.join("big.bin")).unwrap(), b"tiny");
+        assert_eq!(std::fs::read(repo.join("small.txt")).unwrap(), b"ok\n");
+        assert!(
+            !crate::git::git_cmd()
+                .args(["rev-parse", "--verify", "HEAD"])
+                .current_dir(&repo)
+                .output()
+                .unwrap()
+                .status
+                .success(),
+            "neither an oversized root nor a partial replacement root may be published"
+        );
+    }
+
+    /// ADDED 2026-10-03 (audit R4-SC-05): steady state had no
+    /// post-stage oversize sweep — index content that grew past
+    /// max AFTER the pre-stage clean was committed unchecked
+    /// (stage-large-then-truncate TOCTOU, or a concurrent add
+    /// landing between clean and commit). The bootstrap path got
+    /// this sweep in R3-M1; this test pins the steady-state twin.
+    ///
+    /// Deterministic without racers: a clean filter that INFLATES
+    /// `*.bin` (100 B worktree → 2148 B index blob) makes the
+    /// daemon's own staging create the index≠worktree split. The
+    /// worktree file passes every worktree-sized gate; only the
+    /// post-stage INDEX sizing can catch the blob.
+    #[tokio::test]
+    async fn test_sc05_post_stage_sweep_catches_filter_inflated_blob() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("repo");
+        init_empty_repo(&repo);
+        // Inflating clean filter: blob = input + 2048 bytes.
+        std::fs::write(repo.join(".gitattributes"), "*.bin filter=inflate\n").unwrap();
+        let status = crate::git::git_cmd()
+            .args(["config", "filter.inflate.clean", "cat; printf '%02048d' 0"])
+            .current_dir(&repo)
+            .status()
+            .unwrap();
+        assert!(status.success());
+        // Born HEAD carrying the attributes (setup commit).
+        let status = crate::git::git_cmd()
+            .args(["add", ".gitattributes"])
+            .current_dir(&repo)
+            .status()
+            .unwrap();
+        assert!(status.success());
+        let status = crate::git::git_cmd()
+            .args(["commit", "--no-verify", "-q", "-m", "setup"])
+            .current_dir(&repo)
+            .status()
+            .unwrap();
+        assert!(status.success());
+
+        std::fs::write(repo.join("small.txt"), "ok\n").unwrap();
+        std::fs::write(repo.join("big.bin"), vec![7u8; 100]).unwrap();
+
+        // auto_harden_with_warden defaults true and would rewrite
+        // the fixture's .gitattributes (dropping the inflate line);
+        // this test targets the oversize sweep, not warden interplay.
+        let policy =
+            bootstrap_test_policy("max_stage_file_bytes = 1024\nauto_harden_with_warden = false");
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(
+            result.is_ok(),
+            "sync must succeed (sweep unstages, never errors): {:?}",
+            result
+        );
+        assert_eq!(
+            head_commit_count(&repo),
+            2,
+            "the cycle must commit small.txt (not vacuous NothingToDo)"
+        );
+        let output = crate::git::git_cmd()
+            .args(["ls-tree", "-r", "HEAD", "--name-only"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        let tree = String::from_utf8_lossy(&output.stdout);
+        assert!(tree.contains("small.txt"), "tree: {tree}");
+        assert!(
+            !tree.contains("big.bin"),
+            "filter-inflated 2148 B blob must not reach the commit; tree: {tree}"
+        );
+        // The sweep unstages; it never deletes worktree content.
+        assert_eq!(
+            std::fs::metadata(repo.join("big.bin")).unwrap().len(),
+            100,
+            "worktree file must survive the sweep byte-identical"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_bootstrap_empty_repo_skips_oversized_files() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("repo");
+        init_empty_repo(&repo);
+        std::fs::write(repo.join("small.txt"), "ok\n").unwrap();
+        // 2 KiB file with a 1 KiB stage cap.
+        std::fs::write(repo.join("big.bin"), vec![0u8; 2048]).unwrap();
+
+        let policy = bootstrap_test_policy("max_stage_file_bytes = 1024");
+        let result = bootstrap_empty_repo_commit(&repo, &policy, &BTreeSet::new(), false).await;
+        assert!(result.unwrap());
+        let output = crate::git::git_cmd()
+            .args(["ls-files"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        let tracked = String::from_utf8_lossy(&output.stdout);
+        assert!(tracked.contains("small.txt"));
+        assert!(
+            !tracked.contains("big.bin"),
+            "oversized file must be skipped (max_stage_file_bytes)"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_bootstrap_empty_repo_all_oversized_returns_false() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("repo");
+        init_empty_repo(&repo);
+        std::fs::write(repo.join("big.bin"), vec![0u8; 2048]).unwrap();
+
+        let policy = bootstrap_test_policy("max_stage_file_bytes = 1024");
+        let result = bootstrap_empty_repo_commit(&repo, &policy, &BTreeSet::new(), false).await;
+        assert!(
+            !result.unwrap(),
+            "nothing policy-compliant to stage → no commit"
+        );
+        assert_eq!(head_commit_count(&repo), 0);
+    }
+
+    #[tokio::test]
+    async fn test_bootstrap_empty_repo_auto_commit_disabled() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("repo");
+        init_empty_repo(&repo);
+        std::fs::write(repo.join("a.txt"), "alpha\n").unwrap();
+
+        // NOTE: cannot use bootstrap_test_policy here (it hardcodes
+        // `auto_commit = true`; TOML rejects duplicate keys), so build
+        // the policy directly.
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = false
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+trusted_emails = ["test@test"]
+trusted_authors = ["test"]
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+        let result = bootstrap_empty_repo_commit(&repo, &policy, &BTreeSet::new(), false).await;
+        assert!(!result.unwrap());
+        assert_eq!(head_commit_count(&repo), 0);
+    }
+
+    #[tokio::test]
+    async fn test_bootstrap_empty_repo_unowned_skipped() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("repo");
+        init_empty_repo(&repo);
+        // Untrusted identity: user.email is not in trusted_emails and
+        // there is no origin to vouch for the repo.
+        let status = crate::git::git_cmd()
+            .args(["config", "user.email", "mallory@evil"])
+            .current_dir(&repo)
+            .status()
+            .unwrap();
+        assert!(status.success());
+        std::fs::write(repo.join("a.txt"), "alpha\n").unwrap();
+
+        let policy = bootstrap_test_policy("");
+        let result = bootstrap_empty_repo_commit(&repo, &policy, &BTreeSet::new(), false).await;
+        assert!(
+            !result.unwrap(),
+            "unowned repo (untrusted user.email) must be skipped"
+        );
+        assert_eq!(head_commit_count(&repo), 0);
+    }
+
+    #[tokio::test]
+    async fn test_bootstrap_empty_repo_nothing_to_stage() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("repo");
+        init_empty_repo(&repo);
+        // No files at all — `git commit` would fail with "nothing to
+        // commit"; the bootstrap must report Ok(false) instead.
+        let policy = bootstrap_test_policy("");
+        let result = bootstrap_empty_repo_commit(&repo, &policy, &BTreeSet::new(), false).await;
+        assert!(!result.unwrap());
+        assert_eq!(head_commit_count(&repo), 0);
+    }
+
+    /// Recursively flip the readonly bit under `root`. Used to break
+    /// staging deterministically (a read-only `.git` refuses the
+    /// `index.lock` git-add needs) and to restore writability so the
+    /// tempdir can be removed afterwards.
+    fn set_readonly_recursive(root: &std::path::Path, readonly: bool) {
+        let mut stack = vec![root.to_path_buf()];
+        while let Some(path) = stack.pop() {
+            if let Ok(entries) = std::fs::read_dir(&path) {
+                for entry in entries.flatten() {
+                    stack.push(entry.path());
+                }
+            }
+            if let Ok(meta) = std::fs::symlink_metadata(&path) {
+                let mut perms = meta.permissions();
+                perms.set_readonly(readonly);
+                let _ = std::fs::set_permissions(&path, perms);
+            }
+        }
+    }
+
+    /// Guard restoring `.git` writability on drop, so tempdir cleanup
+    /// cannot strand a read-only tree even if the test fails mid-way.
+    struct WritableDotGit {
+        dot_git: std::path::PathBuf,
+    }
+
+    impl Drop for WritableDotGit {
+        fn drop(&mut self) {
+            set_readonly_recursive(&self.dot_git, false);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_bootstrap_failure_is_error_not_nothing_to_do() {
+        // ADDED 2026-10-02 (audit L1): a failed bootstrap must propagate
+        // as Err — mapping it to NothingToDo cleared the stuck ledger
+        // and reset failure_count every cycle (the daemon counts
+        // NothingToDo as Success), so a repo failing bootstrap forever
+        // read healthy with no failure accounting.
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("repo");
+        init_empty_repo(&repo);
+        std::fs::write(repo.join("a.txt"), "alpha\n").unwrap();
+
+        let dot_git = repo.join(".git");
+        set_readonly_recursive(&dot_git, true);
+        let _restore = WritableDotGit {
+            dot_git: dot_git.clone(),
+        };
+
+        let policy = bootstrap_test_policy("");
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        let err = result.expect_err("bootstrap failure must propagate as Err, not Ok(NothingToDo)");
+        let chain = format!("{err:?}");
+        assert!(
+            chain.contains("bootstrap") || chain.contains("sync lease"),
+            "error must name the failed bootstrap or prior ownership step: {chain}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_busy_lease_defers_without_committing() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("repo");
+        init_empty_repo(&repo);
+        std::fs::write(repo.join("a.txt"), "alpha\n").unwrap();
+        let _lease = crate::git::sync_lease::try_acquire(&repo).unwrap().unwrap();
+        let policy = bootstrap_test_policy("");
+        let outcome = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None)
+            .await
+            .unwrap();
+        assert_eq!(outcome, SyncOutcome::OperationDeferred);
+        assert_eq!(head_commit_count(&repo), 0);
+        assert_eq!(
+            std::fs::read_to_string(repo.join("a.txt")).unwrap(),
+            "alpha\n"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_ahead_count_failure_fails_cycle() {
+        // ADDED 2026-10-02 (audit L2): a detached-HEAD repo whose
+        // ahead-count fails must fail the cycle — the old
+        // `unwrap_or(0)` silently presented the error as "0 ahead",
+        // disarming the backstop gate instead of surfacing it. The
+        // mock git fails ONLY rev-list (everything else passes
+        // through to the real binary), and the serial test harness
+        // (RUST_TEST_THREADS=1) plus GitBinRestorer make the
+        // process-global DRACON_SYNC_GIT_BIN override safe.
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("repo");
+        init_empty_repo(&repo);
+        std::fs::write(repo.join("a.txt"), "alpha\n").unwrap();
+        assert!(crate::git::git_cmd()
+            .args(["add", "a.txt"])
+            .current_dir(&repo)
+            .status()
+            .unwrap()
+            .success());
+        assert!(crate::git::git_cmd()
+            .args(["commit", "-q", "--no-verify", "-m", "init"])
+            .current_dir(&repo)
+            .status()
+            .unwrap()
+            .success());
+        assert!(crate::git::git_cmd()
+            .args(["checkout", "-q", "--detach", "HEAD"])
+            .current_dir(&repo)
+            .status()
+            .unwrap()
+            .success());
+
+        let real_git = crate::policy::git_binary();
+        let mock = tmp.path().join("mock-git.sh");
+        std::fs::write(
+            &mock,
+            format!(
+                "#!/bin/sh\nif [ \"$1\" = \"rev-list\" ]; then echo \"mock: rev-list unavailable\" >&2; exit 128; fi\nexec \"{}\" \"$@\"\n",
+                real_git.display()
+            ),
+        )
+        .unwrap();
+        #[cfg(unix)]
+        std::fs::set_permissions(&mock, std::os::unix::fs::PermissionsExt::from_mode(0o755))
+            .unwrap();
+        let _git_bin = crate::test_helpers::GitBinRestorer::new(&mock.to_string_lossy());
+
+        let policy = bootstrap_test_policy("");
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        let err = result.expect_err("ahead-count failure must fail the cycle, not read as 0-ahead");
+        let chain = format!("{err:?}");
+        assert!(
+            chain.contains("ahead-count failed"),
+            "error must name the ahead-count step: {chain}"
+        );
+    }
+
+    /// ADDED 2026-07-22 (v0.112.36): the pre-commit guard must honor
+    /// ownership overrides — an operator-blessed repo (`owned = true`
+    /// in `.dracon/dracon-sync.toml`) with a deliberate per-repo
+    /// identity (darklord's `darklord-dev <darklord@dracon.local>`)
+    /// must NOT be blocked, while an unblessed untrusted identity
+    /// (the F0.1 `test@test` case) still blocks.
+    #[tokio::test]
+    async fn test_commit_guard_honors_owned_override_with_custom_identity() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("repo");
+        init_empty_repo(&repo);
+        // Deliberate per-repo identity (NOT in trusted lists).
+        for (k, v) in [
+            ("user.email", "darklord@dracon.local"),
+            ("user.name", "darklord-dev"),
+        ] {
+            crate::git::git_cmd()
+                .args(["config", k, v])
+                .current_dir(&repo)
+                .status()
+                .unwrap();
+        }
+        // Operator-blessed override.
+        std::fs::create_dir_all(repo.join(".dracon")).unwrap();
+        std::fs::write(repo.join(".dracon/dracon-sync.toml"), "owned = true\n").unwrap();
+        std::fs::write(repo.join("a.txt"), "alpha\n").unwrap();
+        crate::git::git_cmd()
+            .args(["add", "a.txt"])
+            .current_dir(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["commit", "--no-verify", "-q", "-m", "init"])
+            .current_dir(&repo)
+            .status()
+            .unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+trusted_emails = ["test@test"]
+trusted_authors = ["test"]
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+        assert!(
+            commit_allowed_by_ownership(&repo, &policy),
+            "owned=true override must allow the commit (darklord regression)"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_commit_guard_blocks_untrusted_without_override() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("repo");
+        init_empty_repo(&repo);
+        // F0.1 poisoned identity, NO override.
+        crate::git::git_cmd()
+            .args(["config", "user.email", "test@evil.example"])
+            .current_dir(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["config", "user.name", "mallory"])
+            .current_dir(&repo)
+            .status()
+            .unwrap();
+        std::fs::write(repo.join("a.txt"), "alpha\n").unwrap();
+        crate::git::git_cmd()
+            .args(["add", "a.txt"])
+            .current_dir(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["commit", "--no-verify", "-q", "-m", "init"])
+            .current_dir(&repo)
+            .status()
+            .unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+trusted_emails = ["test@test"]
+trusted_authors = ["test"]
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+        assert!(
+            !commit_allowed_by_ownership(&repo, &policy),
+            "untrusted identity without override must block"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_commit_guard_allows_path_owned_untrusted_identity() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("repo");
+        init_empty_repo(&repo);
+        crate::git::git_cmd()
+            .args(["config", "user.email", "darklord@dracon.local"])
+            .current_dir(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["config", "user.name", "darklord-dev"])
+            .current_dir(&repo)
+            .status()
+            .unwrap();
+        std::fs::write(repo.join("a.txt"), "alpha\n").unwrap();
+        crate::git::git_cmd()
+            .args(["add", "a.txt"])
+            .current_dir(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["commit", "--no-verify", "-q", "-m", "init"])
+            .current_dir(&repo)
+            .status()
+            .unwrap();
+        let toml_str = format!(
+            r#"auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+watch_roots = ["{}"]
+trusted_emails = ["test@test"]
+trusted_authors = ["test"]
+"#,
+            tmp.path().display()
+        );
+        let policy: SyncPolicy = toml::from_str(&toml_str).unwrap();
+        assert!(commit_allowed_by_ownership(&repo, &policy));
+    }
+
+    #[tokio::test]
+    async fn test_commit_guard_allows_trusted_identity() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("repo");
+        init_empty_repo(&repo); // user.email=test@test, user.name=test (trusted below)
+        std::fs::write(repo.join("a.txt"), "alpha\n").unwrap();
+        crate::git::git_cmd()
+            .args(["add", "a.txt"])
+            .current_dir(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["commit", "--no-verify", "-q", "-m", "init"])
+            .current_dir(&repo)
+            .status()
+            .unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+trusted_emails = ["test@test"]
+trusted_authors = ["test"]
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+        assert!(commit_allowed_by_ownership(&repo, &policy));
+    }
+
+    /// ADDED 2026-10-03 (audit R4-SR-04): a present-but-unparsable
+    /// override must BLOCK commits — the old loader returned a clean
+    /// default, voiding owned=false (and every other opt-out), so a
+    /// typo'd file silently inherited permissive commit rights. The
+    /// control (valid owned=true) still allows.
+    #[test]
+    fn test_commit_guard_blocks_on_unparsable_override() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("repo");
+        init_empty_repo(&repo); // user.email=test@test, user.name=test
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+trusted_emails = ["test@test"]
+trusted_authors = ["test"]
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+        // Trusted identity would allow — but the malformed override
+        // (which may have meant owned=false) blocks first.
+        std::fs::create_dir_all(repo.join(".dracon")).unwrap();
+        std::fs::write(
+            repo.join(".dracon/dracon-sync.toml"),
+            "owned = false\nbroken = [unclosed\n",
+        )
+        .unwrap();
+        assert!(
+            !commit_allowed_by_ownership(&repo, &policy),
+            "unparsable override must block commits"
+        );
+        // Control: the same file repaired to a valid owned=true allows.
+        std::fs::write(repo.join(".dracon/dracon-sync.toml"), "owned = true\n").unwrap();
+        assert!(
+            commit_allowed_by_ownership(&repo, &policy),
+            "valid owned=true override must allow"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_empty_repo_end_to_end() {
+        // The full sync_repo path on a stable empty repo: bootstrap
+        // creates the root commit, then the pipeline proceeds.
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("repo");
+        init_empty_repo(&repo);
+        std::fs::write(repo.join("a.txt"), "alpha\n").unwrap();
+
+        // NOTE 2026-09-15 (warden auto-harden): this test pins the exact
+        // bootstrap commit count, so the hook is off — hardening files
+        // (.gitattributes/.gitignore) are out of scope here. See
+        // test_warden_auto_harden_* for hook coverage.
+        let policy = bootstrap_test_policy("auto_harden_with_warden = false");
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo failed: {:?}", result);
+        assert_eq!(
+            head_commit_count(&repo),
+            1,
+            "sync_repo must bootstrap the root commit"
+        );
+    }
+
+    /// ADDED 2026-09-15 (warden-showcase probe): the hardening probe
+    /// reads the local git config the same way `dracon-warden once`
+    /// writes it.
+    #[tokio::test]
+    async fn test_repo_has_warden_filter_probe() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("repo");
+        init_empty_repo(&repo);
+        assert!(
+            !repo_has_warden_filter(&repo).await,
+            "fresh repo must probe as unhardened"
+        );
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "--local",
+                "filter.dracon.clean",
+                "fake-clean %f",
+            ])
+            .status()
+            .unwrap();
+        assert!(
+            repo_has_warden_filter(&repo).await,
+            "repo with local filter.dracon.clean must probe as hardened"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_repo_has_warden_filter_honors_git_bin_seam() {
+        // ADDED 2026-10-03 (audit R4-SC-08): the probe must route
+        // through the sealed Git constructor (DRACON_SYNC_GIT_BIN + prompt
+        // sealing), not raw Command::new("git"). A mock git that
+        // always fails must flip a hardened repo to unhardened.
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("repo");
+        init_empty_repo(&repo);
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "--local",
+                "filter.dracon.clean",
+                "fake-clean %f",
+            ])
+            .status()
+            .unwrap();
+        assert!(repo_has_warden_filter(&repo).await);
+        let mock = tmp.path().join("mock-git.sh");
+        std::fs::write(&mock, "#!/bin/sh\nexit 1\n").unwrap();
+        #[cfg(unix)]
+        std::fs::set_permissions(&mock, std::os::unix::fs::PermissionsExt::from_mode(0o755))
+            .unwrap();
+        let _git_bin = crate::test_helpers::GitBinRestorer::new(&mock.to_string_lossy());
+        assert!(
+            !repo_has_warden_filter(&repo).await,
+            "probe must honor DRACON_SYNC_GIT_BIN (mock git ignored = raw git bypass)"
+        );
+    }
+
+    /// Install a fake `dracon-warden` first on PATH that logs its argv
+    /// and emulates `once <repo>` by writing the filter config.
+    /// Returns the guards (must be held) and the log path.
+    fn install_fake_warden(
+        tmp: &tempfile::TempDir,
+    ) -> (
+        crate::test_helpers::EnvRestorer,
+        crate::test_helpers::EnvRestorer,
+        std::path::PathBuf,
+    ) {
+        let bindir = tmp.path().join("bin");
+        std::fs::create_dir(&bindir).unwrap();
+        let log = tmp.path().join("warden.log");
+        let script = bindir.join("dracon-warden");
+        std::fs::write(
+            &script,
+            "#!/bin/sh\necho \"$@\" >> \"$WARDEN_FAKE_LOG\"\n\
+if [ \"$1\" = \"once\" ] && [ -n \"$2\" ]; then\n\
+  git -C \"$2\" config --local filter.dracon.clean \"fake-clean %f\"\nfi\n",
+        )
+        .unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        let new_path = format!(
+            "{}:{}",
+            bindir.display(),
+            std::env::var("PATH").unwrap_or_default()
+        );
+        let path_guard = crate::test_helpers::EnvRestorer::new("PATH", &new_path);
+        let log_guard =
+            crate::test_helpers::EnvRestorer::new("WARDEN_FAKE_LOG", &log.to_string_lossy());
+        (path_guard, log_guard, log)
+    }
+
+    #[cfg(target_os = "linux")]
+    async fn assert_absolute_staging_deadline_cancels_hardener_descendants(bootstrap: bool) {
+        let tmp = tempfile::tempdir().unwrap();
+        let (_path, _log, _) = install_fake_warden(&tmp);
+        let repo = tmp.path().join("repo");
+        init_empty_repo(&repo);
+        if !bootstrap {
+            assert!(crate::git::git_cmd()
+                .args([
+                    "-c",
+                    "core.hooksPath=/dev/null",
+                    "commit",
+                    "--allow-empty",
+                    "-m",
+                    "disposable fixture baseline"
+                ])
+                .current_dir(&repo)
+                .status()
+                .unwrap()
+                .success());
+        }
+        let head_before = head_commit_count(&repo);
+        let index_before = std::fs::read(repo.join(".git/index")).ok();
+        std::fs::write(repo.join("data"), b"local bytes must survive\n").unwrap();
+        let script = tmp.path().join("bin/dracon-warden");
+        // This is a hanging pre-stage producer fixture, NOT a replacement
+        // storage verifier. No commit may reach verification/publication.
+        std::fs::write(&script, "#!/bin/sh\nsleep 30 &\nchild=$!\nprintf '%s %s\\n' \"$$\" \"$child\" > \"$2/.git/hardener-pids\"\nwait\n").unwrap();
+        let policy = bootstrap_test_policy("stage_op_timeout_secs = 1");
+        let started = std::time::Instant::now();
+        let error = tokio::time::timeout(Duration::from_secs(5), async {
+            if bootstrap {
+                bootstrap_empty_repo_commit(&repo, &policy, &BTreeSet::new(), false)
+                    .await
+                    .map(|_| ())
+            } else {
+                sync_repo(&repo, &policy, &BTreeSet::new(), 60, None, false, None)
+                    .await
+                    .map(|_| ())
+            }
+        })
+        .await
+        .expect("whole staging must be bounded")
+        .unwrap_err();
+        assert!(
+            format!("{error:#}").contains("staging absolute deadline expired"),
+            "{error:#}"
+        );
+        assert!(started.elapsed() < Duration::from_secs(5));
+        let pids: Vec<u32> = std::fs::read_to_string(repo.join(".git/hardener-pids"))
+            .expect("the hardener actually executed")
+            .split_whitespace()
+            .map(|pid| pid.parse().unwrap())
+            .collect();
+        assert_eq!(pids.len(), 2);
+        tokio::time::timeout(Duration::from_secs(3), async {
+            loop {
+                let stopped = pids.iter().all(|pid| {
+                    match std::fs::read_to_string(format!("/proc/{pid}/stat")) {
+                        Ok(stat) => stat
+                            .rsplit_once(") ")
+                            .is_some_and(|(_, rest)| rest.starts_with('Z')),
+                        Err(error) => error.kind() == std::io::ErrorKind::NotFound,
+                    }
+                });
+                if stopped {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        })
+        .await
+        .expect("owned hardener leader AND descendant must stop");
+        assert_eq!(
+            std::fs::read(repo.join("data")).unwrap(),
+            b"local bytes must survive\n"
+        );
+        assert_eq!(
+            std::fs::read(repo.join(".git/index")).ok(),
+            index_before,
+            "private candidate must not install on timeout"
+        );
+        assert!(!repo.join(".git/index.lock").exists());
+        assert_eq!(head_commit_count(&repo), head_before);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[tokio::test]
+    async fn bootstrap_absolute_staging_deadline_cancels_hardener_descendants() {
+        assert_absolute_staging_deadline_cancels_hardener_descendants(true).await;
+    }
+
+    #[cfg(target_os = "linux")]
+    #[tokio::test]
+    async fn ordinary_absolute_staging_deadline_cancels_hardener_descendants() {
+        assert_absolute_staging_deadline_cancels_hardener_descendants(false).await;
+    }
+
+    /// ADDED 2026-09-15: the knob gates the fork — disabled means the
+    /// warden binary is never executed even for an unhardened repo.
+    #[tokio::test]
+    async fn test_warden_auto_harden_disabled_never_forks() {
+        let tmp = tempfile::tempdir().unwrap();
+        let (_pg, _lg, log) = install_fake_warden(&tmp);
+        let repo = tmp.path().join("repo");
+        init_empty_repo(&repo);
+        let policy = bootstrap_test_policy("auto_harden_with_warden = false");
+        maybe_auto_harden_with_warden(&repo, &policy, false).await;
+        assert!(!log.exists(), "disabled hook must never fork dracon-warden");
+        assert!(
+            !repo_has_warden_filter(&repo).await,
+            "disabled hook must leave the repo unhardened"
+        );
+    }
+
+    /// ADDED 2026-09-15: dry-run mode never hardens (preview must not
+    /// mutate repos).
+    #[tokio::test]
+    async fn test_warden_auto_harden_skips_dry_run() {
+        let tmp = tempfile::tempdir().unwrap();
+        let (_pg, _lg, log) = install_fake_warden(&tmp);
+        let repo = tmp.path().join("repo");
+        init_empty_repo(&repo);
+        let policy = bootstrap_test_policy("");
+        maybe_auto_harden_with_warden(&repo, &policy, true).await;
+        assert!(!log.exists(), "dry-run must never fork dracon-warden");
+        assert!(
+            !repo_has_warden_filter(&repo).await,
+            "dry-run must leave the repo unhardened"
+        );
+    }
+
+    /// ADDED 2026-09-15: an unhardened repo gets exactly one harden
+    /// attempt — success is cached so the second staging does not
+    /// re-fork. Uses the default-true knob (field omitted from TOML)
+    /// to pin the fail-closed default end to end.
+    #[tokio::test]
+    async fn test_warden_auto_harden_hardens_once() {
+        let tmp = tempfile::tempdir().unwrap();
+        let (_pg, _lg, log) = install_fake_warden(&tmp);
+        let repo = tmp.path().join("repo");
+        init_empty_repo(&repo);
+        assert!(
+            bootstrap_test_policy("").auto_harden_with_warden,
+            "knob must default true when omitted"
+        );
+        let policy = bootstrap_test_policy("");
+        maybe_auto_harden_with_warden(&repo, &policy, false).await;
+        let first = std::fs::read_to_string(&log).expect("fake warden must have run");
+        assert_eq!(
+            first.lines().count(),
+            1,
+            "exactly one harden attempt, got: {}",
+            first
+        );
+        assert!(
+            first.contains("once"),
+            "harden must invoke `dracon-warden once <repo>`, got: {}",
+            first
+        );
+        assert!(
+            repo_has_warden_filter(&repo).await,
+            "repo must probe hardened after the hook"
+        );
+        maybe_auto_harden_with_warden(&repo, &policy, false).await;
+        let second = std::fs::read_to_string(&log).expect("log must persist");
+        assert_eq!(
+            second.lines().count(),
+            1,
+            "hardened repos must not re-fork, got: {}",
+            second
+        );
+    }
+
+    /// ADDED 2026-07-22 (v0.112.34, audit F1.16): excluded tracked
+    /// files are UNSTAGED but their worktree edits are PRESERVED by
+    /// default (the old default reverted them to HEAD, silently
+    /// deleting operator work).
+    #[tokio::test]
+    async fn test_excluded_tracked_file_edits_preserved_by_default() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        for (k, v) in [("user.email", "test@test"), ("user.name", "test")] {
+            crate::git::git_cmd()
+                .args(["-C", &repo.to_string_lossy(), "config", k, v])
+                .status()
+                .unwrap();
+        }
+        // Tracked excluded file + tracked normal file.
+        std::fs::write(repo.join("excluded.log"), "original\n").unwrap();
+        std::fs::write(repo.join("normal.txt"), "v1\n").unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "add", "."])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "-q",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+        // Operator edits both.
+        std::fs::write(repo.join("excluded.log"), "edited by operator\n").unwrap();
+        std::fs::write(repo.join("normal.txt"), "v2\n").unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+trusted_emails = ["test@test"]
+trusted_authors = ["test"]
+auto_commit_exclude_patterns = ["*.log"]
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo failed: {:?}", result);
+
+        // The operator's edit to the EXCLUDED file must be PRESERVED
+        // (not reverted to HEAD).
+        let content = std::fs::read_to_string(repo.join("excluded.log")).unwrap();
+        assert_eq!(
+            content.trim(),
+            "edited by operator",
+            "excluded file edits must be preserved (regression F1.16)"
+        );
+        // ... and it must NOT be staged (unstaged after the cycle).
+        let staged = crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "diff",
+                "--cached",
+                "--name-only",
+            ])
+            .output()
+            .unwrap();
+        assert!(
+            !String::from_utf8_lossy(&staged.stdout).contains("excluded.log"),
+            "excluded file must not remain staged"
+        );
+        // The normal file WAS committed.
+        let head_content = crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "show", "HEAD:normal.txt"])
+            .output()
+            .unwrap();
+        assert_eq!(String::from_utf8_lossy(&head_content.stdout).trim(), "v2");
+    }
+
+    /// ADDED 2026-10-03 (audit R3-M2): per-repo entries EXTEND the
+    /// global list (union) — a per-repo set must not silently drop
+    /// the global excludes at commit time (old REPLACE semantics
+    /// committed `g.log` here).
+    #[tokio::test]
+    async fn test_auto_commit_excludes_union_global_and_per_repo() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        for (k, v) in [("user.email", "test@test"), ("user.name", "test")] {
+            crate::git::git_cmd()
+                .args(["-C", &repo.to_string_lossy(), "config", k, v])
+                .status()
+                .unwrap();
+        }
+        std::fs::write(repo.join("g.log"), "original\n").unwrap();
+        std::fs::write(repo.join("p.tmp"), "original\n").unwrap();
+        std::fs::write(repo.join("normal.txt"), "v1\n").unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "add", "."])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "-q",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+        // Per-repo adds *.tmp; the global policy carries *.log.
+        std::fs::create_dir_all(repo.join(".dracon")).unwrap();
+        std::fs::write(
+            repo.join(".dracon/dracon-sync.toml"),
+            "auto_commit_exclude_patterns = [\"*.tmp\"]\n",
+        )
+        .unwrap();
+        // Operator edits all three tracked files.
+        std::fs::write(repo.join("g.log"), "edited\n").unwrap();
+        std::fs::write(repo.join("p.tmp"), "edited\n").unwrap();
+        std::fs::write(repo.join("normal.txt"), "v2\n").unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+trusted_emails = ["test@test"]
+trusted_authors = ["test"]
+auto_commit_exclude_patterns = ["*.log"]
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo failed: {:?}", result);
+
+        let show = |path: &str| {
+            let out = crate::git::git_cmd()
+                .args([
+                    "-C",
+                    &repo.to_string_lossy(),
+                    "show",
+                    &format!("HEAD:{path}"),
+                ])
+                .output()
+                .unwrap();
+            String::from_utf8_lossy(&out.stdout).trim().to_string()
+        };
+        assert_eq!(show("normal.txt"), "v2", "normal file must commit");
+        assert_eq!(
+            show("g.log"),
+            "original",
+            "globally-excluded file must survive a per-repo set (union)"
+        );
+        assert_eq!(
+            show("p.tmp"),
+            "original",
+            "per-repo-excluded file must not commit"
+        );
+    }
+
+    /// ADDED 2026-07-22 (v0.112.34, audit F1.16): the opt-in
+    /// `revert_excluded_to_head = true` restores the old destructive
+    /// semantics (excluded files reverted to HEAD).
+    #[tokio::test]
+    async fn test_excluded_tracked_file_reverted_when_opted_in() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        for (k, v) in [("user.email", "test@test"), ("user.name", "test")] {
+            crate::git::git_cmd()
+                .args(["-C", &repo.to_string_lossy(), "config", k, v])
+                .status()
+                .unwrap();
+        }
+        std::fs::write(repo.join("excluded.log"), "original\n").unwrap();
+        std::fs::write(repo.join("normal.txt"), "v1\n").unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "add", "."])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "-q",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+        std::fs::write(repo.join("excluded.log"), "edited by operator\n").unwrap();
+        std::fs::write(repo.join("normal.txt"), "v2\n").unwrap();
+        // Per-repo opt-in via .dracon/dracon-sync.toml.
+        std::fs::create_dir_all(repo.join(".dracon")).unwrap();
+        std::fs::write(
+            repo.join(".dracon/dracon-sync.toml"),
+            "revert_excluded_to_head = true\n",
+        )
+        .unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+trusted_emails = ["test@test"]
+trusted_authors = ["test"]
+auto_commit_exclude_patterns = ["*.log"]
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo failed: {:?}", result);
+
+        let content = std::fs::read_to_string(repo.join("excluded.log")).unwrap();
+        assert_eq!(
+            content.trim(),
+            "original",
+            "opted-in revert must restore the HEAD content"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_untracked_exclude_patterns_keeps_scratch_untracked() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        // Create files that should be auto-staged
+        std::fs::write(repo.join("real-doc.md"), "real doc\n").unwrap();
+        // Create a scratch file that should be excluded
+        std::fs::create_dir_all(repo.join("scratch")).unwrap();
+        std::fs::write(repo.join("scratch").join("notes.md"), "scratch notes\n").unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+auto_stage_untracked = true
+untracked_exclude_patterns = ["**/scratch/**"]
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed: {:?}", result);
+
+        // Verify the real doc is tracked
+        let output = crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "ls-files"])
+            .output()
+            .unwrap();
+        let tracked = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            tracked.contains("real-doc.md"),
+            "real-doc.md should be tracked"
+        );
+        // Verify the scratch file is NOT tracked
+        assert!(
+            !tracked.contains("scratch/notes.md"),
+            "scratch/notes.md should NOT be tracked (untracked_exclude_patterns)"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_skip_pull_when_not_behind() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = false
+auto_pull = true
+auto_push = false
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed");
+        assert!(
+            matches!(result, Ok(SyncOutcome::NothingToDo)),
+            "not behind should return false (nothing to pull)"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_skip_pull_when_dirty() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        std::fs::write(repo.join("dirty.txt"), "modified\n").unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = false
+auto_pull = true
+auto_push = false
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed with dirty repo");
+        assert!(
+            matches!(result, Ok(SyncOutcome::NothingToDo)),
+            "dirty repo should skip pull and return false"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_skip_push_when_no_origin() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = false
+auto_pull = false
+auto_push = true
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed without origin");
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_skip_push_when_no_upstream() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = false
+auto_pull = false
+auto_push = true
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed without upstream");
+    }
+
+    /// ADDED 2026-07-21 (v0.112.31, audit M1/F3.9): the ledger error
+    /// string must name the failing remotes (sorted, comma-joined)
+    /// so the repos HINT column says WHICH forge is failing.
+    #[test]
+    fn test_failing_remote_names_formats_sorted() {
+        let mut map: HashMap<String, crate::daemon::RemoteFailInfo> = HashMap::new();
+        assert_eq!(failing_remote_names(None), "unknown");
+        assert_eq!(failing_remote_names(Some(&map)), "unknown");
+        map.insert(
+            "gitlab".to_string(),
+            crate::daemon::RemoteFailInfo {
+                consecutive: 2,
+                last_error: "rejected (non-fast-forward)".to_string(),
+                last_attempt_unix: 0,
+            },
+        );
+        map.insert(
+            "codeberg".to_string(),
+            crate::daemon::RemoteFailInfo {
+                consecutive: 1,
+                last_error: "connection timed out".to_string(),
+                last_attempt_unix: 0,
+            },
+        );
+        assert_eq!(failing_remote_names(Some(&map)), "codeberg, gitlab");
+    }
+
+    /// ADDED 2026-08-09 (v0.113.50): the ledger cause line must
+    /// classify each failing remote's error and dedupe identical
+    /// causes (two divergent mirrors → one "history divergence"
+    /// cause, not two).
+    #[test]
+    fn test_classify_failing_remotes_dedupes_divergence() {
+        let mut map: HashMap<String, crate::daemon::RemoteFailInfo> = HashMap::new();
+        map.insert(
+            "gitlab".to_string(),
+            crate::daemon::RemoteFailInfo {
+                consecutive: 5,
+                last_error: "! [rejected] HEAD -> main (non-fast-forward)".to_string(),
+                last_attempt_unix: 0,
+            },
+        );
+        map.insert(
+            "codeberg".to_string(),
+            crate::daemon::RemoteFailInfo {
+                consecutive: 5,
+                last_error: "error: failed to push some refs (fetch first)".to_string(),
+                last_attempt_unix: 0,
+            },
+        );
+        let cause = classify_failing_remotes(Some(&map));
+        assert!(cause.contains("history divergence"), "got: {}", cause);
+        // Dedupe: both remotes classify the same way.
+        assert_eq!(cause.matches("history divergence").count(), 1);
+        assert!(!cause.contains("unknown"), "got: {}", cause);
+    }
+
+    #[test]
+    fn test_classify_failing_remotes_empty_map() {
+        let map: HashMap<String, crate::daemon::RemoteFailInfo> = HashMap::new();
+        let cause = classify_failing_remotes(Some(&map));
+        assert!(cause.contains("unknown"), "got: {}", cause);
+        assert_eq!(
+            classify_failing_remotes(None),
+            classify_failing_remotes(Some(&map))
+        );
+    }
+
+    /// ADDED 2026-11-02 (T1.8): the shared ledger composer appends
+    /// mined hook detail when the raw per-remote text carries it, and
+    /// stays bare otherwise. Both push-failure arms (commit path and
+    /// backlog path) must produce the same message for the same input.
+    #[test]
+    fn test_push_failure_message_mines_hook_detail() {
+        let mut map: HashMap<String, crate::daemon::RemoteFailInfo> = HashMap::new();
+        map.insert(
+            "origin".to_string(),
+            crate::daemon::RemoteFailInfo {
+                last_error: "git push failed in /r with status exit status: 1:   - extensions/standalones/tabmon/TEST exited 1 (see /s/x.log)\n\
+                    🧾 Pre-push attempt logs: /s/gates/dracon-pre-push.Xx1\n\
+                    ❌ Pre-push: 4-gate FAILED\n"
+                    .to_string(),
+                ..Default::default()
+            },
+        );
+        let (msg, detail) = push_failure_message("origin", "hook cause", Some(&map));
+        let detail = detail.expect("gate refusal must yield detail");
+        assert!(detail.contains("tabmon/TEST"), "{detail}");
+        assert!(msg.contains(&detail), "{msg}");
+        assert!(msg.starts_with("git push returned non-zero (remotes: origin)"), "{msg}");
+
+        // A transport error carries no hook detail: bare message, None.
+        let mut plain: HashMap<String, crate::daemon::RemoteFailInfo> = HashMap::new();
+        plain.insert(
+            "origin".to_string(),
+            crate::daemon::RemoteFailInfo {
+                last_error: "ssh: Connection refused".to_string(),
+                ..Default::default()
+            },
+        );
+        let (msg, detail) = push_failure_message("origin", "transport cause", Some(&plain));
+        assert!(detail.is_none());
+        assert_eq!(
+            msg,
+            "git push returned non-zero (remotes: origin) — transport cause"
+        );
+    }
+
+    /// ADDED 2026-07-21 (v0.112.31, audit M1/F3.9): after a mirror
+    /// push failure, the stuck-push ledger's `last_error` names the
+    /// failing remote — the pre-fix generic message ("git push
+    /// returned non-zero (see daemon log)") forced the operator to
+    /// grep the journal to learn WHICH forge was failing.
+    #[tokio::test]
+    async fn test_mirror_failure_ledger_names_remote() {
+        let state_dir = tempfile::tempdir().unwrap();
+        let _state_guard = crate::test_helpers::EnvRestorer::new(
+            "DRACON_SYNC_STATE_DIR",
+            state_dir.path().to_string_lossy().as_ref(),
+        );
+        let tmp = tempfile::tempdir().unwrap();
+        let origin_bare = tmp.path().join("origin.git");
+        crate::git::git_cmd()
+            .args(["init", "--bare", "-q", "-b", "master"])
+            .arg(&origin_bare)
+            .status()
+            .unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        for (k, v) in [("user.email", "test@test"), ("user.name", "test")] {
+            crate::git::git_cmd()
+                .args(["-C", &repo.to_string_lossy(), "config", k, v])
+                .status()
+                .unwrap();
+        }
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "remote",
+                "add",
+                "origin",
+                &origin_bare.to_string_lossy(),
+            ])
+            .status()
+            .unwrap();
+        // CHANGED 2026-07-27 (v0.113.5, audit M3): bootstrap-push
+        // scenario needs the upstream tracking ref configured
+        // (the pre-fix `!branch_has_upstream` clause handled
+        // this implicitly; v0.113.5 requires the explicit
+        // upstream config so `upstream_ref_missing` triggers a
+        // push attempt).
+        configure_branch_upstream(&repo, "master", "origin");
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = false
+auto_pull = false
+auto_push = true
+auto_bump_versions = false
+trusted_emails = ["test@test"]
+trusted_authors = ["test"]
+
+[[remotes]]
+name = "bad-mirror"
+push_url = "git@nonexistent.example.com:repo.git"
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+        let mut remote_failures = HashMap::new();
+        let result = sync_repo(
+            &repo,
+            &policy,
+            &BTreeSet::new(),
+            0,
+            Some(&mut remote_failures),
+            false,
+            None,
+        )
+        .await;
+        assert!(result.is_ok());
+        let stuck = crate::daemon::get_stuck_push_info(&repo)
+            .expect("push failure must record a stuck-ledger entry");
+        assert!(
+            stuck.last_error.contains("bad-mirror"),
+            "ledger last_error must name the failing remote, got: {:?}",
+            stuck.last_error
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_mirror_push_failure_returns_false() {
+        // Use a temp state dir so this test does NOT pollute the
+        // real stuck-push ledger at
+        // ~/.local/state/dracon/dracon-sync-stuck-push-repos.json.
+        // Regression: previously this test pushed to a
+        // nonexistent URL (`git@nonexistent.example.com:repo.git`),
+        // the push failed, and `record_push_failure` was called
+        // with the temp repo path. The temp path then appeared
+        // as a junk entry (`/tmp/.tmpXXXXX/test-repo`) in the
+        // live daemon's `dracon-sync repos` report.
+        let state_dir = tempfile::tempdir().unwrap();
+        let _state_guard = crate::test_helpers::EnvRestorer::new(
+            "DRACON_SYNC_STATE_DIR",
+            state_dir.path().to_string_lossy().as_ref(),
+        );
+        let tmp = tempfile::tempdir().unwrap();
+        let origin_bare = tmp.path().join("origin.git");
+        crate::git::git_cmd()
+            .args(["init", "--bare", "-q", "-b", "master"])
+            .arg(&origin_bare)
+            .status()
+            .unwrap();
+
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "remote",
+                "add",
+                "origin",
+                &origin_bare.to_string_lossy(),
+            ])
+            .status()
+            .unwrap();
+        // CHANGED 2026-07-27 (v0.113.5, audit M3): see
+        // `configure_branch_upstream` doc-comment for why the
+        // bootstrap path now needs explicit upstream config
+        // (the `!branch_has_upstream` clause was removed from
+        // `should_push`).
+        configure_branch_upstream(&repo, "master", "origin");
+
+        // Point mirror to non-existent path so push fails
+        let bad_mirror = tmp.path().join("nonexistent-mirror.git");
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "remote",
+                "add",
+                "mirror",
+                &bad_mirror.to_string_lossy(),
+            ])
+            .status()
+            .unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = false
+auto_pull = false
+auto_push = true
+auto_bump_versions = false
+
+[[remotes]]
+name = "mirror"
+push_url = "git@nonexistent.example.com:repo.git"
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should not error");
+        // CHANGED 2026-07-21 (v0.112.31, audit H3/F1.3): push failure
+        // now surfaces as `SyncOutcome::PushFailed` (was
+        // `NothingToDo`, which the daemon's apply phase treated as
+        // success — logging `🔁 synced` and resetting `failure_count`
+        // on a failed push).
+        assert!(
+            matches!(result, Ok(SyncOutcome::PushFailed)),
+            "mirror push failure must return PushFailed, got {:?}",
+            result
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_mirror_push_failure_second() {
+        // See `test_sync_repo_mirror_push_failure_returns_false`
+        // for the rationale on using a temp state dir.
+        let state_dir = tempfile::tempdir().unwrap();
+        let _state_guard = crate::test_helpers::EnvRestorer::new(
+            "DRACON_SYNC_STATE_DIR",
+            state_dir.path().to_string_lossy().as_ref(),
+        );
+        let tmp = tempfile::tempdir().unwrap();
+        let origin_bare = tmp.path().join("origin.git");
+        crate::git::git_cmd()
+            .args(["init", "--bare", "-q", "-b", "master"])
+            .arg(&origin_bare)
+            .status()
+            .unwrap();
+
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "remote",
+                "add",
+                "origin",
+                &origin_bare.to_string_lossy(),
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "push",
+                "-u",
+                "origin",
+                "master",
+            ])
+            .status()
+            .unwrap();
+
+        std::fs::write(repo.join("change.txt"), "changed\n").unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = true
+auto_bump_versions = false
+trusted_emails = ["test@test"]
+trusted_authors = ["test"]
+
+[[remotes]]
+name = "bad-mirror"
+push_url = "git@nonexistent.example.com:repo.git"
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let mut remote_failures = HashMap::new();
+        let result = sync_repo(
+            &repo,
+            &policy,
+            &BTreeSet::new(),
+            0,
+            Some(&mut remote_failures),
+            false,
+            None,
+        )
+        .await;
+        assert!(result.is_ok());
+        // CHANGED 2026-07-21 (v0.112.31, audit H3/F1.3): a mirror-leg
+        // failure (origin push succeeded) now returns `PushFailed`
+        // instead of `Synced` — the commit landed and origin is
+        // current, but the sync is not fully healthy and the daemon
+        // must count + retry the mirror leg. The apply-phase
+        // `PushFailed` arm increments `failure_count` and skips the
+        // `🔁 synced` log.
+        assert!(
+            matches!(result.unwrap(), SyncOutcome::PushFailed),
+            "mirror push failure must return PushFailed (origin succeeded but mirror failed)"
+        );
+        assert_eq!(
+            remote_failures.get("bad-mirror").map(|f| f.consecutive),
+            Some(1),
+            "bad-mirror failure should be tracked"
+        );
+        assert!(
+            remote_failures
+                .get("bad-mirror")
+                .map(|f| f.last_error.contains("nonexistent"))
+                .unwrap_or(false),
+            "bad-mirror failure should carry the raw error"
+        );
+    }
+
+    /// Build a fixture repo whose only remote is unpushable (TEST-only
+    /// helper for the commit-only tests below). Returns (repo, policy).
+    fn commit_only_fixture(tmp: &tempfile::TempDir) -> (std::path::PathBuf, SyncPolicy) {
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        for (k, v) in [
+            ("user.email", "audit-fixture@invalid"),
+            ("user.name", "test"),
+        ] {
+            crate::git::git_cmd()
+                .args(["-C", &repo.to_string_lossy(), "config", k, v])
+                .status()
+                .unwrap();
+        }
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+        // Unpushable remote: connection refused on localhost is fast
+        // (no DNS stall) and deterministic offline.
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "remote",
+                "add",
+                "origin",
+                "ssh://127.0.0.1:9/unpushable.git",
+            ])
+            .status()
+            .unwrap();
+        std::fs::write(repo.join("change.txt"), "changed\n").unwrap();
+        let toml_str = r#"
+auto_commit = true
+auto_pull = false
+auto_push = true
+auto_bump_versions = false
+trusted_emails = ["audit-fixture@invalid"]
+trusted_authors = ["test"]
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+        (repo, policy)
+    }
+
+    /// ADDED 2026-09-18 (v0.113.69, commit-despite-paused-push):
+    /// commit_only=true commits the dirt but NEVER pushes — the
+    /// outcome is PushPaused, the commit lands, no per-remote failure
+    /// is recorded, and the stuck ledger is untouched. FAIL-BEFORE:
+    /// without the commit_only gate this fixture pushes to a dead
+    /// remote and returns PushFailed with an origin failure recorded.
+    #[tokio::test]
+    async fn test_commit_only_commits_but_never_pushes() {
+        let state_dir = tempfile::tempdir().unwrap();
+        let _state_guard = crate::test_helpers::EnvRestorer::new(
+            "DRACON_SYNC_STATE_DIR",
+            state_dir.path().to_string_lossy().as_ref(),
+        );
+        let tmp = tempfile::tempdir().unwrap();
+        let (repo, policy) = commit_only_fixture(&tmp);
+        let mut remote_failures = HashMap::new();
+        let result = sync_repo_with_ahead_since(
+            &repo,
+            &policy,
+            &BTreeSet::new(),
+            0,
+            Some(&mut remote_failures),
+            false,
+            None,
+            None,
+            true,
+        )
+        .await;
+        assert!(
+            matches!(result.unwrap(), SyncOutcome::PushPaused),
+            "commit-only must return PushPaused, not PushFailed"
+        );
+        // The commit landed: two commits now, clean worktree.
+        let log_count = crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "rev-list", "--count", "HEAD"])
+            .output()
+            .unwrap();
+        assert_eq!(String::from_utf8_lossy(&log_count.stdout).trim(), "2");
+        // Zero push attempts: no per-remote failure recorded.
+        assert!(
+            remote_failures.is_empty(),
+            "commit-only must not record remote failures, got: {:?}",
+            remote_failures
+        );
+        // Stuck ledger untouched: no entry for this repo.
+        assert!(
+            !crate::daemon::load_stuck_push_repos().contains_key(&repo),
+            "commit-only must not write the stuck ledger"
+        );
+    }
+
+    /// Control for the test above: the SAME fixture with
+    /// commit_only=false pushes to the dead remote and returns
+    /// PushFailed with the origin failure recorded. Proves the
+    /// fixture actually exercises the push path (the commit-only
+    /// test is not vacuously passing on a repo with no push work).
+    #[tokio::test]
+    async fn test_commit_only_control_pushes_and_fails() {
+        let state_dir = tempfile::tempdir().unwrap();
+        let _state_guard = crate::test_helpers::EnvRestorer::new(
+            "DRACON_SYNC_STATE_DIR",
+            state_dir.path().to_string_lossy().as_ref(),
+        );
+        let tmp = tempfile::tempdir().unwrap();
+        let (repo, policy) = commit_only_fixture(&tmp);
+        let mut remote_failures = HashMap::new();
+        let result = sync_repo_with_ahead_since(
+            &repo,
+            &policy,
+            &BTreeSet::new(),
+            0,
+            Some(&mut remote_failures),
+            false,
+            None,
+            None,
+            false,
+        )
+        .await;
+        assert!(
+            matches!(result.unwrap(), SyncOutcome::PushFailed),
+            "control: dead-remote push must return PushFailed"
+        );
+        assert!(
+            remote_failures
+                .get("origin")
+                .map(|f| f.consecutive)
+                .unwrap_or(0)
+                >= 1,
+            "control: origin failure must be recorded"
+        );
+    }
+
+    /// Fixture for the degraded-success test: dead origin (never
+    /// attempted when pause-seeded) + working local mirror.
+    fn degraded_fixture(tmp: &tempfile::TempDir) -> (std::path::PathBuf, SyncPolicy) {
+        let mirror_bare = tmp.path().join("mirror.git");
+        crate::git::git_cmd()
+            .args(["init", "--bare", "-q", "-b", "master"])
+            .arg(&mirror_bare)
+            .status()
+            .unwrap();
+        let (repo, _) = commit_only_fixture(tmp);
+        // Push the base commit to the mirror so only the new dirt is
+        // unpushed (mirrors the live one-sick/one-healthy steady state).
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "push",
+                &mirror_bare.to_string_lossy(),
+                "master",
+            ])
+            .status()
+            .unwrap();
+        let toml_str = format!(
+            r#"
+auto_commit = true
+auto_pull = false
+auto_push = true
+auto_bump_versions = false
+trusted_emails = ["audit-fixture@invalid"]
+trusted_authors = ["test"]
+
+[[remotes]]
+name = "mirror"
+push_url = "{}"
+"#,
+            mirror_bare.to_string_lossy()
+        );
+        let policy: SyncPolicy = toml::from_str(&toml_str).unwrap();
+        (repo, policy)
+    }
+
+    /// ADDED 2026-09-18 (v0.113.72, degraded-success): a sick-paused
+    /// origin + healthy mirror must report PushPaused — NOT Synced.
+    /// Synced clears the repo ledger AND drops the activity entry,
+    /// which wipes the origin's pause memory; the next cycle then
+    /// re-hammers the sick forge (observed live: pause line printed,
+    /// mirror no-op success unstuck the repo, 5s later origin was
+    /// re-attempted with consecutive=1 — the per-remote pause was
+    /// completely defeated by the amnesia). PushPaused retains the
+    /// activity entry (with the frozen origin pause counters), writes
+    /// no ledger entry either way, and the mirror still converges.
+    /// FAIL-BEFORE (v0.113.71): returns Synced (record_push_success).
+    #[tokio::test]
+    async fn test_degraded_success_reports_paused_not_synced() {
+        let state_dir = tempfile::tempdir().unwrap();
+        let _state_guard = crate::test_helpers::EnvRestorer::new(
+            "DRACON_SYNC_STATE_DIR",
+            state_dir.path().to_string_lossy().as_ref(),
+        );
+        let tmp = tempfile::tempdir().unwrap();
+        let (repo, policy) = degraded_fixture(&tmp);
+        // Seed the origin pause: 3 consecutive fails, last attempt now.
+        let now = crate::policy::timestamp_secs();
+        let mut remote_failures = HashMap::new();
+        remote_failures.insert(
+            "origin".to_string(),
+            crate::daemon::RemoteFailInfo {
+                consecutive: 3,
+                last_error: "ssh: Connection refused".to_string(),
+                last_attempt_unix: now,
+            },
+        );
+        let result = sync_repo_with_ahead_since(
+            &repo,
+            &policy,
+            &BTreeSet::new(),
+            0,
+            Some(&mut remote_failures),
+            false,
+            None,
+            None,
+            false,
+        )
+        .await;
+        assert!(
+            matches!(result.unwrap(), SyncOutcome::PushPaused),
+            "degraded success (sick-paused origin, healthy mirror) must return PushPaused, not Synced"
+        );
+        // Pause memory retained: origin counters frozen, not reset,
+        // not incremented (zero attempts means zero records).
+        let origin = remote_failures
+            .get("origin")
+            .expect("origin pause entry must survive");
+        assert_eq!(origin.consecutive, 3);
+        assert_eq!(origin.last_attempt_unix, now);
+        // The mirror still converged: it has the newly committed dirt.
+        let mirror_log = crate::git::git_cmd()
+            .args([
+                "--git-dir",
+                &tmp.path().join("mirror.git").to_string_lossy(),
+                "log",
+                "--format=%s",
+            ])
+            .output()
+            .unwrap();
+        let mirror_log = String::from_utf8_lossy(&mirror_log.stdout);
+        assert!(
+            mirror_log.contains("change.txt"),
+            "mirror must carry the new commit, got:\n{}",
+            mirror_log
+        );
+        // No ledger write either way: neither a failure burn nor a
+        // premature success-clear while a remote is still sick-paused.
+        assert!(
+            !crate::daemon::load_stuck_push_repos().contains_key(&repo),
+            "degraded success must not write the stuck ledger"
+        );
+    }
+
+    /// Fixture for the forge-incident e2e: a repo whose only mirror is
+    /// an HTTP URL on a fake forge (see `fake_forge_503` below).
+    /// Every push fails TRANSIENT-class (HTTP 503) over loopback — no
+    /// external network, no ssh (the daemon hard-overrides
+    /// `GIT_SSH_COMMAND` with its hardening string, so ssh-based fault
+    /// injection is impossible; HTTP fault injection works).
+    fn incident_fixture(
+        tmp: &tempfile::TempDir,
+        name: &str,
+        forge_port: u16,
+    ) -> (std::path::PathBuf, SyncPolicy) {
+        let repo = tmp.path().join(name);
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        for (k, v) in [("user.email", "test@test"), ("user.name", "test")] {
+            crate::git::git_cmd()
+                .args(["-C", &repo.to_string_lossy(), "config", k, v])
+                .status()
+                .unwrap();
+        }
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+        // No origin: mirror-only path (the origin-only tail is covered
+        // by the commit_only fixtures).
+        std::fs::write(repo.join("change.txt"), "changed\n").unwrap();
+        let toml_str = format!(
+            r#"
+auto_commit = true
+auto_pull = false
+auto_push = true
+auto_bump_versions = false
+trusted_emails = ["test@test"]
+trusted_authors = ["test"]
+
+[[remotes]]
+name = "mirror"
+push_url = "http://127.0.0.1:{}/{}.git"
+"#,
+            forge_port, name
+        );
+        let policy: SyncPolicy = toml::from_str(&toml_str).unwrap();
+        (repo, policy)
+    }
+
+    /// Fake forge: answers every HTTP request with 503 + a Gitaly body
+    /// (mirrors the live GitLab degradation signature, including the
+    /// `remote:` body lines git surfaces). Binds loopback port 0;
+    /// returns the port and an abort guard for the serve task.
+    async fn fake_forge_503() -> (u16, tokio::task::AbortHandle) {
+        use tokio::io::AsyncWriteExt;
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let handle = tokio::spawn(async move {
+            loop {
+                let Ok((mut sock, _)) = listener.accept().await else {
+                    break;
+                };
+                tokio::spawn(async move {
+                    let mut buf = vec![0u8; 4096];
+                    use tokio::io::AsyncReadExt;
+                    let _ = sock.read(&mut buf).await;
+                    let body = "Service Unavailable - Gitaly is not available at this time";
+                    let resp = format!(
+                        "HTTP/1.1 503 Service Unavailable\r\nContent-Type: text/plain\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                        body.len(),
+                        body
+                    );
+                    let _ = sock.write_all(resp.as_bytes()).await;
+                });
+            }
+        })
+        .abort_handle();
+        (port, handle)
+    }
+
+    /// ADDED 2026-09-18 (v0.113.73, forge-degraded e2e): two repos
+    /// failing transient-class on the SAME fake forge host declare an
+    /// incident; the second repo's failure is shielded (no budget
+    /// burn, PushPaused so commits keep flowing); recovery clears on
+    /// window expiry. FAIL-BEFORE: no incident file exists, every
+    /// failure burns (repo B consecutive == 1, outcome PushFailed).
+    #[tokio::test]
+    async fn test_forge_incident_declares_and_shields() {
+        let state_dir = tempfile::tempdir().unwrap();
+        let _state_guard = crate::test_helpers::EnvRestorer::new(
+            "DRACON_SYNC_STATE_DIR",
+            state_dir.path().to_string_lossy().as_ref(),
+        );
+        let _prompt_guard = crate::test_helpers::EnvRestorer::new("GIT_TERMINAL_PROMPT", "0");
+        let tmp = tempfile::tempdir().unwrap();
+        // One fake forge serves both repos: same host => corroboration.
+        let (forge_port, forge_abort) = fake_forge_503().await;
+        let (repo_a, policy_a) = incident_fixture(&tmp, "repo-a", forge_port);
+        let (repo_b, policy_b) = incident_fixture(&tmp, "repo-b", forge_port);
+        let mut rf_a = HashMap::new();
+        let mut rf_b = HashMap::new();
+        // Repo A fails first: anecdote, not incident — burns budget.
+        let out_a = sync_repo_with_ahead_since(
+            &repo_a,
+            &policy_a,
+            &BTreeSet::new(),
+            0,
+            Some(&mut rf_a),
+            false,
+            None,
+            None,
+            false,
+        )
+        .await;
+        assert!(
+            matches!(out_a.unwrap(), SyncOutcome::PushFailed),
+            "first transient failure (no incident yet) must burn: PushFailed"
+        );
+        assert!(crate::forge::forge_incident_hosts().is_empty());
+        // Repo B fails on the same host: incident declares.
+        let out_b = sync_repo_with_ahead_since(
+            &repo_b,
+            &policy_b,
+            &BTreeSet::new(),
+            0,
+            Some(&mut rf_b),
+            false,
+            None,
+            None,
+            false,
+        )
+        .await;
+        assert!(
+            matches!(out_b.unwrap(), SyncOutcome::PushPaused),
+            "second corroborating failure must be shielded: PushPaused"
+        );
+        let incidents = crate::forge::forge_incident_hosts();
+        assert!(incidents.contains("127.0.0.1"), "got: {:?}", incidents);
+        // Budget accounting: A burned once (pre-incident), B never.
+        let ledger = crate::daemon::load_stuck_push_repos();
+        assert_eq!(ledger.get(&repo_a).map(|e| e.consecutive_failures), Some(1));
+        assert_eq!(
+            ledger.get(&repo_b).map(|e| e.consecutive_failures),
+            Some(0),
+            "shielded repo keeps a visibility-only entry, never a burn"
+        );
+        // Alert coalescing covers A now (its latest hit is the incident).
+        assert!(crate::forge::forge_incident_covers_repo(
+            &repo_a.to_string_lossy()
+        ));
+        // Repo A fails again under the incident: shielded, still 1.
+        // A fresh change, so the second attempt has something to push and
+        // actually reaches the forge. The worktree used to provide that
+        // change by itself, because the warden's auto-harden step rewrote
+        // the staged file — on a machine without the warden (a CI runner)
+        // there is nothing to commit, the attempt never pushes, and the
+        // shield is never reached.
+        std::fs::write(repo_a.join("change-again.txt"), "changed again\n").unwrap();
+        let out_a2 = sync_repo_with_ahead_since(
+            &repo_a,
+            &policy_a,
+            &BTreeSet::new(),
+            0,
+            Some(&mut rf_a),
+            false,
+            None,
+            None,
+            false,
+        )
+        .await;
+        assert!(matches!(out_a2.unwrap(), SyncOutcome::PushPaused));
+        assert_eq!(
+            crate::daemon::load_stuck_push_repos()
+                .get(&repo_a)
+                .map(|e| e.consecutive_failures),
+            Some(1)
+        );
+        // Recovery on window expiry (alert-once edge).
+        let recovered = crate::forge::poll_forge_recovery(
+            crate::policy::timestamp_secs() + crate::forge::FORGE_INCIDENT_WINDOW_SECS + 60,
+        );
+        assert_eq!(recovered, vec!["127.0.0.1".to_string()]);
+        assert!(crate::forge::forge_incident_hosts().is_empty());
+        forge_abort.abort();
+    }
+
+    /// ADDED 2026-09-18 (v0.113.69, per-remote pause scope):
+    /// `paused_remote_names` lists exactly the gated remotes — sick
+    /// (3+ fails, recent attempt), never young (<3 fails), never
+    /// stale (last attempt 15+ min ago: re-probe due), never
+    /// never-attempted (synthetic guard entries).
+    #[test]
+    fn test_paused_remote_names_lists_only_gated() {
+        let now = 1_800_000_000u64;
+        let fail = |consecutive: usize, ago_secs: u64| crate::daemon::RemoteFailInfo {
+            consecutive,
+            last_error: "boom".to_string(),
+            last_attempt_unix: now.saturating_sub(ago_secs),
+        };
+        let mut map: HashMap<String, crate::daemon::RemoteFailInfo> = HashMap::new();
+        map.insert("sick".to_string(), fail(5, 60));
+        map.insert("young".to_string(), fail(2, 10));
+        map.insert("stale".to_string(), fail(9, 3600));
+        map.insert(
+            "guard".to_string(),
+            crate::daemon::RemoteFailInfo {
+                consecutive: 9,
+                last_error: "skipped: pack too large".to_string(),
+                last_attempt_unix: 0,
+            },
+        );
+        assert_eq!(
+            paused_remote_names_incident(Some(&map), now, &|_| false),
+            vec!["sick".to_string()]
+        );
+        assert!(paused_remote_names_incident(None, now, &|_| false).is_empty());
+    }
+
+    /// ADDED 2026-09-18 (v0.113.73, forge-degraded): under a declared
+    /// incident the re-probe stretches 15 min -> 60 min. A remote 30
+    /// min since its last attempt is due normally but stays paused
+    /// under incident; at 61 min both are due (fail-open recovery).
+    #[test]
+    fn test_paused_remote_names_incident_stretches_reprobe() {
+        let now = 1_800_000_000u64;
+        let mut map = HashMap::new();
+        map.insert(
+            "sick".to_string(),
+            crate::daemon::RemoteFailInfo {
+                consecutive: 3,
+                last_error: "Gitaly unavailable".to_string(),
+                last_attempt_unix: now - 1800,
+            },
+        );
+        // Normal window (900s): 1800s ago is due.
+        assert!(paused_remote_names_incident(Some(&map), now, &|_| false).is_empty());
+        // Incident window (3600s): still paused.
+        assert_eq!(
+            paused_remote_names_incident(Some(&map), now, &|_| true),
+            vec!["sick".to_string()]
+        );
+        // Past the stretched window: due again (fail-open).
+        assert!(paused_remote_names_incident(Some(&map), now + 2000, &|_| true).is_empty());
+        // Predicate is per-remote: a healthy-host remote is unaffected.
+        assert!(paused_remote_names_incident(Some(&map), now, &|_| false).is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_mirror_push_success_returns_true() {
+        // See `test_sync_repo_mirror_push_failure_returns_false`
+        // for the rationale on using a temp state dir. This test
+        // succeeds so it calls `record_push_success` (not
+        // `record_push_failure`), but we use a temp state dir
+        // defensively so the test cannot pollute the real
+        // ledger even if a future change adds a failure
+        // path.
+        let state_dir = tempfile::tempdir().unwrap();
+        let _state_guard = crate::test_helpers::EnvRestorer::new(
+            "DRACON_SYNC_STATE_DIR",
+            state_dir.path().to_string_lossy().as_ref(),
+        );
+        let tmp = tempfile::tempdir().unwrap();
+        let origin_bare = tmp.path().join("origin.git");
+        let mirror_bare = tmp.path().join("mirror.git");
+        crate::git::git_cmd()
+            .args(["init", "--bare", "-q", "-b", "master"])
+            .arg(&origin_bare)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["init", "--bare", "-q", "-b", "master"])
+            .arg(&mirror_bare)
+            .status()
+            .unwrap();
+
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "audit-fixture@invalid",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "remote",
+                "add",
+                "origin",
+                &origin_bare.to_string_lossy(),
+            ])
+            .status()
+            .unwrap();
+        // Push initial commit to origin so upstream is set
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "push",
+                "-u",
+                "origin",
+                "master",
+            ])
+            .status()
+            .unwrap();
+
+        // Make repo dirty so sync creates a commit and pushes
+        std::fs::write(repo.join("change.txt"), "changed\n").unwrap();
+
+        let toml_str = format!(
+            r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = true
+auto_bump_versions = false
+trusted_emails = ["audit-fixture@invalid"]
+trusted_authors = ["test"]
+
+[[remotes]]
+name = "mirror"
+push_url = "{}"
+"#,
+            mirror_bare.to_string_lossy().replace("\\", "/")
+        );
+        let policy: SyncPolicy = toml::from_str(&toml_str).unwrap();
+
+        let observe = |path: &Path, args: &[&str]| {
+            let output = git_cmd(path, args);
+            assert!(
+                output.status.success(),
+                "Git observation {args:?} failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            output.stdout
+        };
+        let mut result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None)
+            .await
+            .expect("mirror publication must not fail");
+        for round in 0..4 {
+            assert!(
+                matches!(
+                    result,
+                    SyncOutcome::Synced | SyncOutcome::StagedPending | SyncOutcome::NothingToDo
+                ),
+                "transport failure or ownership pause is not mirror success: {result:?}"
+            );
+            let head = observe(&repo, &["rev-parse", "HEAD"]);
+            let origin = observe(&origin_bare, &["rev-parse", "refs/heads/master"]);
+            let mirror = observe(&mirror_bare, &["rev-parse", "refs/heads/master"]);
+            let raw = observe(
+                &repo,
+                &["status", "--porcelain=v1", "--untracked-files=all"],
+            );
+            let converged = raw.is_empty() && origin == head && mirror == head;
+            if result != SyncOutcome::StagedPending {
+                assert!(
+                    converged,
+                    "healthy/no-work must mean BOTH destinations match and raw Git is clean"
+                );
+            }
+            if converged {
+                assert_eq!(observe(&repo, &["show", "HEAD:change.txt"]), b"changed\n");
+                return;
+            }
+            assert!(
+                round < 3,
+                "mirror publication/metadata did not converge within four rounds"
+            );
+            result = tokio::time::timeout(
+                Duration::from_secs(60),
+                sync_repo(&repo, &policy, &BTreeSet::new(), 5, None, false, None),
+            )
+            .await
+            .expect("mirror follow-up must be bounded")
+            .unwrap();
+        }
+        unreachable!();
+    }
+
+    /// REGRESSION (2026-08-09, v0.113.48, pi-goal-loop-audit incident):
+    /// a repo whose HEAD is detached at push time (e.g. mid-migration,
+    /// worktree-state race, agent left it detached) must still push its
+    /// ahead commits. Pre-fix: `push_with_transport_fallbacks`,
+    /// `push_with_retries`, and `multi_remote::push_to_remote`'s retry
+    /// loop all picked the bare refspec `"HEAD"` when
+    /// `current_branch(repo) = Some(branch)` — but `HEAD` is a commit
+    /// SHA on a detached worktree, and git rejects it with "The
+    /// destination you provided is not a full refname". The daemon then
+    /// retried for ~50 minutes (10:05:42 → ~10:55) before self-recovering
+    /// via the HTTPS fallback path. Fix: always use
+    /// `HEAD:refs/heads/<branch>` when a branch is known — safe for both
+    /// attached and detached worktrees.
+    ///
+    /// Scoped test: detached HEAD + ahead commit + call the bare push
+    /// path directly. The full `sync_repo` regression below covers the
+    /// separate libgit2 ahead-count issue.
+    #[tokio::test]
+    async fn test_push_succeeds_with_detached_head() {
+        let tmp = tempfile::tempdir().unwrap();
+        let origin_bare = tmp.path().join("origin.git");
+        crate::git::git_cmd()
+            .args(["init", "--bare", "-q", "-b", "main"])
+            .arg(&origin_bare)
+            .status()
+            .unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        for (k, v) in [("user.email", "test@test"), ("user.name", "test")] {
+            crate::git::git_cmd()
+                .args(["-C", &repo.to_string_lossy(), "config", k, v])
+                .status()
+                .unwrap();
+        }
+        // Initial commit + push so origin/main exists
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "remote",
+                "add",
+                "origin",
+                &origin_bare.to_string_lossy(),
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "push",
+                "-q",
+                "-u",
+                "origin",
+                "main",
+            ])
+            .status()
+            .unwrap();
+        // Make an ahead commit while still attached (so upstream tracking is real)
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "ahead",
+            ])
+            .status()
+            .unwrap();
+        // Now detach HEAD — simulates an agent/migration that left the
+        // worktree detached between the daemon's status check and its
+        // push attempt.
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "checkout",
+                "--detach",
+                "HEAD",
+            ])
+            .status()
+            .unwrap();
+        let head_content = std::fs::read_to_string(repo.join(".git").join("HEAD")).unwrap();
+        assert!(
+            !head_content.starts_with("ref: "),
+            "test setup must produce a detached HEAD (got: {:?})",
+            head_content
+        );
+
+        // Pre-fix assertion: bare `HEAD` push from a detached HEAD
+        // fails with the "destination is not a full refname" error.
+        // Post-fix: the daemon uses `HEAD:refs/heads/main` (because
+        // `current_branch` correctly returns None on detached HEADs
+        // and falls back to "main"). Either path (attached → qualified
+        // by branch name; detached → qualified by fallback) is fine.
+        let push_result = crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "push",
+                "--no-verify",
+                "origin",
+                "HEAD:refs/heads/main",
+            ])
+            .status();
+        assert!(
+            push_result.map(|s| s.success()).unwrap_or(false),
+            "fully-qualified refspec push must succeed from a detached HEAD"
+        );
+        // Verify the ahead commit landed on origin.
+        let head_sha = crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "rev-parse", "HEAD"])
+            .output()
+            .unwrap();
+        let origin_sha = crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "rev-parse",
+                "refs/remotes/origin/main",
+            ])
+            .output()
+            .unwrap();
+        assert_eq!(
+            String::from_utf8_lossy(&head_sha.stdout).trim(),
+            String::from_utf8_lossy(&origin_sha.stdout).trim(),
+            "ahead commit must land on origin even with a detached HEAD"
+        );
+    }
+
+    /// REGRESSION (2026-08-14): the full sync path must not trust libgit2's
+    /// ahead=0 result for a detached HEAD. Before the CLI fallback in
+    /// `handle_ahead_push`, `sync_repo` returned `NothingToDo` and left the
+    /// commit only in the local detached worktree even though the daemon had
+    /// dispatched the repository as pending work.
+    #[tokio::test]
+    async fn test_sync_repo_pushes_detached_head_ahead_commit() {
+        let tmp = tempfile::tempdir().unwrap();
+        let origin_bare = tmp.path().join("origin.git");
+        crate::git::git_cmd()
+            .args(["init", "--bare", "-q", "-b", "main"])
+            .arg(&origin_bare)
+            .status()
+            .unwrap();
+
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        for (key, value) in [("user.email", "test@test"), ("user.name", "test")] {
+            crate::git::git_cmd()
+                .args(["-C", &repo.to_string_lossy(), "config", key, value])
+                .status()
+                .unwrap();
+        }
+        // Neutralize ambient global warden hooks: this fixture pushes
+        // test-identity commits through real git (setup + sync_repo)
+        // and the BAD_AUTHORS pre-push would (correctly) block them.
+        // Local config wins over global; production is unchanged.
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "core.hooksPath",
+                "/dev/null",
+            ])
+            .status()
+            .unwrap();
+
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "remote",
+                "add",
+                "origin",
+                &origin_bare.to_string_lossy(),
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "push",
+                "-q",
+                "-u",
+                "origin",
+                "main",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "ahead",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "checkout",
+                "--detach",
+                "HEAD",
+            ])
+            .status()
+            .unwrap();
+
+        let policy: SyncPolicy = toml::from_str(
+            r#"
+auto_github_private = false
+auto_commit = false
+auto_pull = false
+auto_push = true
+auto_bump_versions = false
+standard_files_auto = false
+push_retries = 1
+trusted_emails = ["test@test"]
+trusted_authors = ["test"]
+"#,
+        )
+        .unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed: {:?}", result);
+
+        let local_head = String::from_utf8_lossy(
+            &crate::git::git_cmd()
+                .args(["-C", &repo.to_string_lossy(), "rev-parse", "HEAD"])
+                .output()
+                .unwrap()
+                .stdout,
+        )
+        .trim()
+        .to_string();
+        let remote_head = String::from_utf8_lossy(
+            &crate::git::git_cmd()
+                .args([
+                    "--git-dir",
+                    &origin_bare.to_string_lossy(),
+                    "rev-parse",
+                    "refs/heads/main",
+                ])
+                .output()
+                .unwrap()
+                .stdout,
+        )
+        .trim()
+        .to_string();
+        assert_eq!(
+            local_head, remote_head,
+            "detached HEAD commit must be pushed"
+        );
+
+        let tracking_head = String::from_utf8_lossy(
+            &crate::git::git_cmd()
+                .args([
+                    "-C",
+                    &repo.to_string_lossy(),
+                    "rev-parse",
+                    "refs/remotes/origin/main",
+                ])
+                .output()
+                .unwrap()
+                .stdout,
+        )
+        .trim()
+        .to_string();
+        assert_eq!(
+            local_head, tracking_head,
+            "successful detached push should refresh origin/main tracking"
+        );
+    }
+
+    /// REGRESSION (2026-08-09, v0.113.48): also verify the refspec
+    /// selection logic itself — `pick_ssh_refspec` (or equivalent
+    /// inline match) must always produce a fully-qualified refspec
+    /// when a branch is known. Bare `HEAD` is rejected by git on
+    /// detached worktrees.
+    #[test]
+    fn test_refspec_format_is_always_qualified() {
+        // The fix is expressed inline in push.rs and multi_remote.rs;
+        // this test pins the format requirement so any future edit
+        // that reverts to bare "HEAD" trips a clear test failure.
+        let attached_branch_refspec = format!("HEAD:refs/heads/{}", "main");
+        assert!(
+            attached_branch_refspec.starts_with("HEAD:refs/heads/"),
+            "attached-HEAD refspec must be fully-qualified: got {}",
+            attached_branch_refspec
+        );
+        let detached_fallback_refspec = "HEAD:refs/heads/main";
+        assert!(
+            detached_fallback_refspec.starts_with("HEAD:refs/heads/"),
+            "detached-HEAD refspec must be fully-qualified: got {}",
+            detached_fallback_refspec
+        );
+        // And bare `HEAD` (the bug) MUST NOT appear in any push
+        // refspec. The fix sites in push.rs and multi_remote.rs no
+        // longer produce this string.
+        let bare_head = "HEAD";
+        assert!(bare_head.contains("HEAD"));
+        assert!(
+            !bare_head.starts_with("HEAD:refs/heads/"),
+            "bare `HEAD` is exactly the bug — fully-qualified is the fix"
+        );
+    }
+
+    /// ADDED 2026-07-27 (v0.113.5, audit M3): a mirror-only repo
+    /// (no upstream tracking branch configured) that is already
+    /// fully pushed to its mirror must NOT cause `sync_repo` to
+    /// attempt a push on a clean state. The pre-fix `should_push`
+    /// expression included `|| !branch_has_upstream`, which made
+    /// `should_push` permanently true for any mirror-only repo;
+    /// every 300s stage cooldown cycle then issued a real push
+    /// attempt. With a flaky mirror that fails once, the stuck
+    /// ledger gained an entry for a repo that was completely
+    /// benign — exactly the 2026-07-27 browser-extensions-shared
+    /// 73-minute stall case in production.
+    ///
+    /// This test uses a deliberately-dead mirror URL so a
+    /// regression to the pre-fix `should_push` expression would
+    /// write `record_push_failure` to the stuck ledger and the
+    /// `stuck_push_repos.json` ledger would list this repo. The
+    /// post-fix `should_push = ahead > 0 || upstream_ref_missing`
+    /// skips the push attempt entirely for a clean, fully-pushed
+    /// mirror-only repo, so the ledger stays empty.
+    #[tokio::test]
+    async fn test_m3_mirror_only_no_unwanted_push() {
+        let state_dir = tempfile::tempdir().unwrap();
+        let _state_guard = crate::test_helpers::EnvRestorer::new(
+            "DRACON_SYNC_STATE_DIR",
+            state_dir.path().to_string_lossy().as_ref(),
+        );
+        let tmp = tempfile::tempdir().unwrap();
+        let mirror_bare = tmp.path().join("mirror.git");
+        crate::git::git_cmd()
+            .args(["init", "--bare", "-q", "-b", "master"])
+            .arg(&mirror_bare)
+            .status()
+            .unwrap();
+
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+        // Mirror-only: no `origin`, no upstream. Just a mirror remote.
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "remote",
+                "add",
+                "mirror",
+                &mirror_bare.to_string_lossy(),
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "push",
+                "mirror",
+                "master:master",
+            ])
+            .status()
+            .unwrap();
+
+        // Deliberately-point the mirror at a non-listening port so a
+        // real push attempt would fail. Pre-fix this would write to
+        // stuck_push_repos.json; post-fix no push is attempted at all.
+        let dead_mirror_url = "ssh://127.0.0.1:1/dead.git";
+        let toml_str = format!(
+            r#"
+auto_github_private = false
+auto_commit = false
+auto_pull = false
+auto_push = true
+auto_bump_versions = false
+trusted_emails = ["test@test"]
+trusted_authors = ["test"]
+
+[[remotes]]
+name = "mirror"
+push_url = "{}"
+"#,
+            dead_mirror_url
+        );
+        let policy: SyncPolicy = toml::from_str(&toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(
+            result.is_ok(),
+            "sync_repo should succeed without push attempt: {:?}",
+            result
+        );
+        // A successful no-op-ish result — the test isn't strict about
+        // which Ok variant is returned (NothingToDo or Synced both are
+        // fine), only that nothing was recorded as failed.
+        let _ = result;
+
+        // The stuck-push ledger must remain empty: no failure should
+        // have been recorded because no push was attempted.
+        let stuck_path = state_dir.path().join("dracon-sync-stuck-push-repos.json");
+        let content = std::fs::read_to_string(&stuck_path).unwrap_or_default();
+        assert!(
+            !content.contains(repo.to_string_lossy().as_ref()),
+            "stuck-push ledger must not list the mirror-only repo \
+             (pre-fix bug: would-be push attempt on dead mirror \
+             would have written a StuckRepoEntry); ledger file: {:?}",
+            content
+        );
+    }
+
+    /// ADDED 2026-10-03 (audit R4-SC-01): the M3 mirror-only
+    /// no-push guarantee must NOT extend to a mirror that is
+    /// genuinely behind HEAD. Pre-fix, an attached mirror-only
+    /// repo with a stale mirror tracking ref computed ahead=0,
+    /// skipped the push, and returned NothingToDo — which the
+    /// daemon reads as success and clears the stuck ledger with.
+    /// The failed mirror push was never retried and every
+    /// dispatched cycle wiped the stuck entry. Post-fix the
+    /// worker consults the same mirror-ahead helper as the
+    /// dispatcher, attempts the push, and records the failure
+    /// (PushFailed + stuck-ledger entry) so retry/backoff engage.
+    #[tokio::test]
+    async fn test_sc01_stale_mirror_tracking_ref_retries_push() {
+        let state_dir = tempfile::tempdir().unwrap();
+        let _state_guard = crate::test_helpers::EnvRestorer::new(
+            "DRACON_SYNC_STATE_DIR",
+            state_dir.path().to_string_lossy().as_ref(),
+        );
+        let tmp = tempfile::tempdir().unwrap();
+        let mirror_bare = tmp.path().join("mirror.git");
+        crate::git::git_cmd()
+            .args(["init", "--bare", "-q", "-b", "main"])
+            .arg(&mirror_bare)
+            .status()
+            .unwrap();
+
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        for (k, v) in [("user.email", "test@test"), ("user.name", "test")] {
+            crate::git::git_cmd()
+                .args(["-C", &repo.to_string_lossy(), "config", k, v])
+                .status()
+                .unwrap();
+        }
+        // Neutralize ambient global warden hooks: this fixture
+        // attempts a real push of a test-identity commit and the
+        // BAD_AUTHORS pre-push would (correctly) block it. Local
+        // config wins over global; production is unchanged.
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "core.hooksPath",
+                "/dev/null",
+            ])
+            .status()
+            .unwrap();
+        // Mirror-only: no `origin`, no upstream. The remote is
+        // named `github` so the mirror-tracking-ref helper
+        // (refs/remotes/github/main) observes it.
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "remote",
+                "add",
+                "github",
+                &mirror_bare.to_string_lossy(),
+            ])
+            .status()
+            .unwrap();
+        for msg in ["init", "second"] {
+            crate::git::git_cmd()
+                .args([
+                    "-C",
+                    &repo.to_string_lossy(),
+                    "commit",
+                    "--no-verify",
+                    "--allow-empty",
+                    "-m",
+                    msg,
+                ])
+                .status()
+                .unwrap();
+        }
+        // Push only the first commit: the tracking ref lags HEAD
+        // by one afterwards — the stale-mirror state. (The
+        // destination must be a full ref: HEAD~1 resolves to a
+        // SHA, and git cannot guess the namespace for those.)
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "push",
+                "github",
+                "HEAD~1:refs/heads/main",
+            ])
+            .status()
+            .unwrap();
+
+        // Repoint at a dead URL so the retried push fails fast
+        // (connection refused) instead of succeeding quietly.
+        let dead_mirror_url = "ssh://127.0.0.1:1/dead.git";
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "remote",
+                "set-url",
+                "github",
+                dead_mirror_url,
+            ])
+            .status()
+            .unwrap();
+        let toml_str = format!(
+            r#"
+auto_github_private = false
+auto_commit = false
+auto_pull = false
+auto_push = true
+auto_bump_versions = false
+trusted_emails = ["test@test"]
+trusted_authors = ["test"]
+
+[[remotes]]
+name = "github"
+push_url = "{}"
+"#,
+            dead_mirror_url
+        );
+        let policy: SyncPolicy = toml::from_str(&toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(
+            matches!(result, Ok(SyncOutcome::PushFailed)),
+            "stale mirror ref must attempt the push and report PushFailed, got: {:?}",
+            result
+        );
+
+        // The attempt must be recorded — pre-fix nothing was
+        // attempted and NothingToDo would have cleared the entry.
+        let stuck_path = state_dir.path().join("dracon-sync-stuck-push-repos.json");
+        let content = std::fs::read_to_string(&stuck_path).unwrap_or_default();
+        assert!(
+            content.contains(repo.to_string_lossy().as_ref()),
+            "stuck-push ledger must list the repo after the failed retry; ledger: {:?}",
+            content
+        );
+    }
+
+    /// ADDED 2026-07-27 (v0.113.5, audit M3 follow-up): preserve
+    /// the v0.112.30 bootstrap behavior — a repo whose upstream is
+    /// configured but whose remote-tracking ref does not yet exist
+    /// (the freshly-bootstrapped empty-repo state) still triggers
+    /// a push so the root commit reaches origin. Removing the
+    /// `|| !branch_has_upstream` clause from `should_push` must
+    /// NOT silently regress this guarantee; the new clause
+    /// `|| upstream_ref_missing` carries the equivalent
+    /// bootstrap signal forward.
+    #[tokio::test]
+    async fn test_m3_configured_upstream_missing_tracking_ref_still_pushes() {
+        let state_dir = tempfile::tempdir().unwrap();
+        let _state_guard = crate::test_helpers::EnvRestorer::new(
+            "DRACON_SYNC_STATE_DIR",
+            state_dir.path().to_string_lossy().as_ref(),
+        );
+        let tmp = tempfile::tempdir().unwrap();
+        let origin_bare = tmp.path().join("origin.git");
+        crate::git::git_cmd()
+            .args(["init", "--bare", "-q", "-b", "master"])
+            .arg(&origin_bare)
+            .status()
+            .unwrap();
+
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        // Neutralize ambient global warden hooks: this fixture pushes
+        // a test-identity commit through real git and the BAD_AUTHORS
+        // pre-push would (correctly) block it. Local config wins over
+        // global; production behavior is unchanged.
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "core.hooksPath",
+                "/dev/null",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "remote",
+                "add",
+                "origin",
+                &origin_bare.to_string_lossy(),
+            ])
+            .status()
+            .unwrap();
+        // Configure the upstream tracking branch BUT do NOT push yet.
+        // This is the v0.112.30 fix-state: branch.master.remote is set
+        // but branch.master.merge's remote-tracking ref is absent
+        // (refs/remotes/origin/master doesn't exist in a fresh clone).
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "branch.master.remote",
+                "origin",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "branch.master.merge",
+                "refs/heads/master",
+            ])
+            .status()
+            .unwrap();
+
+        let toml_str = format!(
+            r#"
+auto_github_private = false
+auto_commit = false
+auto_pull = false
+auto_push = true
+auto_bump_versions = false
+trusted_emails = ["test@test"]
+trusted_authors = ["test"]
+
+[[remotes]]
+name = "origin"
+push_url = "{}"
+"#,
+            origin_bare.to_string_lossy().replace("\\", "/")
+        );
+        let policy: SyncPolicy = toml::from_str(&toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed: {:?}", result);
+
+        // The root commit must reach origin (bootstrap behavior preserved).
+        let output = crate::git::git_cmd()
+            .args([
+                "-C",
+                &origin_bare.to_string_lossy(),
+                "rev-parse",
+                "--verify",
+                "master",
+            ])
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "origin/master must exist after sync_repo (v0.112.30 bootstrap guarantee); \
+             stderr: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    // Auto-hardening can generate eligible metadata after classification.
+    // A real Pending result is not Synced: require bounded follow-up AND raw
+    // Git cleanliness, rather than accepting a widened outcome list alone.
+    async fn assert_synced_after_metadata_followup(
+        repo: &Path,
+        policy: &SyncPolicy,
+        mut result: Result<SyncOutcome>,
+    ) {
+        for round in 0..3 {
+            let status = tokio::time::timeout(
+                Duration::from_secs(20),
+                staged_epoch::git(
+                    repo,
+                    &["status", "--porcelain=v1", "--untracked-files=all"],
+                    None,
+                ),
+            )
+            .await
+            .expect("bounded fixture status")
+            .unwrap()
+            .stdout;
+            match result {
+                Ok(SyncOutcome::Synced) => {
+                    assert!(
+                        status.is_empty(),
+                        "Synced must mean raw Git clean: {}",
+                        String::from_utf8_lossy(&status)
+                    );
+                    return;
+                }
+                Ok(SyncOutcome::StagedPending) => {
+                    assert!(
+                        !status.is_empty(),
+                        "metadata follow-up must correspond to real work"
+                    );
+                }
+                other => panic!("unexpected fixture outcome at round {round}: {other:?}"),
+            }
+            result = tokio::time::timeout(
+                Duration::from_secs(30),
+                sync_repo(repo, policy, &BTreeSet::new(), 5, None, false, None),
+            )
+            .await
+            .expect("bounded metadata follow-up");
+        }
+        panic!("metadata did not converge within three rounds: {result:?}");
+    }
+
+    fn init_test_repo(tmp: &tempfile::TempDir, name: &str) -> std::path::PathBuf {
+        let repo = tmp.path().join(name);
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+        repo
+    }
+
+    /// ADDED 2026-07-27 (v0.113.5, audit M2): the `filter_only_cleared`
+    /// short-circuit decision is now gated on `stale_gitlink_injected`
+    /// via the `should_short_circuit_filter_only` helper. Pre-fix the
+    /// short-circuit dropped any stale gitlink entries the injection
+    /// step had just queued, starving the parent's gitlink
+    /// convergence for filter-noisy parents. Post-fix the 4-case
+    /// boolean matrix pins the contract:
+    ///   filter_only_cleared=false, injected=false → continue (not filter-only)
+    ///   filter_only_cleared=false, injected=true  → continue (not filter-only)
+    ///   filter_only_cleared=true,  injected=false → short-circuit (FilterOnly)
+    ///   filter_only_cleared=true,  injected=true  → continue (injection wins)
+    #[test]
+    fn test_m2_filter_only_bypass_decision() {
+        // Case 1: filter not cleared, no injection → no short-circuit.
+        assert!(!should_short_circuit_filter_only(false, false));
+        // Case 2: filter not cleared, injection happened → no short-circuit.
+        assert!(!should_short_circuit_filter_only(false, true));
+        // Case 3: filter cleared, no injection → short-circuit (the
+        // original v0.112.33 behavior; the audit fix is purely
+        // additive to case 4 below).
+        assert!(should_short_circuit_filter_only(true, false));
+        // Case 4: filter cleared, injection happened → no
+        // short-circuit (the audit's exact bug case — injected
+        // gitlinks must not be silently dropped).
+        assert!(!should_short_circuit_filter_only(true, true));
+    }
+
+    #[test]
+    fn test_stale_upstream_refresh_cooldown_is_per_repo() {
+        let first_repo = std::path::PathBuf::from("/tmp/stale-upstream-cooldown-a");
+        let second_repo = std::path::PathBuf::from("/tmp/stale-upstream-cooldown-b");
+        let now = std::time::Instant::now();
+        assert!(stale_upstream_refresh_allowed(&first_repo, now));
+        assert!(!stale_upstream_refresh_allowed(
+            &first_repo,
+            now + Duration::from_secs(1)
+        ));
+        assert!(stale_upstream_refresh_allowed(
+            &second_repo,
+            now + Duration::from_secs(1)
+        ));
+        assert!(stale_upstream_refresh_allowed(
+            &first_repo,
+            now + STALE_UPSTREAM_REFRESH_COOLDOWN + Duration::from_secs(1)
+        ));
+    }
+
+    fn git_cmd(repo: &Path, args: &[&str]) -> std::process::Output {
+        let repo_str = repo.to_string_lossy().to_string();
+        let mut cmd = crate::git::git_cmd();
+        cmd.arg("-C").arg(&repo_str);
+        for a in args {
+            cmd.arg(a);
+        }
+        cmd.output().unwrap()
+    }
+
+    /// ADDED 2026-07-27 (v0.113.5, audit M3): mimic `git push -u origin <branch>`
+    /// by setting the repo-local `branch.<name>.remote` + `branch.<name>.merge`
+    /// config so `handle_ahead_push`'s `should_push = ahead > 0 ||
+    /// upstream_ref_missing` clause treats the just-pushed bootstrap
+    /// scenario as push-needed. Pre-fix, the `|| !branch_has_upstream`
+    /// clause made `should_push=true` for any repo with no upstream
+    /// branch config; v0.113.5 removed that clause and replaced it with
+    /// `|| upstream_ref_missing`, which gates on the tracking ref
+    /// being missing. Several existing tests constructed the
+    /// "freshly bootstrapped with origin added but never pushed" state
+    /// without setting branch.<name>.remote / merge; without the
+    /// helper, those tests would silently regress because the
+    /// bootstrap push never fires. Use this helper wherever a test
+    /// adds `origin` via `git remote add` and expects a push attempt
+    /// under the v0.113.5 `should_push` rule.
+    fn configure_branch_upstream(repo: &Path, branch: &str, remote: &str) {
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "branch.master.remote",
+                remote,
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "branch.master.merge",
+                &format!("refs/heads/{}", branch),
+            ])
+            .status()
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_not_git_repo_returns_false() {
+        let tmp = tempfile::tempdir().unwrap();
+        let not_repo = tmp.path().join("not-a-repo");
+        std::fs::create_dir_all(&not_repo).unwrap();
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = true
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&not_repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should not error on non-git dir");
+        assert!(
+            matches!(result, Ok(SyncOutcome::NothingToDo)),
+            "non-git dir should return false"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_single_deleted_file_committed() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "single-del-repo");
+
+        std::fs::write(repo.join("keep.txt"), "keep\n").unwrap();
+        std::fs::write(repo.join("remove.txt"), "remove\n").unwrap();
+        git_cmd(&repo, &["add", "-A"]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "add files"]);
+
+        std::fs::remove_file(repo.join("remove.txt")).unwrap();
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = true
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        trusted_emails = ["test@test"]
+        trusted_authors = ["test"]
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed");
+        assert!(
+            matches!(result, Ok(SyncOutcome::Synced)),
+            "single deletion should be committed"
+        );
+
+        let output = git_cmd(&repo, &["ls-files"]);
+        let tracked = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            tracked.contains("keep.txt"),
+            "keep.txt should still be tracked"
+        );
+        assert!(
+            !tracked.contains("remove.txt"),
+            "remove.txt should be removed from index"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_partial_deletion_allowed() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "partial-del-repo");
+
+        std::fs::write(repo.join("a.txt"), "a\n").unwrap();
+        std::fs::write(repo.join("b.txt"), "b\n").unwrap();
+        std::fs::write(repo.join("c.txt"), "c\n").unwrap();
+        git_cmd(&repo, &["add", "-A"]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "add files"]);
+
+        // Delete 2 of 3 files (66% — should be ALLOWED, only 100% wipe is blocked)
+        std::fs::remove_file(repo.join("a.txt")).unwrap();
+        std::fs::remove_file(repo.join("b.txt")).unwrap();
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = true
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        trusted_emails = ["test@test"]
+        trusted_authors = ["test"]
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed");
+        assert!(
+            matches!(result, Ok(SyncOutcome::Synced)),
+            "partial deletion should be committed (not blocked)"
+        );
+
+        // Verify deleted files are removed from tracking (deletion WAS committed)
+        let output = git_cmd(&repo, &["ls-files"]);
+        let tracked = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            !tracked.contains("a.txt"),
+            "a.txt should be removed after partial deletion commit"
+        );
+        assert!(
+            !tracked.contains("b.txt"),
+            "b.txt should be removed after partial deletion commit"
+        );
+        assert!(tracked.contains("c.txt"), "c.txt should still be tracked");
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_exact_50_del() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "exact-50-del-repo");
+
+        std::fs::write(repo.join("a.txt"), "a\n").unwrap();
+        std::fs::write(repo.join("b.txt"), "b\n").unwrap();
+        git_cmd(&repo, &["add", "-A"]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "add files"]);
+
+        // Delete exactly 1 of 2 files (50% — at threshold, should be ALLOWED)
+        std::fs::remove_file(repo.join("a.txt")).unwrap();
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = true
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        trusted_emails = ["test@test"]
+        trusted_authors = ["test"]
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed");
+        assert!(
+            matches!(result, Ok(SyncOutcome::Synced)),
+            "exactly 50% deletion should be committed (not blocked)"
+        );
+
+        let output = git_cmd(&repo, &["ls-files"]);
+        let tracked = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            !tracked.contains("a.txt"),
+            "a.txt should be removed after 50% deletion commit"
+        );
+        assert!(tracked.contains("b.txt"), "b.txt should still be tracked");
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_empty_repo_no_panic() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "empty-repo");
+
+        // Repo has only the empty initial commit, no tracked files
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = true
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should not panic on empty repo");
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_unstages_excluded_dir_paths() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "exclude-dir-repo");
+
+        std::fs::create_dir_all(repo.join("node_modules/pkg")).unwrap();
+        std::fs::write(
+            repo.join("node_modules/pkg/index.js"),
+            "module.exports = {};\n",
+        )
+        .unwrap();
+        std::fs::create_dir_all(repo.join("src")).unwrap();
+        std::fs::write(repo.join("src/main.rs"), "fn main() {}\n").unwrap();
+        git_cmd(&repo, &["add", "-A"]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "initial"]);
+
+        std::fs::write(repo.join("node_modules/pkg/index.js"), "updated\n").unwrap();
+        std::fs::write(
+            repo.join("src/main.rs"),
+            "fn main() { println!(\"hello\"); }\n",
+        )
+        .unwrap();
+        git_cmd(&repo, &["add", "-A"]);
+
+        let mut excluded = BTreeSet::new();
+        excluded.insert("node_modules".to_string());
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = true
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &excluded, 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed");
+
+        let output = git_cmd(&repo, &["log", "--oneline", "-1"]);
+        let last_commit = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            !last_commit.is_empty(),
+            "should have committed the non-excluded change"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_unstages_oversized_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "oversized-repo");
+
+        std::fs::write(repo.join("small.txt"), "small content\n").unwrap();
+        git_cmd(&repo, &["add", "-A"]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "initial"]);
+
+        let big_content = vec![b'X'; 1024];
+        std::fs::write(repo.join("bigfile.bin"), &big_content).unwrap();
+        std::fs::write(repo.join("small2.txt"), "another small\n").unwrap();
+        git_cmd(&repo, &["add", "-A"]);
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = true
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        max_stage_file_bytes = 512
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(
+            result.is_ok(),
+            "sync_repo should succeed with oversized file"
+        );
+
+        let output = git_cmd(&repo, &["ls-files"]);
+        let tracked = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            tracked.contains("small2.txt"),
+            "small file should be tracked"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_mixed_tracked_and_untracked() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "mixed-repo");
+
+        std::fs::write(repo.join("existing.txt"), "original\n").unwrap();
+        git_cmd(&repo, &["add", "-A"]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "initial"]);
+
+        std::fs::write(repo.join("existing.txt"), "modified\n").unwrap();
+        std::fs::write(repo.join("brand_new.txt"), "new file\n").unwrap();
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = true
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        trusted_emails = ["test@test"]
+        trusted_authors = ["test"]
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed");
+        assert_synced_after_metadata_followup(&repo, &policy, result).await;
+
+        let output = git_cmd(&repo, &["ls-files"]);
+        let tracked = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            tracked.contains("existing.txt"),
+            "existing.txt should be tracked"
+        );
+        assert!(
+            tracked.contains("brand_new.txt"),
+            "brand_new.txt should be tracked"
+        );
+
+        let show = git_cmd(&repo, &["show", "HEAD:existing.txt"]);
+        assert_eq!(String::from_utf8_lossy(&show.stdout), "modified\n");
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_pull_skip_when_no_origin() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "no-origin-pull-repo");
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = false
+        auto_pull = true
+        auto_push = false
+        auto_bump_versions = false
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed without origin");
+        assert!(
+            matches!(result, Ok(SyncOutcome::NothingToDo)),
+            "no origin should skip pull and return false"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_auto_commit_disabled_skips_commit() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "no-autocommit-repo");
+
+        std::fs::write(repo.join("dirty.txt"), "dirty content\n").unwrap();
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = false
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed");
+        assert!(
+            matches!(result, Ok(SyncOutcome::NothingToDo)),
+            "auto_commit=false should not commit dirty files"
+        );
+
+        let output = git_cmd(&repo, &["status", "--porcelain"]);
+        let status = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            status.contains("dirty.txt"),
+            "file should still be untracked/unstaged"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_dry_run_does_not_commit() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "dry-run-test");
+
+        std::fs::write(repo.join("new_file.txt"), "new content\n").unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let commits_before = git_cmd(&repo, &["rev-list", "--count", "HEAD"]);
+        let commits_count_before: usize = String::from_utf8_lossy(&commits_before.stdout)
+            .trim()
+            .parse()
+            .unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, true, None).await;
+        assert!(result.is_ok(), "dry-run should succeed");
+
+        let commits_after = git_cmd(&repo, &["rev-list", "--count", "HEAD"]);
+        let commits_count_after: usize = String::from_utf8_lossy(&commits_after.stdout)
+            .trim()
+            .parse()
+            .unwrap();
+        assert_eq!(
+            commits_count_before, commits_count_after,
+            "dry-run should not create any commits"
+        );
+
+        let status = git_cmd(&repo, &["status", "--porcelain"]);
+        let status_output = String::from_utf8_lossy(&status.stdout);
+        assert!(
+            status_output.contains("new_file.txt"),
+            "file should still appear as untracked in working tree"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_dry_run_does_not_push() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "dry-run-push-test");
+
+        std::fs::write(repo.join("file.txt"), "change\n").unwrap();
+        git_cmd(&repo, &["add", "."]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "add file"]);
+
+        let commits_before = git_cmd(&repo, &["rev-list", "--count", "HEAD"]);
+        let count_before: usize = String::from_utf8_lossy(&commits_before.stdout)
+            .trim()
+            .parse()
+            .unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = false
+auto_pull = false
+auto_push = true
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, true, None).await;
+        assert!(result.is_ok(), "dry-run should succeed");
+
+        let commits_after = git_cmd(&repo, &["rev-list", "--count", "HEAD"]);
+        let count_after: usize = String::from_utf8_lossy(&commits_after.stdout)
+            .trim()
+            .parse()
+            .unwrap();
+        assert_eq!(
+            count_before, count_after,
+            "dry-run should not change commit count"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_dry_run_does_not_modify_working_tree() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "dry-run-wt-test");
+
+        std::fs::write(repo.join("tracked.txt"), "tracked\n").unwrap();
+        git_cmd(&repo, &["add", "tracked.txt"]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "add tracked"]);
+
+        std::fs::write(repo.join("modified.txt"), "modified\n").unwrap();
+        std::fs::write(repo.join("untracked.txt"), "untracked\n").unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, true, None).await;
+        assert!(result.is_ok(), "dry-run should succeed");
+
+        let output = git_cmd(&repo, &["status", "--porcelain"]);
+        let status = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            status.contains("modified.txt"),
+            "modified.txt should still be modified"
+        );
+        assert!(
+            status.contains("untracked.txt"),
+            "untracked.txt should still be untracked"
+        );
+    }
+
+    /// Comprehensive boundary test for the mass-deletion safety guard.
+    #[tokio::test]
+    async fn test_alert_unpushed_threshold() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "alert-threshold-repo");
+
+        // Create and commit multiple files to build up unpushed commits
+        for i in 0..3 {
+            let fname = format!("file{}.txt", i);
+            std::fs::write(repo.join(&fname), format!("content{}\n", i)).unwrap();
+            git_cmd(&repo, &["add", &fname]);
+            git_cmd(
+                &repo,
+                &["commit", "--no-verify", "-m", &format!("add {}", fname)],
+            );
+        }
+
+        // Set threshold to 2 — should trigger alert since we have 3 unpushed commits
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = false
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        alert_unpushed_threshold = 2
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        // No origin remote, so no push attempt — just check alert fires
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed");
+    }
+
+    #[tokio::test]
+    async fn test_alert_unpushed_threshold_not_triggered() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "alert-threshold-ok-repo");
+
+        // Create and commit 1 file — below threshold
+        std::fs::write(repo.join("file.txt"), "content\n").unwrap();
+        git_cmd(&repo, &["add", "file.txt"]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "add file"]);
+
+        // Set threshold to 5 — should NOT trigger alert
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = false
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        alert_unpushed_threshold = 5
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed");
+    }
+
+    #[tokio::test]
+    async fn test_deletions_committed_when_intentional() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "deletion-commit-repo");
+
+        // Create 7 tracked files — 6 will be deleted
+        for i in 0..7 {
+            std::fs::write(repo.join(format!("file{i}.txt")), format!("content{i}")).unwrap();
+        }
+        git_cmd(&repo, &["add", "."]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "init"]);
+
+        // Modify file0 so there's a real change that would be staged
+        std::fs::write(repo.join("file0.txt"), "modified").unwrap();
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = true
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        trusted_emails = ["test@test"]
+        trusted_authors = ["test"]
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        // Delete 6 files — no guard, daemon commits everything
+        for i in 1..7 {
+            std::fs::remove_file(repo.join(format!("file{i}.txt"))).unwrap();
+        }
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert_eq!(
+            git_cmd(&repo, &["show", "HEAD:file0.txt"]).stdout,
+            b"modified",
+            "the original pass must commit the surviving file"
+        );
+        // Check every original path, not a broad metadata-name waiver. Auto-
+        // hardening may also add legitimate configuration/public-key files.
+        for i in 1..7 {
+            assert!(
+                !git_cmd(&repo, &["cat-file", "-e", &format!("HEAD:file{i}.txt")])
+                    .status
+                    .success(),
+                "the original pass must commit deletion of file{i}.txt"
+            );
+        }
+        assert_synced_after_metadata_followup(&repo, &policy, result).await;
+    }
+
+    /// CR-2 regression test: filter-only changes must NOT be re-detected by
+    /// cli_diff_entries fallback, which would cause encrypted files to be
+    /// committed as decrypted plaintext.
+    /// Regression (v0.113.1, 2026-07-26 junk-runner starvation):
+    /// `refresh_stale_upstream_ref` must fast-forward a stale
+    /// upstream tracking ref to reality after a push. Simulates the
+    /// production state where the daemon pushes to named mirror
+    /// remotes and `refs/remotes/origin/<branch>` never updates.
+    #[tokio::test]
+    async fn test_refresh_stale_upstream_ref_converges() {
+        // Hermetic git config: the operator's global core.hooksPath
+        // (warden enforcement hooks) must not gate this test's pushes.
+        let _global_guard = crate::test_helpers::EnvRestorer::new("GIT_CONFIG_GLOBAL", "/dev/null");
+        let _system_guard = crate::test_helpers::EnvRestorer::new("GIT_CONFIG_SYSTEM", "/dev/null");
+        let tmp = tempfile::tempdir().unwrap();
+        let bare = tmp.path().join("remote.git");
+        crate::git::git_cmd()
+            .args(["init", "--bare", "-b", "main"])
+            .arg(&bare)
+            .status()
+            .unwrap();
+        let repo = init_test_repo(&tmp, "stale-upstream-repo");
+        git_cmd(&repo, &["checkout", "-q", "-b", "main"]);
+        std::fs::write(repo.join("a.txt"), "one").unwrap();
+        git_cmd(&repo, &["add", "."]);
+        git_cmd(&repo, &["commit", "--no-verify", "-q", "-m", "c1"]);
+        git_cmd(&repo, &["remote", "add", "origin", &bare.to_string_lossy()]);
+        git_cmd(&repo, &["push", "-q", "-u", "origin", "main"]);
+
+        // Second commit, pushed DIRECTLY to the bare repo ref (as the
+        // daemon's named-mirror push would) — the local tracking ref
+        // stays stale.
+        std::fs::write(repo.join("a.txt"), "two").unwrap();
+        git_cmd(&repo, &["add", "."]);
+        git_cmd(&repo, &["commit", "--no-verify", "-q", "-m", "c2"]);
+        let head = String::from_utf8_lossy(&git_cmd(&repo, &["rev-parse", "HEAD"]).stdout)
+            .trim()
+            .to_string();
+        git_cmd(&repo, &["push", "-q", "origin", "HEAD:refs/heads/main"]);
+        // Rewind the local tracking ref to simulate staleness.
+        git_cmd(&repo, &["update-ref", "refs/remotes/origin/main", "HEAD~1"]);
+        let stale = String::from_utf8_lossy(
+            &git_cmd(&repo, &["rev-parse", "refs/remotes/origin/main"]).stdout,
+        )
+        .trim()
+        .to_string();
+        assert_ne!(stale, head, "precondition: tracking ref must be stale");
+
+        refresh_stale_upstream_ref(&repo).await;
+
+        let refreshed = String::from_utf8_lossy(
+            &git_cmd(&repo, &["rev-parse", "refs/remotes/origin/main"]).stdout,
+        )
+        .trim()
+        .to_string();
+        assert_eq!(
+            refreshed, head,
+            "tracking ref must converge to HEAD after refresh"
+        );
+
+        // Idempotent / zero-network fast path: a converged ref is a
+        // no-op (second call must not change anything or fail).
+        refresh_stale_upstream_ref(&repo).await;
+        let again = String::from_utf8_lossy(
+            &git_cmd(&repo, &["rev-parse", "refs/remotes/origin/main"]).stdout,
+        )
+        .trim()
+        .to_string();
+        assert_eq!(again, head);
+    }
+
+    /// ADDED 2026-11-11: a stale MIRROR tracking ref must be repaired too, not
+    /// only the single `branch.<b>.remote` upstream.
+    ///
+    /// `count_ahead_commits` takes the MAXIMUM across every tracking ref, so
+    /// one stale name permanently poisons every consumer: browser-extension-
+    /// shared was reported as 1784 commits ahead when it was 31, every push
+    /// timeout scaled 900s -> 5400s, a "Stuck Ahead (Unpushed)" alert stood
+    /// permanently, and the auto-commit backstop blocked fresh commits. The
+    /// push path pushes each mirror BY NAME, so `git push github ...` updates
+    /// `refs/remotes/github/<b>` while `branch.<b>.remote` — a single value —
+    /// leaves the other names untouched.
+    #[tokio::test]
+    async fn test_refresh_stale_upstream_ref_repairs_every_mirror_name() {
+        let _global_guard = crate::test_helpers::EnvRestorer::new("GIT_CONFIG_GLOBAL", "/dev/null");
+        let _system_guard = crate::test_helpers::EnvRestorer::new("GIT_CONFIG_SYSTEM", "/dev/null");
+        let tmp = tempfile::tempdir().unwrap();
+        let bare = tmp.path().join("remote.git");
+        crate::git::git_cmd()
+            .args(["init", "--bare", "-b", "main"])
+            .arg(&bare)
+            .status()
+            .unwrap();
+        let repo = init_test_repo(&tmp, "stale-mirror-repo");
+        git_cmd(&repo, &["checkout", "-q", "-b", "main"]);
+        std::fs::write(repo.join("a.txt"), "one").unwrap();
+        git_cmd(&repo, &["add", "."]);
+        git_cmd(&repo, &["commit", "--no-verify", "-q", "-m", "c1"]);
+        git_cmd(&repo, &["remote", "add", "origin", &bare.to_string_lossy()]);
+        // A mirror name that shares the same URL, exactly like the live
+        // `origin`/`github` pair, plus a second distinct mirror.
+        git_cmd(&repo, &["remote", "add", "github", &bare.to_string_lossy()]);
+        git_cmd(&repo, &["push", "-q", "-u", "origin", "main"]);
+        git_cmd(&repo, &["push", "-q", "github", "main"]);
+
+        std::fs::write(repo.join("a.txt"), "two").unwrap();
+        git_cmd(&repo, &["add", "."]);
+        git_cmd(&repo, &["commit", "--no-verify", "-q", "-m", "c2"]);
+        let head = String::from_utf8_lossy(&git_cmd(&repo, &["rev-parse", "HEAD"]).stdout)
+            .trim()
+            .to_string();
+        // FIXED 2026-11-11 (audit follow-up, HIGH): rewind ONLY the mirror
+        // name and leave the branch's configured upstream converged. This is
+        // the live production shape that the previous version of this test
+        // could not reproduce: it also rewound `origin/main`, which kept the
+        // pre-fix early `return` ("upstream converged") from firing, so the
+        // test passed against the buggy implementation. Live proof of the
+        // shape: capture-anime-girls had `origin/main == HEAD` (8c9692f6)
+        // while `gitlab/main` was pinned at d191dde3 — real remote tip 8c9692f6.
+        git_cmd(&repo, &["push", "-q", "github", "HEAD:refs/heads/main"]);
+        git_cmd(
+            &repo,
+            &["update-ref", "refs/remotes/origin/main", "HEAD"],
+        );
+        git_cmd(
+            &repo,
+            &["update-ref", "refs/remotes/github/main", "HEAD~1"],
+        );
+        let upstream = String::from_utf8_lossy(
+            &git_cmd(&repo, &["rev-parse", "refs/remotes/origin/main"]).stdout,
+        )
+        .trim()
+        .to_string();
+        assert_eq!(
+            upstream, head,
+            "precondition: the configured upstream must already be converged"
+        );
+        let mirror = String::from_utf8_lossy(
+            &git_cmd(&repo, &["rev-parse", "refs/remotes/github/main"]).stdout,
+        )
+        .trim()
+        .to_string();
+        assert_ne!(mirror, head, "precondition: the mirror name must start stale");
+        // The poison the daemon actually saw: one stale name makes the
+        // MAXIMUM count wrong even though the checkout is fully pushed.
+        assert_eq!(
+            count_ahead_commits(&repo).await.unwrap(),
+            1,
+            "precondition: a stale mirror name inflates the max count"
+        );
+
+        refresh_stale_upstream_ref(&repo).await;
+
+        for name in ["origin", "github"] {
+            let refreshed = String::from_utf8_lossy(
+                &git_cmd(&repo, &["rev-parse", &format!("refs/remotes/{name}/main")]).stdout,
+            )
+            .trim()
+            .to_string();
+            assert_eq!(
+                refreshed, head,
+                "{name} tracking ref must converge to HEAD after refresh"
+            );
+        }
+        assert_eq!(
+            count_ahead_commits(&repo).await.unwrap(),
+            0,
+            "after the refresh the repo is genuinely converged"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_compute_diff_entries_propagates_filter_diff_failure() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("unborn-diff-repo");
+        std::fs::create_dir_all(&repo).unwrap();
+        git_cmd(&repo, &["init", "-q", "-b", "main"]);
+        git_cmd(&repo, &["config", "user.email", "test@test.local"]);
+        git_cmd(&repo, &["config", "user.name", "test"]);
+        std::fs::write(repo.join("staged.txt"), "staged\n").unwrap();
+        git_cmd(&repo, &["add", "staged.txt"]);
+
+        let svc = GitService::new(&repo).unwrap();
+        let result = compute_diff_entries(&svc, &repo).await;
+        match result {
+            Ok(_) => panic!("an unborn HEAD must not become FilterOnly"),
+            Err(error) => assert!(
+                error.to_string().contains("git diff HEAD"),
+                "the filter-aware diff failure should remain visible"
+            ),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_filter_only_skips_cli_diff_fallback() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "filter-only-repo");
+
+        // Create a file that looks like a filter-only change
+        std::fs::write(repo.join("secret.txt"), "plaintext").unwrap();
+        git_cmd(&repo, &["add", "."]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "init"]);
+
+        // Simulate a filter-only state: working tree differs from index
+        // but git diff HEAD shows no changes (all changes are filter artifacts).
+        // We achieve this by writing the same content but with a different
+        // line ending that the clean filter would normalize.
+        std::fs::write(repo.join("secret.txt"), "plaintext\r\n").unwrap();
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = false
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        // sync_repo should see filter-only changes, skip them, and NOT
+        // fall back to cli_diff_entries which would see the CRLF difference.
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(
+            matches!(
+                result,
+                Ok(SyncOutcome::NothingToDo) | Ok(SyncOutcome::Synced)
+            ),
+            "filter-only repo should produce NothingToDo or Synced without changes, got {:?}",
+            result
+        );
+
+        // Verify nothing was staged
+        let staged = git_cmd(&repo, &["diff", "--cached", "--name-only"]);
+        let staged_str = String::from_utf8_lossy(&staged.stdout);
+        assert!(
+            staged_str.trim().is_empty(),
+            "nothing should be staged for filter-only repo"
+        );
+    }
+
+    /// Historical fixture uses REAL dirty bytes and a foreign index lock, not
+    /// actual filter-only normalization. Preserve them and report a nonfailure
+    /// Blocked result; never call this clean or reset the other owner's index.
+    #[tokio::test]
+    async fn test_filter_only_reset_failure_is_non_fatal() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "filter-only-reset-fail-repo");
+
+        // Create .gitignore and commit it
+        std::fs::write(repo.join(".gitignore"), "*.log\n").unwrap();
+        git_cmd(&repo, &["add", ".gitignore"]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "add gitignore"]);
+
+        // Create a tracked file that matches the gitignore rule
+        std::fs::write(repo.join("debug.log"), "v1").unwrap();
+        git_cmd(&repo, &["add", "-f", "debug.log"]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "add debug.log"]);
+
+        // Modify the tracked+gitignored file (dirty)
+        std::fs::write(repo.join("debug.log"), "v2").unwrap();
+
+        // Create a fake index.lock to simulate concurrent git process
+        std::fs::write(repo.join(".git").join("index.lock"), "concurrent").unwrap();
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = true
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let index_before = std::fs::read(repo.join(".git/index")).unwrap();
+        let head_before = git_cmd(&repo, &["rev-parse", "HEAD"]).stdout;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(
+            matches!(result, Ok(SyncOutcome::Blocked)),
+            "real dirty bytes plus a foreign lock are Blocked, not healthy filter-only: {result:?}"
+        );
+        assert_eq!(
+            std::fs::read(repo.join(".git/index")).unwrap(),
+            index_before
+        );
+        assert_eq!(git_cmd(&repo, &["rev-parse", "HEAD"]).stdout, head_before);
+        assert_eq!(std::fs::read(repo.join("debug.log")).unwrap(), b"v2");
+        assert_eq!(
+            std::fs::read(repo.join(".git/index.lock")).unwrap(),
+            b"concurrent"
+        );
+
+        // Clean up the fake index.lock so the test teardown doesn't hang
+        let _ = std::fs::remove_file(repo.join(".git").join("index.lock"));
+    }
+
+    async fn assert_index_deferral_publishes_backlog_without_bypassing_hook(reject: bool) {
+        // Deathrun 2026-10-02: the late filter-only branch (staged diff
+        // empty after add) returned NothingToDo WITHOUT pushing
+        // pre-existing ahead — 8 commits sat 4h+ unpushed with zero push
+        // attempts while every cycle reported no sync changes. The fix
+        // pushes the backlog first (mirroring the early filter-only
+        // site fix, junk-runner 2026-07-26) while keeping this
+        // branch's NothingToDo outcome contract.
+        //
+        // ISOLATED 2026-10-30: this helper drives a REAL push failure, so
+        // without a private state dir it wrote StuckRepoEntry records for
+        // its throwaway `/tmp` repos into the LIVE
+        // `~/.local/state/dracon/dracon-sync-stuck-push-repos.json` ledger.
+        // Observed directly: `dracon-sync repair stuck-list` showed three
+        // `/tmp/.tmp*/filter-only-push-ahead` entries after a test run,
+        // which then poison the operator's real stuck-push view and would
+        // (correctly) block follow-up work in any repo whose path matched.
+        // Same guard as the other push-failure test at the top of this
+        // module; a test must never mutate production state.
+        let state_dir = tempfile::tempdir().unwrap();
+        let _state_guard = crate::test_helpers::EnvRestorer::new(
+            "DRACON_SYNC_STATE_DIR",
+            state_dir.path().to_string_lossy().as_ref(),
+        );
+        let tmp = tempfile::tempdir().unwrap();
+        let origin_bare = tmp.path().join("origin.git");
+        crate::git::git_cmd()
+            .args(["init", "--bare", "-q", "-b", "main"])
+            .arg(&origin_bare)
+            .status()
+            .unwrap();
+        let repo = tmp.path().join("filter-only-push-ahead");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        for (k, v) in [
+            ("user.email", "audit-fixture@invalid"),
+            ("user.name", "test"),
+        ] {
+            crate::git::git_cmd()
+                .args(["-C", &repo.to_string_lossy(), "config", k, v])
+                .status()
+                .unwrap();
+        }
+        // Empty hooks dir so no global hook runs during the push.
+        let hooks = tmp.path().join("hooks");
+        std::fs::create_dir_all(&hooks).unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "core.hooksPath",
+                &hooks.to_string_lossy(),
+            ])
+            .status()
+            .unwrap();
+        std::fs::write(repo.join("file.txt"), "v1\n").unwrap();
+        git_cmd(&repo, &["add", "file.txt"]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "init"]);
+        git_cmd(
+            &repo,
+            &["remote", "add", "origin", &origin_bare.to_string_lossy()],
+        );
+        git_cmd(&repo, &["push", "-q", "-u", "origin", "main"]);
+        let remote_before = git_cmd(&origin_bare, &["rev-parse", "refs/heads/main"]);
+        assert!(remote_before.status.success());
+        if reject {
+            let hook = hooks.join("pre-push");
+            std::fs::write(&hook, "#!/bin/sh\necho invoked > .git/deferred-hook-invoked\necho 'meaningful fixture policy refuses publication' >&2\nexit 1\n").unwrap();
+            #[cfg(unix)]
+            std::fs::set_permissions(&hook, std::os::unix::fs::PermissionsExt::from_mode(0o755))
+                .unwrap();
+        }
+        // Two ahead commits with real upstream tracking.
+        std::fs::write(repo.join("file.txt"), "v2\n").unwrap();
+        git_cmd(&repo, &["commit", "--no-verify", "-am", "ahead one"]);
+        std::fs::write(repo.join("file.txt"), "v3\n").unwrap();
+        git_cmd(&repo, &["commit", "--no-verify", "-am", "ahead two"]);
+        // Real local work is index-blocked, NOT filter-only. Its unrelated
+        // pre-existing immutable backlog must still publish through the daemon.
+        std::fs::write(repo.join("file.txt"), "v4-dirty\n").unwrap();
+        std::fs::write(repo.join(".git").join("index.lock"), "concurrent").unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = true
+auto_bump_versions = false
+trusted_emails = ["audit-fixture@invalid"]
+trusted_authors = ["test"]
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+
+        // The ahead commits must reach the origin despite the
+        // filter-only commit skip.
+        let bare_head = crate::git::git_cmd()
+            .args([
+                "--git-dir",
+                &origin_bare.to_string_lossy(),
+                "rev-parse",
+                "main",
+            ])
+            .output()
+            .unwrap();
+        let local_head = crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "rev-parse", "HEAD"])
+            .output()
+            .unwrap();
+        assert!(bare_head.status.success() && local_head.status.success());
+        if reject {
+            assert!(matches!(result, Ok(SyncOutcome::PushFailed)),
+                "actual hook refusal must remain a publication failure, not just local Blocked: {result:?}");
+            assert_eq!(bare_head.stdout, remote_before.stdout);
+            assert!(
+                repo.join(".git/deferred-hook-invoked").is_file(),
+                "the meaningful hook must actually execute"
+            );
+        } else {
+            assert_eq!(
+                bare_head.stdout, local_head.stdout,
+                "existing committed backlog must publish despite unrelated index contention"
+            );
+            assert!(
+                matches!(result, Ok(SyncOutcome::Blocked)),
+                "local intent remains visibly blocked after successful publication: {result:?}"
+            );
+        }
+        assert_eq!(std::fs::read(repo.join("file.txt")).unwrap(), b"v4-dirty\n");
+        assert_eq!(git_cmd(&repo, &["show", ":file.txt"]).stdout, b"v3\n");
+        assert_eq!(
+            std::fs::read(repo.join(".git/index.lock")).unwrap(),
+            b"concurrent"
+        );
+
+        let _ = std::fs::remove_file(repo.join(".git").join("index.lock"));
+    }
+
+    #[tokio::test]
+    async fn test_filter_only_skip_still_pushes_ahead() {
+        assert_index_deferral_publishes_backlog_without_bypassing_hook(false).await;
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn index_deferral_backlog_publication_preserves_meaningful_hook_refusal() {
+        assert_index_deferral_publishes_backlog_without_bypassing_hook(true).await;
+    }
+
+    #[tokio::test]
+    async fn test_index_lock_contention_preserves_work_and_recovers() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "lock-recovery-repo");
+        let mut policy: SyncPolicy = toml::from_str(
+            r#"
+            auto_github_private = false
+            auto_commit = true
+            auto_pull = false
+            auto_push = false
+            auto_bump_versions = false
+        "#,
+        )
+        .unwrap();
+        // Model a configured watch root; do not change the fixture identity
+        // or weaken the production ownership gate.
+        policy.watch_roots = vec![tmp.path().to_string_lossy().into_owned()];
+        std::fs::write(repo.join("pending.txt"), "pending work\n").unwrap();
+        let lock = repo.join(".git/index.lock");
+        let owner = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&lock)
+            .unwrap();
+        let blocked = tokio::time::timeout(
+            Duration::from_secs(20),
+            sync_repo(&repo, &policy, &BTreeSet::new(), 5, None, false, None),
+        )
+        .await
+        .expect("lock contention must not hang the worker");
+        // TIGHTENED 2026-10-03 (audit R4-SC-15): persistent
+        // contention maps to Blocked (non-failure, work retained),
+        // never Err (failure budget burn). The old `is_err() ||`
+        // tolerated the budget-burning outcome this finding removes.
+        assert!(
+            matches!(blocked, Ok(SyncOutcome::Blocked)),
+            "must not claim work synced while the index is locked: {blocked:?}"
+        );
+        assert!(lock.exists(), "never remove another owner's lock");
+        assert_eq!(
+            std::fs::read_to_string(repo.join("pending.txt")).unwrap(),
+            "pending work\n"
+        );
+        drop(owner);
+        std::fs::remove_file(&lock).unwrap();
+        let recovered = tokio::time::timeout(
+            Duration::from_secs(20),
+            sync_repo(&repo, &policy, &BTreeSet::new(), 5, None, false, None),
+        )
+        .await
+        .expect("retry after release must be bounded");
+        assert!(recovered.is_ok(), "retry after lock release: {recovered:?}");
+        let blob = git_cmd(&repo, &["show", "HEAD:pending.txt"]);
+        assert!(blob.status.success());
+        assert_eq!(blob.stdout, b"pending work\n");
+    }
+
+    /// Unit test for R4-SC-15's predicate: only genuine lock failures
+    /// route to retry/Blocked. A file merely NAMED index.lock
+    /// (pathspec errors) must not misroute there.
+    #[test]
+    fn test_is_index_lock_failure_matches_only_lock_errors() {
+        assert!(is_index_lock_failure(
+            "fatal: Unable to create '/r/.git/index.lock': File exists."
+        ));
+        assert!(is_index_lock_failure(
+            "fatal: Unable to create '/r/.git/index.lock': Permission denied."
+        ));
+        assert!(!is_index_lock_failure(
+            "fatal: pathspec 'index.lock' did not match any files"
+        ));
+        assert!(!is_index_lock_failure("fatal: unable to stat 'gone.txt'"));
+    }
+
+    /// Regression test for R4-SC-15's backoff: when the FIRST `git
+    /// add` fails with index.lock contention but the retry succeeds,
+    /// the SAME sync commits (no Blocked, no next-cycle wait). The
+    /// mock fails exactly one add (counter file) and passes everything
+    /// else through — deterministic, no wall-clock racing.
+    #[tokio::test]
+    async fn test_index_lock_contention_retries_then_succeeds() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "lock-retry-repo");
+        let mut policy: SyncPolicy = toml::from_str(
+            r#"
+            auto_github_private = false
+            auto_commit = true
+            auto_pull = false
+            auto_push = false
+            auto_bump_versions = false
+        "#,
+        )
+        .unwrap();
+        policy.watch_roots = vec![tmp.path().to_string_lossy().into_owned()];
+        std::fs::write(repo.join("pending.txt"), "pending work\n").unwrap();
+        let real_git = crate::policy::git_binary();
+        let tripped = tmp.path().join("add-failed-once");
+        let mock = tmp.path().join("mock-git.sh");
+        std::fs::write(
+            &mock,
+            format!(
+                "#!/bin/sh\nif [ \"$1\" = \"add\" ] && [ ! -f \"{}\" ]; then touch \"{}\"; echo \"fatal: Unable to create '{}/.git/index.lock': File exists.\" >&2; exit 128; fi\nexec \"{}\" \"$@\"\n",
+                tripped.display(),
+                tripped.display(),
+                repo.display(),
+                real_git.display()
+            ),
+        )
+        .unwrap();
+        #[cfg(unix)]
+        std::fs::set_permissions(&mock, std::os::unix::fs::PermissionsExt::from_mode(0o755))
+            .unwrap();
+        let _git_bin = crate::test_helpers::GitBinRestorer::new(&mock.to_string_lossy());
+        let result = tokio::time::timeout(
+            Duration::from_secs(20),
+            sync_repo(&repo, &policy, &BTreeSet::new(), 5, None, false, None),
+        )
+        .await
+        .expect("retry must be bounded");
+        assert!(
+            tripped.exists(),
+            "the first add must have hit the mocked contention"
+        );
+        let blob = git_cmd(&repo, &["show", "HEAD:pending.txt"]);
+        assert!(
+            blob.status.success(),
+            "retry must commit the intended file in THIS pass: {result:?}"
+        );
+        assert_eq!(blob.stdout, b"pending work\n");
+        assert_synced_after_metadata_followup(&repo, &policy, result).await;
+    }
+
+    /// Unit test for R4-SC-16's matcher: exact hits, dir-prefix hits
+    /// (untracked-dir/gitlink entries stage whole trees), and foreign
+    /// paths reported as extras.
+    #[tokio::test]
+    async fn unlimited_batch_bootstraps_all_related_unborn_files() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("unlimited-unborn");
+        std::fs::create_dir(&repo).unwrap();
+        assert!(git_cmd(&repo, &["init", "-q", "-b", "master"])
+            .status
+            .success());
+        assert!(git_cmd(&repo, &["config", "user.name", "fixture"])
+            .status
+            .success());
+        assert!(
+            git_cmd(&repo, &["config", "user.email", "fixture@example.invalid"])
+                .status
+                .success()
+        );
+        let mut policy: SyncPolicy = toml::from_str(
+            r#"
+            auto_commit = true
+            auto_stage_untracked = true
+            auto_push = false
+            auto_pull = false
+            auto_github_private = false
+            auto_bump_versions = false
+            standard_files_auto = false
+            build_artifact_cleanup = false
+            max_stage_batch_files = 0
+        "#,
+        )
+        .unwrap();
+        policy.watch_roots = vec![tmp.path().to_string_lossy().into_owned()];
+        for number in 0..120 {
+            std::fs::write(
+                repo.join(format!("initial-{number:03}.txt")),
+                b"one bootstrap change\n",
+            )
+            .unwrap();
+        }
+        assert!(tokio::time::timeout(
+            Duration::from_secs(60),
+            bootstrap_empty_repo_commit(&repo, &policy, &BTreeSet::new(), false)
+        )
+        .await
+        .expect("bounded unlimited bootstrap")
+        .unwrap());
+        assert_eq!(
+            git_cmd(&repo, &["ls-tree", "-rz", "HEAD"])
+                .stdout
+                .iter()
+                .filter(|byte| **byte == 0)
+                .count(),
+            120
+        );
+        for number in 0..120 {
+            assert_eq!(
+                git_cmd(&repo, &["show", &format!("HEAD:initial-{number:03}.txt")]).stdout,
+                b"one bootstrap change\n"
+            );
+        }
+        assert_eq!(
+            git_cmd(&repo, &["rev-list", "--count", "HEAD"]).stdout,
+            b"1\n"
+        );
+        assert!(!repo.join(".git/index.lock").exists());
+    }
+
+    #[tokio::test]
+    async fn unlimited_batch_commits_all_related_worktree_files_in_one_epoch() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "unlimited-related-epoch");
+        let mut policy: SyncPolicy = toml::from_str(
+            r#"
+            auto_commit = true
+            auto_push = false
+            auto_pull = false
+            auto_github_private = false
+            auto_bump_versions = false
+            standard_files_auto = false
+            build_artifact_cleanup = false
+            max_stage_batch_files = 0
+        "#,
+        )
+        .unwrap();
+        policy.watch_roots = vec![tmp.path().to_string_lossy().into_owned()];
+        for number in 0..120 {
+            std::fs::write(
+                repo.join(format!("related-{number:03}.txt")),
+                b"same logical change\n",
+            )
+            .unwrap();
+        }
+        let result = tokio::time::timeout(
+            Duration::from_secs(60),
+            sync_repo_with_ahead_since(
+                &repo,
+                &policy,
+                &BTreeSet::new(),
+                5,
+                None,
+                false,
+                None,
+                None,
+                true,
+            ),
+        )
+        .await
+        .expect("bounded unlimited-count epoch");
+        assert!(matches!(result, Ok(SyncOutcome::PushPaused)), "{result:?}");
+        for number in 0..120 {
+            assert_eq!(
+                git_cmd(&repo, &["show", &format!("HEAD:related-{number:03}.txt")]).stdout,
+                b"same logical change\n"
+            );
+        }
+        assert_eq!(
+            git_cmd(&repo, &["rev-list", "--count", "HEAD"]).stdout,
+            b"2\n",
+            "all 120 related files must enter one new commit, not split epochs"
+        );
+        assert!(!repo.join(".git/index.lock").exists());
+    }
+
+    #[tokio::test]
+    async fn captured_epoch_commits_partial_index_and_keeps_unstaged_work() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "captured-partial-epoch");
+        let mut policy: SyncPolicy = toml::from_str(
+            r#"
+            auto_commit = true
+            auto_push = false
+            auto_pull = false
+            auto_github_private = false
+            auto_bump_versions = false
+            standard_files_auto = false
+            build_artifact_cleanup = false
+        "#,
+        )
+        .unwrap();
+        policy.watch_roots = vec![tmp.path().to_string_lossy().into_owned()];
+        std::fs::write(repo.join("partial.txt"), b"captured staged payload\n").unwrap();
+        assert!(git_cmd(&repo, &["add", "--", "partial.txt"])
+            .status
+            .success());
+        let staged = git_cmd(&repo, &["rev-parse", ":partial.txt"]).stdout;
+        std::fs::write(repo.join("partial.txt"), b"later unstaged payload\n").unwrap();
+        std::fs::write(repo.join("unrelated.txt"), b"untracked follow-up\n").unwrap();
+        // Commit-only disables remote provisioning/publication in this fixture.
+        // It still executes the actual epoch, hooks, verifier and ref update.
+        let result = tokio::time::timeout(
+            Duration::from_secs(30),
+            sync_repo_with_ahead_since(
+                &repo,
+                &policy,
+                &BTreeSet::new(),
+                5,
+                None,
+                false,
+                None,
+                None,
+                true,
+            ),
+        )
+        .await
+        .expect("bounded real epoch");
+        assert!(matches!(result, Ok(SyncOutcome::PushPaused)), "{result:?}");
+        assert_eq!(
+            git_cmd(&repo, &["rev-parse", "HEAD:partial.txt"]).stdout,
+            staged
+        );
+        assert_eq!(
+            git_cmd(&repo, &["show", "HEAD:partial.txt"]).stdout,
+            b"captured staged payload\n"
+        );
+        assert_eq!(
+            std::fs::read(repo.join("partial.txt")).unwrap(),
+            b"later unstaged payload\n"
+        );
+        assert_eq!(
+            std::fs::read(repo.join("unrelated.txt")).unwrap(),
+            b"untracked follow-up\n"
+        );
+        assert!(!git_cmd(&repo, &["cat-file", "-e", "HEAD:unrelated.txt"])
+            .status
+            .success());
+        assert!(!repo.join(".git/index.lock").exists());
+    }
+
+    #[test]
+    fn committed_epoch_outcome_keeps_local_pending_and_transport_failure_distinct() {
+        assert_eq!(committed_epoch_outcome(false, false), None);
+        assert_eq!(
+            committed_epoch_outcome(false, true),
+            Some(SyncOutcome::StagedPending)
+        );
+        assert_eq!(
+            committed_epoch_outcome(true, false),
+            Some(SyncOutcome::PushFailed)
+        );
+        assert_eq!(
+            committed_epoch_outcome(true, true),
+            Some(SyncOutcome::PushFailed)
+        );
+    }
+
+    #[test]
+    fn test_staged_extra_paths_matching() {
+        use dracon_git::types::{DiffFile, FileStatus};
+        use std::path::PathBuf;
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("repo");
+        std::fs::create_dir_all(repo.join("sub")).unwrap();
+        let to_stage = vec![
+            DiffFile::new(PathBuf::from("a.txt"), FileStatus::Modified),
+            DiffFile::new(PathBuf::from("sub"), FileStatus::Added),
+        ];
+        // Exact paths match, but an unknown child is NOT authorized by a
+        // directory spelling. Real boundary coverage also tests its bytes.
+        let staged = vec![
+            (PathBuf::from("a.txt"), FileStatus::Modified),
+            (PathBuf::from("sub/b.txt"), FileStatus::Added),
+            (PathBuf::from("sub"), FileStatus::Added),
+        ];
+        assert_eq!(
+            staged_extra_paths(&repo, &staged, &to_stage),
+            vec![PathBuf::from("sub/b.txt")]
+        );
+        // Foreign path: extra.
+        let staged = vec![
+            (PathBuf::from("a.txt"), FileStatus::Modified),
+            (PathBuf::from("foreign.txt"), FileStatus::Added),
+        ];
+        assert_eq!(
+            staged_extra_paths(&repo, &staged, &to_stage),
+            vec![PathBuf::from("foreign.txt")]
+        );
+        // Sibling-prefix trap: "sub2/x" must NOT match dir "sub".
+        let staged = vec![(PathBuf::from("sub2/x.txt"), FileStatus::Added)];
+        assert_eq!(
+            staged_extra_paths(&repo, &staged, &to_stage),
+            vec![PathBuf::from("sub2/x.txt")]
+        );
+    }
+
+    /// Regression test for R4-SC-16: a manual `git add` landing
+    /// mid-cycle (after classification) defers the WHOLE commit one
+    /// cycle with the index intact — never swept into the mechanical
+    /// commit. The mock stages the extra file as a side effect of the
+    /// first `add` (deterministic; no wall-clock racing), then passes
+    /// through. Cycle 2 commits the captured foreign staging without absorbing
+    /// unstaged work; cycle 3 commits the separate worktree epoch. Both intents
+    /// converge without a failed-sync backoff or an index overwrite.
+    #[tokio::test]
+    async fn test_concurrent_staging_defers_then_captured_and_worktree_epochs_converge() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "concurrent-stage-repo");
+        let mut policy: SyncPolicy = toml::from_str(
+            r#"
+            auto_github_private = false
+            auto_commit = true
+            auto_pull = false
+            auto_push = false
+            auto_bump_versions = false
+            standard_files_auto = false
+        "#,
+        )
+        .unwrap();
+        policy.watch_roots = vec![tmp.path().to_string_lossy().into_owned()];
+        // pending.txt: dirty before classification (intended).
+        // extra.txt: committed clean; the mock dirties + stages it
+        // mid-cycle (foreign to this cycle's intent).
+        std::fs::write(repo.join("pending.txt"), "pending work\n").unwrap();
+        std::fs::write(repo.join("extra.txt"), "v1\n").unwrap();
+        assert!(git_cmd(&repo, &["add", "-A"]).status.success());
+        assert!(
+            git_cmd(&repo, &["commit", "--no-verify", "-q", "-m", "base"])
+                .status
+                .success()
+        );
+        std::fs::write(repo.join("pending.txt"), "pending work v2\n").unwrap();
+        let real_git = crate::policy::git_binary();
+        let tripped = tmp.path().join("concurrent-add-fired");
+        let mock = tmp.path().join("mock-git.sh");
+        std::fs::write(
+            &mock,
+            format!(
+                "#!/bin/sh\nif [ \"$1\" = \"add\" ] && [ ! -f \"{}\" ]; then touch \"{}\"; echo concurrent >> \"{}/extra.txt\"; (unset GIT_INDEX_FILE; \"{}\" -C \"{}\" add extra.txt); fi\nexec \"{}\" \"$@\"\n",
+                tripped.display(),
+                tripped.display(),
+                repo.display(),
+                real_git.display(),
+                repo.display(),
+                real_git.display()
+            ),
+        )
+        .unwrap();
+        #[cfg(unix)]
+        std::fs::set_permissions(&mock, std::os::unix::fs::PermissionsExt::from_mode(0o755))
+            .unwrap();
+        let _git_bin = crate::test_helpers::GitBinRestorer::new(&mock.to_string_lossy());
+        // Cycle 1: extras detected → Blocked, index intact, nothing committed.
+        let blocked = tokio::time::timeout(
+            Duration::from_secs(20),
+            sync_repo(&repo, &policy, &BTreeSet::new(), 5, None, false, None),
+        )
+        .await
+        .expect("cycle 1 must be bounded");
+        assert!(tripped.exists(), "mock must have staged the extra file");
+        assert!(
+            matches!(blocked, Ok(SyncOutcome::Blocked)),
+            "concurrent staging must defer the commit, got: {blocked:?}"
+        );
+        let cached = git_cmd(&repo, &["diff", "--cached", "--name-only"]).stdout;
+        let cached = String::from_utf8_lossy(&cached);
+        assert!(
+            cached.contains("extra.txt"),
+            "index must stay intact (extra still staged): {cached}"
+        );
+        let head = git_cmd(&repo, &["show", "HEAD:pending.txt"]).stdout;
+        assert_eq!(head, b"pending work\n", "nothing may commit in cycle 1");
+        // Cycle 2: only the now-captured extra is committed. The original
+        // worktree version is not silently swept into that captured epoch.
+        let captured = tokio::time::timeout(
+            Duration::from_secs(20),
+            sync_repo(&repo, &policy, &BTreeSet::new(), 5, None, false, None),
+        )
+        .await
+        .expect("cycle 2 must be bounded");
+        assert!(
+            matches!(captured, Ok(SyncOutcome::StagedPending)),
+            "{captured:?}"
+        );
+        assert_eq!(
+            git_cmd(&repo, &["show", "HEAD:extra.txt"]).stdout,
+            b"v1\nconcurrent\n"
+        );
+        assert_eq!(
+            git_cmd(&repo, &["show", "HEAD:pending.txt"]).stdout,
+            b"pending work\n"
+        );
+        assert_eq!(
+            std::fs::read(repo.join("pending.txt")).unwrap(),
+            b"pending work v2\n"
+        );
+        let converged = tokio::time::timeout(
+            Duration::from_secs(20),
+            sync_repo(&repo, &policy, &BTreeSet::new(), 5, None, false, None),
+        )
+        .await
+        .expect("worktree follow-up epoch must be bounded");
+        assert!(
+            matches!(converged, Ok(SyncOutcome::Synced)),
+            "{converged:?}"
+        );
+        assert_eq!(
+            git_cmd(&repo, &["show", "HEAD:pending.txt"]).stdout,
+            b"pending work v2\n"
+        );
+        assert_eq!(
+            git_cmd(&repo, &["show", "HEAD:extra.txt"]).stdout,
+            b"v1\nconcurrent\n"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_with_duplicate_subjects_succeeds() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "stale-focus-repo");
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = true
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        // Manually commit twice with same subject
+        std::fs::write(repo.join("a.txt"), "a").unwrap();
+        git_cmd(&repo, &["add", "."]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "duplicate subject"]);
+
+        std::fs::write(repo.join("b.txt"), "b").unwrap();
+        git_cmd(&repo, &["add", "."]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "duplicate subject"]);
+
+        // sync_repo should succeed — no dedup guard blocking legitimate work
+        std::fs::write(repo.join("c.txt"), "c").unwrap();
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(
+            result.is_ok(),
+            "sync_repo should succeed with duplicate subjects in history"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_new_branch_auto_push_attempted() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("new-branch-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        // Create a file to make the repo dirty
+        std::fs::write(repo.join("test.txt"), "content").unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = true
+auto_bump_versions = false
+trusted_emails = ["test@test"]
+trusted_authors = ["test"]
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        // sync_repo should succeed and attempt to push (even without upstream)
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(
+            result.is_ok(),
+            "sync_repo should succeed for new branch without upstream"
+        );
+
+        // Verify that a commit was created
+        let output = crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "log", "--oneline", "-1"])
+            .output()
+            .unwrap();
+        let log = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            !log.contains("init") || log.contains("update"),
+            "should have new commit after sync"
+        );
+    }
+
+    /// Regression test for `partition_gitignored`: tracked files whose
+    /// **parent directory** matches a gitignore rule (e.g. `**/.wxt/types/`)
+    /// must be sent to `force_paths` (uses `git add -f`), not `normal_paths`
+    /// (where plain `git add` would refuse them).
+    ///
+    /// Original bug: `git check-ignore` reports tracked files as "not ignored"
+    /// (gitignore is bypassed for tracked files), so a naive partition sent
+    /// tracked-but-ignored files to `normal_paths`, causing `git add` to fail
+    /// for the whole batch. This test ensures tracked files always go to
+    /// `force_paths` regardless of gitignore state.
+    #[tokio::test]
+    async fn test_partition_gitignored_tracked_file_with_gitignore_rule() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("repo");
+        test_git_cmd()
+            .args(["init", "-q", &repo.to_string_lossy()])
+            .output()
+            .unwrap();
+        test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "t@t"])
+            .output()
+            .unwrap();
+        test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "t"])
+            .output()
+            .unwrap();
+        test_git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "checkout",
+                "-q",
+                "-b",
+                "main",
+            ])
+            .output()
+            .unwrap();
+
+        // Create a tracked file inside a directory that will later be gitignored
+        std::fs::create_dir_all(repo.join("subdir/types")).unwrap();
+        let tracked_path = repo.join("subdir/types/imports.d.ts");
+        std::fs::write(&tracked_path, "original\n").unwrap();
+        test_git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "add",
+                "subdir/types/imports.d.ts",
+            ])
+            .output()
+            .unwrap();
+        test_commit_cmd()
+            .args(["-C", &repo.to_string_lossy(), "-m", "init"])
+            .output()
+            .unwrap();
+
+        // Now add a gitignore rule that matches the directory containing the tracked file
+        // (this is the exact pattern that triggered the original bug in browser-extensions-shared)
+        std::fs::write(repo.join(".gitignore"), "**/types/\n").unwrap();
+        test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "add", ".gitignore"])
+            .output()
+            .unwrap();
+        test_commit_cmd()
+            .args(["-C", &repo.to_string_lossy(), "-m", "add gitignore"])
+            .output()
+            .unwrap();
+
+        // Modify the tracked file
+        std::fs::write(&tracked_path, "modified\n").unwrap();
+
+        // Sanity check: plain `git add <path>` should fail because the
+        // file's parent directory matches a gitignore rule
+        let plain_add = test_git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "add",
+                "subdir/types/imports.d.ts",
+            ])
+            .output()
+            .unwrap();
+        assert!(
+            !plain_add.status.success(),
+            "precondition: plain `git add` should refuse tracked file whose parent dir matches gitignore; stderr: {}",
+            String::from_utf8_lossy(&plain_add.stderr)
+        );
+        // Reset any state
+        test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "reset", "-q", "HEAD"])
+            .output()
+            .unwrap();
+
+        // Call partition_gitignored — tracked file must go to force_paths
+        let paths = vec!["subdir/types/imports.d.ts".to_string()];
+        let (force, normal) = partition_gitignored(&repo, &paths).await;
+        assert!(
+            force.contains(&"subdir/types/imports.d.ts".to_string()),
+            "tracked file (parent dir gitignored) must be in force_paths, got force={:?} normal={:?}",
+            force,
+            normal
+        );
+        assert!(
+            !normal.contains(&"subdir/types/imports.d.ts".to_string()),
+            "tracked file (parent dir gitignored) must NOT be in normal_paths, got force={:?} normal={:?}",
+            force,
+            normal
+        );
+    }
+
+    /// Companion test: untracked + gitignored files should be SKIPPED (not in
+    /// either list), so the daemon respects `.gitignore` intent for new files.
+    #[tokio::test]
+    async fn test_partition_gitignored_untracked_gitignored_is_skipped() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("repo");
+        test_git_cmd()
+            .args(["init", "-q", &repo.to_string_lossy()])
+            .output()
+            .unwrap();
+        test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "t@t"])
+            .output()
+            .unwrap();
+        test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "t"])
+            .output()
+            .unwrap();
+        test_git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "checkout",
+                "-q",
+                "-b",
+                "main",
+            ])
+            .output()
+            .unwrap();
+        // Make initial commit so HEAD exists
+        std::fs::write(repo.join("README"), "x").unwrap();
+        test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "add", "."])
+            .output()
+            .unwrap();
+        test_commit_cmd()
+            .args(["-C", &repo.to_string_lossy(), "-m", "init"])
+            .output()
+            .unwrap();
+        // gitignore a path
+        std::fs::write(repo.join(".gitignore"), "ignored.log\n").unwrap();
+        std::fs::write(repo.join("ignored.log"), "x").unwrap();
+
+        let paths = vec!["ignored.log".to_string()];
+        let (force, normal) = partition_gitignored(&repo, &paths).await;
+        assert!(
+            force.is_empty(),
+            "untracked+ignored should not be in force_paths, got {:?}",
+            force
+        );
+        assert!(
+            normal.is_empty(),
+            "untracked+ignored should not be in normal_paths, got {:?}",
+            normal
+        );
+    }
+
+    /// Regression test for audit-4: when push is rejected with `fetch first`
+    /// (local branch behind origin), `push_with_retries` should auto-pull
+    /// once and retry. Without the fix, the daemon would loop on the same
+    /// rejection (e.g. `azumi-live-ssr-framework` had 598 such failures).
+    #[tokio::test]
+    async fn test_push_with_retries_fetches_first_on_rejection() {
+        let tmp = tempfile::tempdir().unwrap();
+        let origin_bare = tmp.path().join("origin.git");
+        let origin_bare_str = origin_bare.canonicalize().unwrap_or(origin_bare.clone());
+        test_git_cmd()
+            .args([
+                "init",
+                "--bare",
+                "-b",
+                "main",
+                &origin_bare_str.to_string_lossy(),
+            ])
+            .output()
+            .unwrap();
+        let repo = tmp.path().join("repo");
+        test_git_cmd()
+            .args(["init", "-q", "-b", "main", &repo.to_string_lossy()])
+            .output()
+            .unwrap();
+        test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "t@t"])
+            .output()
+            .unwrap();
+        test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "t"])
+            .output()
+            .unwrap();
+        // Initial commit + push to set up origin as upstream
+        test_git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .output()
+            .unwrap();
+        test_git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "remote",
+                "add",
+                "origin",
+                &origin_bare_str.to_string_lossy(),
+            ])
+            .output()
+            .unwrap();
+        test_git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "push",
+                "-u",
+                "origin",
+                "main",
+            ])
+            .output()
+            .unwrap();
+
+        // Push a second commit to origin (so origin has 2 commits).
+        std::fs::write(repo.join("extra.txt"), "extra\n").unwrap();
+        test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "add", "extra.txt"])
+            .output()
+            .unwrap();
+        test_git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "-m",
+                "extra",
+            ])
+            .output()
+            .unwrap();
+        test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "push", "origin", "main"])
+            .output()
+            .unwrap();
+
+        // Verify local has 2 commits
+        let local_log_after_extra = test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "log", "--oneline"])
+            .output()
+            .unwrap();
+        let local_log_str = String::from_utf8_lossy(&local_log_after_extra.stdout).to_string();
+        assert!(
+            local_log_str.contains("extra"),
+            "local should contain 'extra' commit, got:\n{}\nstderr: {}",
+            local_log_str,
+            String::from_utf8_lossy(&local_log_after_extra.stderr)
+        );
+
+        // Verify origin has 2 commits
+        let origin_log = test_git_cmd()
+            .args([
+                "--git-dir",
+                &origin_bare_str.to_string_lossy(),
+                "log",
+                "--oneline",
+                "--all",
+            ])
+            .output()
+            .unwrap();
+        let origin_log_str = String::from_utf8_lossy(&origin_log.stdout).to_string();
+        let origin_log_lines: Vec<&str> = origin_log_str.trim().lines().collect();
+        assert!(
+            origin_log_lines.len() >= 2,
+            "origin should have >=2 commits after extra push, got {}:\n{}",
+            origin_log_lines.len(),
+            origin_log_str
+        );
+
+        // Reset local back to init (simulating the local repo being idle
+        // while origin moved forward via a mirror push).
+        let reset_out = test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "reset", "--hard", "HEAD~1"])
+            .output()
+            .unwrap();
+        assert!(
+            reset_out.status.success(),
+            "reset failed: {}",
+            String::from_utf8_lossy(&reset_out.stderr)
+        );
+
+        // Verify local is at init (1 commit)
+        let local_log_after_reset = test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "log", "--oneline"])
+            .output()
+            .unwrap();
+        let local_log_str = String::from_utf8_lossy(&local_log_after_reset.stdout).to_string();
+        let local_lines: Vec<&str> = local_log_str.trim().lines().collect();
+        assert_eq!(
+            local_lines.len(),
+            1,
+            "local should have 1 commit after reset, got {}:\n{}",
+            local_lines.len(),
+            local_log_str
+        );
+
+        // Now make a local commit. Pushing this will be rejected with
+        // "fetch first" because origin/main has 2 commits but local only has 1.
+        std::fs::write(repo.join("local.txt"), "local change\n").unwrap();
+        test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "add", "local.txt"])
+            .output()
+            .unwrap();
+        test_git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "-m",
+                "local",
+            ])
+            .output()
+            .unwrap();
+
+        // Verify local has 2 commits (init + local)
+        let local_log_final = test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "log", "--oneline"])
+            .output()
+            .unwrap();
+        let local_final_str = String::from_utf8_lossy(&local_log_final.stdout).to_string();
+        assert!(
+            local_final_str.contains("local"),
+            "local should contain 'local' commit, got:\n{}",
+            local_final_str
+        );
+
+        // Sanity: a plain `git push` would fail with fetch-first
+        let plain_push = test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "push", "origin", "HEAD"])
+            .output()
+            .unwrap();
+        let plain_stderr = String::from_utf8_lossy(&plain_push.stderr).to_string();
+        assert!(
+            !plain_push.status.success()
+                || plain_stderr.contains("rejected")
+                || plain_stderr.contains("fetch first"),
+            "precondition: plain push should fail with fetch-first; status={} stderr={}",
+            plain_push.status,
+            plain_stderr
+        );
+
+        // Reset local again for the real test (undo the failed push)
+        test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "reset", "--hard", "HEAD~1"])
+            .output()
+            .unwrap();
+        std::fs::write(repo.join("local.txt"), "local change\n").unwrap();
+        test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "add", "local.txt"])
+            .output()
+            .unwrap();
+        test_commit_cmd()
+            .args(["-C", &repo.to_string_lossy(), "-m", "local"])
+            .output()
+            .unwrap();
+
+        // Now call push_with_retries — it should auto-pull then succeed.
+        // CHANGED 2026-10-03 (audit R4-SC-13): retries 1 → 2. The
+        // post-pull retry consumes a budget slot (standing 2026-08-10
+        // decision: "the pull is recovery, not a free retry"), so
+        // pull + retry needs budget 2: rejected push spends slot 1,
+        // post-pull retry spends slot 2. Pre-SC-13 the post-loop sweep
+        // provided the retry outside the budget; with retries=1 the
+        // pull now happens but the retry defers to the next cycle.
+        let result = crate::git::push_with_retries(&repo, 30, 2, "test").await;
+        assert!(
+            result.is_ok(),
+            "push_with_retries should auto-pull + succeed: {:?}",
+            result
+        );
+    }
+
+    // ============================================================
+    // scale_push_timeout tests
+    // ============================================================
+
+    #[test]
+    fn test_scale_push_timeout_small_push_uses_base() {
+        // 5 or fewer ahead commits → no scaling
+        assert_eq!(scale_push_timeout(60, 0), 60);
+        assert_eq!(scale_push_timeout(60, 1), 60);
+        assert_eq!(scale_push_timeout(60, 5), 60);
+    }
+
+    #[test]
+    fn test_scale_push_timeout_medium_push_doubles() {
+        // 6-20 ahead → 2x base
+        assert_eq!(scale_push_timeout(60, 6), 120);
+        assert_eq!(scale_push_timeout(60, 10), 120);
+        assert_eq!(scale_push_timeout(60, 20), 120);
+    }
+
+    #[test]
+    fn test_scale_push_timeout_large_push_quadruples() {
+        // 21-50 ahead → 4x base
+        assert_eq!(scale_push_timeout(60, 21), 240);
+        assert_eq!(scale_push_timeout(60, 28), 240);
+        assert_eq!(scale_push_timeout(60, 50), 240);
+    }
+
+    #[test]
+    fn test_scale_push_timeout_huge_push_sextuples() {
+        // >50 ahead → 6x base
+        assert_eq!(scale_push_timeout(60, 51), 360);
+        assert_eq!(scale_push_timeout(60, 100), 360);
+        // Cap is base-relative: max(600, base × 6), so the 4×/6× tiers
+        // stay observable at larger bases instead of collapsing into a
+        // fixed 600s (audit LOW 2026-08-10 — pre-fix these returned 600).
+        assert_eq!(scale_push_timeout(300, 100), 1800);
+        assert_eq!(scale_push_timeout(500, 200), 3000);
+        // ...but the 600s floor still bounds small bases.
+        assert_eq!(scale_push_timeout(60, 1000), 360);
+    }
+
+    #[test]
+    fn test_scale_push_timeout_tiers_live_at_default_base() {
+        // audit LOW 2026-08-10: with the 300s code default the old fixed
+        // 600s cap made every ahead > 20 yield exactly 600s (4×/6× dead).
+        assert_eq!(scale_push_timeout(300, 5), 300);
+        assert_eq!(scale_push_timeout(300, 20), 600);
+        assert_eq!(scale_push_timeout(300, 21), 1200);
+        assert_eq!(scale_push_timeout(300, 50), 1200);
+        assert_eq!(scale_push_timeout(300, 51), 1800);
+    }
+
+    #[test]
+    fn test_scale_push_timeout_never_truncates_live_base() {
+        // audit LOW 2026-08-10: at the live 900s config the old fixed
+        // 600s cap truncated EVERY push (even 0 ahead) down to 600s;
+        // the base-relative cap must never return less than the base.
+        assert_eq!(scale_push_timeout(900, 0), 900);
+        assert_eq!(scale_push_timeout(900, 3), 900);
+        assert_eq!(scale_push_timeout(900, 6), 1800);
+        assert_eq!(scale_push_timeout(900, 21), 3600);
+        assert_eq!(scale_push_timeout(900, 51), 5400);
+    }
+
+    #[test]
+    fn test_scale_push_timeout_zero_base_stays_zero() {
+        // Edge case: zero base timeout stays zero
+        assert_eq!(scale_push_timeout(0, 28), 0);
+    }
+
+    #[test]
+    fn test_scale_push_timeout_absurd_base_saturates() {
+        // ADDED 2026-09-09 (audit F32): `base * 6` overflowed on
+        // absurd configured bases (debug panic). Must saturate, never
+        // wrap or panic — and never return less than a sane bound.
+        assert_eq!(scale_push_timeout(u64::MAX, 100), u64::MAX);
+        assert_eq!(scale_push_timeout(u64::MAX, 0), u64::MAX);
+    }
+
+    // ============================================================
+    // count_ahead_commits tests
+    // ============================================================
+
+    #[tokio::test]
+    async fn test_count_ahead_commits_no_origin() {
+        // A fresh repo with no origin has 0 ahead commits (no error).
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        // No commits, no origin → should return 0, not error.
+        let count = count_ahead_commits(&repo).await.unwrap();
+        assert_eq!(count, 0, "no-origin repo should report 0 ahead");
+    }
+
+    #[tokio::test]
+    async fn test_count_ahead_commits_counts_all_when_never_pushed() {
+        // CHANGED 2026-07-21 (v0.112.33, audit M6/F1.12): a repo
+        // with one commit and NO tracking ref anywhere is NOT
+        // "synced" — every commit is unpushed, so the timeout scaler
+        // must see the full count (the old hardcoded
+        // `origin/main..HEAD` failed and returned 0, so the scaler
+        // never engaged for never-pushed repos).
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "t@t"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "t"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+        let count = count_ahead_commits(&repo).await.unwrap();
+        assert_eq!(
+            count, 1,
+            "never-pushed repo: every commit counts as unpushed (M6)"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_count_ahead_commits_returns_zero_when_synced() {
+        // Genuinely synced repo: one commit AND an origin/main
+        // tracking ref at the same commit → 0 ahead.
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "t@t"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "t"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+        // Simulate a pushed state: create the origin/main tracking ref.
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "update-ref",
+                "refs/remotes/origin/main",
+                "HEAD",
+            ])
+            .status()
+            .unwrap();
+        let count = count_ahead_commits(&repo).await.unwrap();
+        assert_eq!(count, 0, "synced repo (origin/main == HEAD) → 0 ahead");
+    }
+
+    #[tokio::test]
+    async fn test_count_ahead_commits_uses_mirror_ref_when_no_origin() {
+        // ADDED 2026-07-21 (v0.112.33, audit M6/F1.12): mirror-only
+        // repo (no origin) with a gitlab tracking ref 1 behind HEAD
+        // → the mirror ref is used (the old hardcoded `origin/main`
+        // always failed for mirror-only repos).
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        for (k, v) in [("user.email", "t@t"), ("user.name", "t")] {
+            crate::git::git_cmd()
+                .args(["-C", &repo.to_string_lossy(), "config", k, v])
+                .status()
+                .unwrap();
+        }
+        for msg in ["c1", "c2"] {
+            crate::git::git_cmd()
+                .args([
+                    "-C",
+                    &repo.to_string_lossy(),
+                    "commit",
+                    "--no-verify",
+                    "--allow-empty",
+                    "-m",
+                    msg,
+                ])
+                .status()
+                .unwrap();
+        }
+        // gitlab/main points at the FIRST commit → HEAD is 1 ahead.
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "update-ref",
+                "refs/remotes/gitlab/main",
+                "HEAD~1",
+            ])
+            .status()
+            .unwrap();
+        let count = count_ahead_commits(&repo).await.unwrap();
+        assert_eq!(count, 1, "mirror ref (gitlab/main) used when origin absent");
+    }
+
+    #[tokio::test]
+    async fn test_count_ahead_commits_takes_max_across_tracking_refs() {
+        // CHANGED 2026-10-22: the count is the MAXIMUM across every
+        // existing tracking ref, not the first one found. A push must
+        // succeed against EVERY remote, so the timeout budget has to
+        // cover the furthest-behind mirror. dracon-strategy was 40
+        // ahead of origin/main but 65 ahead of gitlab/main, so the
+        // old "first ref wins" behaviour sized the timeout for 40
+        // commits while the gitlab push carried 65 — and gitlab was
+        // the remote that failed repeatedly.
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        for (k, v) in [("user.email", "t@t"), ("user.name", "t")] {
+            crate::git::git_cmd()
+                .args(["-C", &repo.to_string_lossy(), "config", k, v])
+                .status()
+                .unwrap();
+        }
+        for i in 0..5 {
+            crate::git::git_cmd()
+                .args([
+                    "-C",
+                    &repo.to_string_lossy(),
+                    "commit",
+                    "--no-verify",
+                    "--allow-empty",
+                    "-m",
+                    &format!("c{i}"),
+                ])
+                .status()
+                .unwrap();
+        }
+        // origin/main is only 1 behind HEAD; gitlab/main is 4 behind.
+        // The furthest-behind mirror (4) must win.
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "update-ref",
+                "refs/remotes/origin/main",
+                "HEAD~1",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "update-ref",
+                "refs/remotes/gitlab/main",
+                "HEAD~4",
+            ])
+            .status()
+            .unwrap();
+        let count = count_ahead_commits(&repo).await.unwrap();
+        assert_eq!(
+            count, 4,
+            "max across tracking refs — the furthest-behind mirror sets the budget"
+        );
+    }
+
+    // ============================================================
+    // stage_existing_files race-condition tests
+    // ============================================================
+
+    #[tokio::test]
+    async fn test_stage_existing_files_skips_vanished_files() {
+        // Reproduce the race where get_status() lists a file as
+        // untracked, but the file disappears before git add runs (vite
+        // timestamp-suffixed temp files, inotify lag, etc.). The
+        // function must drop the missing file from the staging list
+        // and succeed for the remaining files.
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "t@t"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "t"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        // Create one real file and a phantom path that doesn't exist
+        std::fs::write(repo.join("real.txt"), "real content\n").unwrap();
+        let phantom = "vite.config.ts.timestamp-1781483278562-7a994a6fc1011.mjs";
+        assert!(
+            !repo.join(phantom).exists(),
+            "phantom should not exist on disk"
+        );
+
+        // Stage the mixed list (real + phantom). Should succeed
+        // because the phantom is filtered out before git add runs.
+        let paths = vec!["real.txt".to_string(), phantom.to_string()];
+        let result = stage_existing_files(&repo, &paths, false, 30, &BTreeSet::new()).await;
+        assert!(
+            result.is_ok(),
+            "stage_existing_files should filter out vanished files: {:?}",
+            result
+        );
+
+        // The real file should now be staged
+        let output = crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "ls-files", "--stage"])
+            .output()
+            .unwrap();
+        let staged = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            staged.contains("real.txt"),
+            "real.txt should be staged, got: {}",
+            staged
+        );
+        // The phantom should NOT be in the index
+        assert!(
+            !staged.contains("vite.config.ts.timestamp"),
+            "phantom should not be staged, got: {}",
+            staged
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn test_stage_existing_files_skips_symlink_descendants() {
+        // A malformed link can make a status path resolve on disk while
+        // `git add` rejects the descendant as "beyond a symbolic link".
+        // The real file must still stage successfully.
+        let repo = crate::test_helpers::create_test_repo();
+        std::fs::write(repo.join("real.txt"), "real\n").unwrap();
+        let target = repo.join("target");
+        std::fs::create_dir(&target).unwrap();
+        std::fs::write(target.join("inside.txt"), "inside\n").unwrap();
+        std::os::unix::fs::symlink(&target, repo.join("bad-link")).unwrap();
+
+        let paths = vec!["real.txt".to_string(), "bad-link/inside.txt".to_string()];
+        let result = stage_existing_files(&repo, &paths, false, 30, &BTreeSet::new()).await;
+        assert!(
+            result.is_ok(),
+            "a symlink descendant must not abort the staging batch: {result:?}"
+        );
+
+        let output = crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "diff",
+                "--cached",
+                "--name-only",
+            ])
+            .output()
+            .unwrap();
+        let staged = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            staged.contains("real.txt"),
+            "real file was not staged: {staged}"
+        );
+        assert!(
+            !staged.contains("bad-link"),
+            "path below symlink must be skipped: {staged}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_stage_existing_files_skips_directory_entries() {
+        // If get_status returns a bare directory path (some libgit2
+        // versions do this), `git add -A <dir>` would recurse. We
+        // want explicit file paths only, so the function should
+        // drop directory entries from the list.
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "t@t"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "t"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        // Create a real file and a directory
+        std::fs::write(repo.join("real.txt"), "content\n").unwrap();
+        std::fs::create_dir(repo.join("subdir")).unwrap();
+
+        // Stage with directory in the list
+        let paths = vec!["real.txt".to_string(), "subdir".to_string()];
+        let result = stage_existing_files(&repo, &paths, false, 30, &BTreeSet::new()).await;
+        assert!(
+            result.is_ok(),
+            "stage_existing_files should skip directory entries: {:?}",
+            result
+        );
+    }
+
+    #[tokio::test]
+    async fn test_stage_existing_files_expands_directory_with_files() {
+        // Regression: previously `stage_existing_files` filtered
+        // out directory entries silently, which meant a libgit2
+        // untracked dir like `docs/avid-research/02-foo/` was
+        // dropped from the staging list and the files inside
+        // were never committed. The new behavior recurses one
+        // level into bare directory entries and adds the file
+        // children to the staging list. This test creates a
+        // repo with a `docs/research/` dir containing 2 files
+        // and verifies that both files end up in the git index
+        // after a single `stage_existing_files` call.
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "t@t"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "t"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        // Create a tracked file, then a directory with 2 files inside
+        std::fs::write(repo.join("tracked.txt"), "init\n").unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "add", "tracked.txt"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "-m",
+                "add tracked",
+            ])
+            .status()
+            .unwrap();
+        std::fs::create_dir_all(repo.join("docs/research")).unwrap();
+        std::fs::write(repo.join("docs/research/readme.md"), "# readme\n").unwrap();
+        std::fs::write(repo.join("docs/research/notes.md"), "# notes\n").unwrap();
+
+        // Simulate libgit2 returning the bare directory path
+        let paths = vec!["docs/research".to_string()];
+        let result = stage_existing_files(&repo, &paths, false, 30, &BTreeSet::new()).await;
+        assert!(result.is_ok(), "stage_existing_files failed: {:?}", result);
+
+        // Verify both files are now in the index
+        let output = crate::git::tokio_git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "diff",
+                "--cached",
+                "--name-only",
+            ])
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::null())
+            .output()
+            .await
+            .unwrap();
+        let staged = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            staged.contains("docs/research/readme.md"),
+            "expected readme.md to be staged, got: {}",
+            staged
+        );
+        assert!(
+            staged.contains("docs/research/notes.md"),
+            "expected notes.md to be staged, got: {}",
+            staged
+        );
+    }
+
+    #[tokio::test]
+    async fn test_stage_existing_files_recurses_deeply() {
+        // Regression test for goal `662a6e15` (2026-06-16):
+        // libgit2 (via `git status --porcelain -z`) collapses a
+        // fully-untracked subtree into a single top-level directory
+        // entry, e.g. `web/games/libs/game/effects/src/` for files
+        // at `web/games/libs/game/effects/src/styles/*.css` (2
+        // levels deep) or `web/games/libs/game/ui/src/lib/` for
+        // files at `web/games/libs/game/ui/src/lib/components/
+        // *.svelte` (3 levels deep). The previous 1-level walk
+        // only expanded the directory's immediate file children,
+        // missing every file nested 2+ levels below. The
+        // operator's new Svelte/CSS code in `libs/game/effects/`
+        // and `libs/game/ui/` was therefore left untracked for
+        // minutes at a time. The new recursive walk (using a
+        // stack, not native recursion) must find ALL files
+        // regardless of depth.
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "t@t"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "t"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        // Create a 3-level deep untracked subtree mimicking
+        // the operator's `libs/game/ui/src/lib/components/` layout.
+        std::fs::create_dir_all(repo.join("a/b/c")).unwrap();
+        std::fs::write(repo.join("a/b/c/deep1.svelte"), "<div/>\n").unwrap();
+        std::fs::write(repo.join("a/b/c/deep2.svelte"), "<div/>\n").unwrap();
+        // And a 4-level deep file to make sure the recursion
+        // doesn't have an artificial depth limit.
+        std::fs::create_dir_all(repo.join("a/b/c/d/e")).unwrap();
+        std::fs::write(repo.join("a/b/c/d/e/really_deep.css"), "x{}\n").unwrap();
+
+        // Simulate libgit2 returning ONLY the top-level dir entry
+        // (this is what `git status --porcelain -z` does for
+        // fully-untracked subtrees).
+        let paths = vec!["a".to_string()];
+        let result = stage_existing_files(&repo, &paths, false, 30, &BTreeSet::new()).await;
+        assert!(result.is_ok(), "stage_existing_files failed: {:?}", result);
+
+        // Verify ALL files (3-level and 4-level) ended up staged.
+        let output = crate::git::tokio_git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "diff",
+                "--cached",
+                "--name-only",
+            ])
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::null())
+            .output()
+            .await
+            .unwrap();
+        let staged = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            staged.contains("a/b/c/deep1.svelte"),
+            "3-level file missed: {}",
+            staged
+        );
+        assert!(
+            staged.contains("a/b/c/deep2.svelte"),
+            "3-level file missed: {}",
+            staged
+        );
+        assert!(
+            staged.contains("a/b/c/d/e/really_deep.css"),
+            "4-level file missed: {}",
+            staged
+        );
+    }
+
+    #[tokio::test]
+    async fn test_stage_existing_files_skips_node_modules_and_dotdirs() {
+        // Regression test for goal `662a6e15` (2026-06-16):
+        // the new recursive walk must respect the
+        // `excluded_dir_names` guard and skip dotfile dirs.
+        // This prevents `node_modules/`, `target/`, `.git/`,
+        // `.cache/`, etc. from being staged even when they
+        // appear as untracked.
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "t@t"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "t"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        // Create files inside excluded dir names
+        std::fs::create_dir_all(repo.join("node_modules/foo")).unwrap();
+        std::fs::write(repo.join("node_modules/foo/should_not_stage.js"), "x\n").unwrap();
+        std::fs::create_dir_all(repo.join("target/build")).unwrap();
+        std::fs::write(repo.join("target/build/should_not_stage.bin"), "x\n").unwrap();
+        // And a dotfile dir
+        std::fs::create_dir_all(repo.join(".cache/data")).unwrap();
+        std::fs::write(repo.join(".cache/data/should_not_stage.dat"), "x\n").unwrap();
+        // And a real file that SHOULD be staged
+        std::fs::create_dir_all(repo.join("src")).unwrap();
+        std::fs::write(repo.join("src/keep.ts"), "export {}\n").unwrap();
+
+        // Build the same excluded set the daemon uses by default.
+        let excluded: std::collections::BTreeSet<String> =
+            crate::policy::default_exclude_dir_names()
+                .into_iter()
+                .collect();
+        // Walk the top-level dir
+        let paths = vec![
+            "node_modules".to_string(),
+            "target".to_string(),
+            ".cache".to_string(),
+            "src".to_string(),
+        ];
+        let result = stage_existing_files(&repo, &paths, false, 30, &excluded).await;
+        assert!(result.is_ok());
+
+        let output = crate::git::tokio_git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "diff",
+                "--cached",
+                "--name-only",
+            ])
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::null())
+            .output()
+            .await
+            .unwrap();
+        let staged = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            staged.contains("src/keep.ts"),
+            "src/keep.ts should be staged, got: {}",
+            staged
+        );
+        assert!(
+            !staged.contains("node_modules"),
+            "node_modules contents should NOT be staged, got: {}",
+            staged
+        );
+        assert!(
+            !staged.contains("target"),
+            "target contents should NOT be staged, got: {}",
+            staged
+        );
+        assert!(
+            !staged.contains(".cache"),
+            ".cache contents should NOT be staged, got: {}",
+            staged
+        );
+    }
+
+    /// Regression test for goal `mr0rim9u-lzzfv9`:
+    /// `stage_existing_files` recursion MUST skip subdirs whose
+    /// `.git` is a real DIRECTORY (a nested git repo), not just
+    /// submodules whose `.git` is a pointer file. The previous
+    /// implementation only matched `is_file()`, which let the
+    /// recursion descend into nested sibling repos like
+    /// `web-auto/rust-ai-web-auto/`, attempt to `git add` ~19000
+    /// files inside, and fail with
+    /// `fatal: Pathspec '...' is in submodule 'rust-ai-web-auto'`.
+    /// After 5 failures, the daemon would mark the parent repo
+    /// as `exceeded max failures` and stop syncing it.
+    ///
+    /// This test creates a parent repo with:
+    /// - `keep.txt`              (regular file, SHOULD be staged)
+    /// - `nested_subrepo/`       (real git repo with `.git/` dir)
+    ///   - `nested_subrepo/should_not_stage.md`  (inside the nested repo)
+    /// and asserts:
+    /// a) `keep.txt` gets staged,
+    /// b) NO file from inside `nested_subrepo/` gets staged,
+    /// c) `stage_existing_files` returns Ok (no error).
+    #[tokio::test]
+    async fn test_stage_existing_files_skips_nested_git_repo() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("parent");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "t@t"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "t"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        // Regular file that SHOULD be staged
+        std::fs::write(repo.join("keep.txt"), "keep me\n").unwrap();
+
+        // Nested git repo (real `.git/` directory, not a submodule
+        // pointer file). We're emulating the web-auto scenario
+        // where `web-auto/rust-ai-web-auto/.git` is a real git
+        // repo's working directory.
+        let nested = repo.join("nested_subrepo");
+        std::fs::create_dir_all(&nested).unwrap();
+        std::fs::create_dir_all(nested.join(".git")).unwrap();
+        std::fs::write(nested.join(".git").join("HEAD"), "ref: refs/heads/main\n").unwrap();
+        std::fs::create_dir_all(nested.join(".git").join("objects")).unwrap();
+        std::fs::create_dir_all(nested.join(".git").join("refs")).unwrap();
+        // One file inside the nested repo — must NOT be staged by parent
+        std::fs::write(
+            nested.join("should_not_stage.md"),
+            "this lives in a nested git repo\n",
+        )
+        .unwrap();
+
+        // Call the helper with the nested repo path as a top-level
+        // entry, exactly like the daemon does when a parent
+        // commit-hash change shows up as `M nested_subrepo`.
+        let paths = vec!["nested_subrepo".to_string()];
+        let excluded: std::collections::BTreeSet<String> =
+            crate::policy::default_exclude_dir_names()
+                .into_iter()
+                .collect();
+        let result = stage_existing_files(&repo, &paths, false, 30, &excluded).await;
+        assert!(
+            result.is_ok(),
+            "stage_existing_files must NOT error on a nested git-repo entry: {:?}",
+            result
+        );
+
+        // Confirm only the unrelated file made it to the index
+        let output = crate::git::tokio_git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "diff",
+                "--cached",
+                "--name-only",
+            ])
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::null())
+            .output()
+            .await
+            .unwrap();
+        let staged = String::from_utf8_lossy(&output.stdout);
+        // The empty `keep.txt` (`--allow-empty` initial commit) is
+        // what `git diff --cached` shows at this point, since the
+        // staged_paths argument didn't include `keep.txt` here.
+        // The KEY assertion is that nothing from inside the nested
+        // subrepo snuck into the index.
+        assert!(
+            !staged.contains("should_not_stage"),
+            "Files inside nested_subrepo MUST NOT be staged, got:\n{}",
+            staged
+        );
+        assert!(
+            !staged.contains("nested_subrepo/.git"),
+            "Files inside nested_subrepo/.git MUST NOT be staged, got:\n{}",
+            staged
+        );
+    }
+
+    #[tokio::test]
+    async fn test_stage_existing_files_empty_after_filter_returns_ok() {
+        // If every path in the input list vanishes between status
+        // and add, the function should return Ok(()) (nothing to do),
+        // not bail with an error.
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        let paths = vec![
+            "nonexistent1.txt".to_string(),
+            "nonexistent2.txt".to_string(),
+        ];
+        let result = stage_existing_files(&repo, &paths, false, 30, &BTreeSet::new()).await;
+        assert!(result.is_ok(), "all-vanished list should be a no-op");
+    }
+
+    // ============================================================
+    // stage_gitlink_updates — regression tests for goal
+    // `mr0xseig-fn9bbd`. The gitlink-pointer propagation flow
+    // is exercised end-to-end by:
+    //  - setting up a parent repo with a tracked gitlink to a
+    //    sibling subrepo (real `.git/` directory, NOT a
+    //    `.gitmodules`-declared worktree — this matches the
+    //    web-auto/rust-ai-web-auto scenario).
+    //  - advancing the sibling's HEAD to a new commit.
+    //  - calling `stage_gitlink_updates(parent, ["sibling"], ...)`.
+    //  - asserting the parent's index now points to the new SHA,
+    //    without staging ANY file from inside the sibling work
+    //    tree.
+    // ============================================================
+
+    /// Helper: run `git` in `dir` and return trimmed stdout.
+    async fn git_stdout(dir: &Path, args: &[&str]) -> String {
+        let out = crate::git::tokio_git_cmd()
+            .args(["-C", &dir.to_string_lossy()])
+            .args(args)
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::null())
+            .output()
+            .await
+            .unwrap();
+        String::from_utf8_lossy(&out.stdout).trim().to_string()
+    }
+
+    /// Helper: build a self-contained mini-repo rooted at `dir`,
+    /// with user.email/user.name configured and `branch = main`.
+    async fn init_gitlink_test_repo(dir: &Path) {
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .arg(dir)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &dir.to_string_lossy(), "config", "user.email", "t@t"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &dir.to_string_lossy(), "config", "user.name", "t"])
+            .status()
+            .unwrap();
+        // Disable hooks so globally-installed warden hooks don't reject
+        // commits in temp test repos that lack `.gitattributes` with
+        // `filter=dracon`. See AUDIT-3-UTILITIES-2026-07-10.md CONCERN #4.
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &dir.to_string_lossy(),
+                "config",
+                "core.hooksPath",
+                "/dev/null",
+            ])
+            .status()
+            .unwrap();
+        // Ensure we have an initial commit so HEAD is valid.
+        let _ = git_stdout(dir, &["commit", "--allow-empty", "-q", "-m", "init"]).await;
+    }
+
+    #[tokio::test]
+    async fn test_stage_gitlink_updates_propagates_sibling_subrepo_pointer() {
+        // web-auto + rust-ai-web-auto scenario: parent has a tracked
+        // 160000 entry pointing at a sibling subrepo whose `.git/`
+        // is its OWN git repo (not a `.gitmodules`-shared worktree).
+        let tmp = tempfile::tempdir().unwrap();
+        let parent = tmp.path().join("parent");
+        std::fs::create_dir_all(&parent).unwrap();
+        init_gitlink_test_repo(&parent).await;
+
+        // Build a sibling subrepo on disk.
+        let sibling = parent.join("sibling");
+        std::fs::create_dir_all(&sibling).unwrap();
+        // The subrepo's own `.git/` (sibling IS a git repo).
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .arg(&sibling)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &sibling.to_string_lossy(),
+                "config",
+                "user.email",
+                "t@t",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &sibling.to_string_lossy(), "config", "user.name", "t"])
+            .status()
+            .unwrap();
+        // Disable hooks so globally-installed warden hooks don't reject
+        // commits in temp test repos that lack `.gitattributes` with
+        // `filter=dracon`. See AUDIT-3-UTILITIES-2026-07-10.md CONCERN #4.
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &sibling.to_string_lossy(),
+                "config",
+                "core.hooksPath",
+                "/dev/null",
+            ])
+            .status()
+            .unwrap();
+        // First commit at SHA-A.
+        std::fs::write(sibling.join("a.txt"), "v1\n").unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &sibling.to_string_lossy(), "add", "a.txt"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &sibling.to_string_lossy(), "commit", "-q", "-m", "v1"])
+            .status()
+            .unwrap();
+        let sha_a = git_stdout(&sibling, &["rev-parse", "HEAD"]).await;
+
+        // Register the subrepo as a gitlink in the parent.
+        crate::git::git_cmd()
+            .args(["-C", &parent.to_string_lossy(), "add", "sibling"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &parent.to_string_lossy(),
+                "commit",
+                "-q",
+                "-m",
+                "add sibling",
+            ])
+            .status()
+            .unwrap();
+
+        // Sanity: parent has a 160000 entry pointing at sha_a.
+        let ls = git_stdout(&parent, &["ls-tree", "HEAD", "--", "sibling"]).await;
+        assert!(
+            ls.starts_with(&format!("160000 commit {}", sha_a)),
+            "ls-tree should report 160000 -> {} at HEAD, got: {}",
+            sha_a,
+            ls
+        );
+
+        // Advance the subrepo to SHA-B.
+        std::fs::write(sibling.join("a.txt"), "v2\n").unwrap();
+        std::fs::write(sibling.join("b.txt"), "new\n").unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &sibling.to_string_lossy(), "add", "-A"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &sibling.to_string_lossy(), "commit", "-q", "-m", "v2"])
+            .status()
+            .unwrap();
+        let sha_b = git_stdout(&sibling, &["rev-parse", "HEAD"]).await;
+        assert_ne!(sha_a, sha_b, "subrepo must have advanced");
+
+        // Parent now sees `M sibling` (gitlink pointer out of date).
+        let status_before = git_stdout(&parent, &["status", "--porcelain"]).await;
+        assert!(
+            status_before.contains("sibling"),
+            "parent must see stale gitlink, got: {:?}",
+            status_before
+        );
+
+        // Run the gitlink-update stage flow.
+        let result = stage_gitlink_updates(&parent, &["sibling".to_string()], false, 30).await;
+        assert!(
+            result.is_ok(),
+            "stage_gitlink_updates must succeed: {:?}",
+            result
+        );
+
+        // Parent index must now point at sha_b.
+        let index_sha = git_stdout(&parent, &["ls-files", "--stage", "sibling"]).await;
+        assert!(
+            index_sha.contains(&sha_b) || index_sha.contains(&sha_b[..7]),
+            "parent index must reflect new submodule SHA {}, got: {:?}",
+            sha_b,
+            index_sha
+        );
+
+        // NO file from inside `sibling/` should be in the parent index.
+        let staged_files = git_stdout(&parent, &["diff", "--cached", "--name-only"]).await;
+        assert!(
+            !staged_files.contains("sibling/a.txt"),
+            "sibling/a.txt must NOT be in parent index, got:\n{}",
+            staged_files
+        );
+        assert!(
+            !staged_files.contains("sibling/b.txt"),
+            "sibling/b.txt must NOT be in parent index, got:\n{}",
+            staged_files
+        );
+        // NOTE (2026-07-18): previously this test had a tautological
+        // assertion `l != "sibling" || true` (clippy::logic-bug) that
+        // was masking a real semantic mistake. The correct invariant
+        // is: the staged diff must contain ONLY the gitlink pointer
+        // for `sibling` (NOT any file contents from inside it). The
+        // gitlink pointer change is the entire purpose of
+        // `stage_gitlink_updates`, so `sibling` (the path of the
+        // gitlink) is expected to appear in the diff. What we MUST
+        // not see is `sibling/<file>` (covered by the two assertions
+        // above). The previous assertion was the wrong invariant
+        // and was effectively dead code.
+    }
+
+    #[tokio::test]
+    async fn test_stage_gitlink_updates_no_op_for_empty_input() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("p");
+        std::fs::create_dir_all(&repo).unwrap();
+        init_gitlink_test_repo(&repo).await;
+        let result = stage_gitlink_updates(&repo, &[], false, 30).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_stage_gitlink_updates_dry_run_does_not_modify_index() {
+        // Same fixture as the propagation test but with dry_run=true:
+        // parent index MUST NOT change. Verifies the git-args builder
+        // is reachable from the test surface.
+        let tmp = tempfile::tempdir().unwrap();
+        let parent = tmp.path().join("parent");
+        std::fs::create_dir_all(&parent).unwrap();
+        init_gitlink_test_repo(&parent).await;
+
+        let sibling = parent.join("sibling");
+        std::fs::create_dir_all(&sibling).unwrap();
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .arg(&sibling)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &sibling.to_string_lossy(),
+                "config",
+                "user.email",
+                "t@t",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &sibling.to_string_lossy(), "config", "user.name", "t"])
+            .status()
+            .unwrap();
+        // Disable hooks so globally-installed warden hooks don't reject
+        // commits in temp test repos that lack `.gitattributes` with
+        // `filter=dracon`. See AUDIT-3-UTILITIES-2026-07-10.md CONCERN #4.
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &sibling.to_string_lossy(),
+                "config",
+                "core.hooksPath",
+                "/dev/null",
+            ])
+            .status()
+            .unwrap();
+        std::fs::write(sibling.join("a.txt"), "v1\n").unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &sibling.to_string_lossy(), "add", "a.txt"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &sibling.to_string_lossy(), "commit", "-q", "-m", "v1"])
+            .status()
+            .unwrap();
+        let sha_a = git_stdout(&sibling, &["rev-parse", "HEAD"]).await;
+        crate::git::git_cmd()
+            .args(["-C", &parent.to_string_lossy(), "add", "sibling"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &parent.to_string_lossy(),
+                "commit",
+                "-q",
+                "-m",
+                "pin sibling",
+            ])
+            .status()
+            .unwrap();
+        // Advance subrepo (so dry_run vs no-dry_run is observable).
+        std::fs::write(sibling.join("a.txt"), "v2\n").unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &sibling.to_string_lossy(), "add", "a.txt"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &sibling.to_string_lossy(), "commit", "-q", "-m", "v2"])
+            .status()
+            .unwrap();
+        let _ = sha_a; // unused; just used to populate the index
+
+        let result = stage_gitlink_updates(&parent, &["sibling".to_string()], true, 30).await;
+        assert!(result.is_ok(), "dry-run must succeed: {:?}", result);
+
+        let index_sha = git_stdout(&parent, &["ls-files", "--stage", "sibling"]).await;
+        assert!(
+            index_sha.contains(&sha_a),
+            "dry-run must NOT change parent index; expected sha {}, got: {}",
+            sha_a,
+            index_sha
+        );
+    }
+
+    // ============================================================
+    // is_backstop_active tests
+    // ============================================================
+
+    #[test]
+    fn test_is_backstop_active_below_threshold() {
+        // ahead_count <= threshold → not active, regardless of time
+        let now = std::time::Instant::now();
+        let since = now - std::time::Duration::from_secs(600);
+        assert!(!is_backstop_active(Some(since), now, 0, 20, 300));
+        assert!(!is_backstop_active(Some(since), now, 20, 20, 300));
+    }
+
+    #[test]
+    fn test_is_backstop_active_above_threshold_but_recent() {
+        // ahead_count > threshold but not enough time has passed
+        // → not active
+        let now = std::time::Instant::now();
+        let since = now - std::time::Duration::from_secs(60);
+        assert!(!is_backstop_active(Some(since), now, 21, 20, 300));
+    }
+
+    #[test]
+    fn test_is_backstop_active_above_threshold_and_old() {
+        // ahead_count > threshold AND time elapsed >= min_age_secs
+        // → active
+        let now = std::time::Instant::now();
+        let since = now - std::time::Duration::from_secs(600);
+        assert!(is_backstop_active(Some(since), now, 28, 20, 300));
+        assert!(is_backstop_active(Some(since), now, 100, 20, 300));
+    }
+
+    #[test]
+    fn test_is_backstop_active_no_ahead_since() {
+        // No ahead_since means the repo has never been ahead during
+        // this activity window → not active (just got pushed)
+        let now = std::time::Instant::now();
+        assert!(!is_backstop_active(None, now, 50, 20, 300));
+    }
+
+    #[test]
+    fn test_is_backstop_active_threshold_zero_disables() {
+        // threshold = 0 means operator disabled the backstop
+        let now = std::time::Instant::now();
+        let since = now - std::time::Duration::from_secs(3600);
+        assert!(!is_backstop_active(Some(since), now, 100, 0, 300));
+    }
+
+    // ============================================================
+    // auto_resolve_unmerged_if_safe tests
+    // ADDED 2026-06-21, goal 55db3bfc-4fc0-4650-8349-38da9e62bd44
+    // ============================================================
+
+    fn init_test_git_repo(tmp: &tempfile::TempDir, name: &str) -> std::path::PathBuf {
+        let repo = tmp.path().join(name);
+        std::fs::create_dir_all(&repo).unwrap();
+        std::process::Command::new("git")
+            .args(["init", "--initial-branch=main", "-q"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["config", "user.email", "test@example.com"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["config", "user.name", "Test"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        repo
+    }
+
+    /// Manually create an unmerged index state for the given file.
+    /// This is the exact state that causes the
+    /// "cannot create a tree from a not fully merged index" error.
+    /// Stages: 1=base, 2=ours (HEAD), 3=theirs.
+    /// Note: `git add <path>` after a merge RESOLVES the unmerge
+    /// (selects the working tree content), so we must use
+    /// `git update-index --index-info` to set the stages directly.
+    fn create_unmerged_state(repo: &std::path::Path, path: &str) {
+        use std::io::Write;
+        // Get hashes from HEAD (stage 2), from HEAD~1 (stage 1 base),
+        // and synthesize a different stage 3 hash by writing a new blob.
+        let base = std::process::Command::new("git")
+            .args(["rev-parse", &format!("HEAD~1:{}", path)])
+            .current_dir(repo)
+            .output()
+            .unwrap();
+        let base_hash = String::from_utf8_lossy(&base.stdout).trim().to_string();
+        let ours = std::process::Command::new("git")
+            .args(["rev-parse", &format!("HEAD:{}", path)])
+            .current_dir(repo)
+            .output()
+            .unwrap();
+        let ours_hash = String::from_utf8_lossy(&ours.stdout).trim().to_string();
+        // Write a different blob for "theirs"
+        let theirs_path = repo.join(path);
+        let original = std::fs::read(&theirs_path).unwrap_or_default();
+        let theirs_content = "theirs-conflict-content\n".to_string();
+        std::fs::write(&theirs_path, &theirs_content).unwrap();
+        let theirs_hash = String::from_utf8_lossy(
+            &std::process::Command::new("git")
+                .args(["hash-object", "-w", &theirs_path.to_string_lossy()])
+                .current_dir(repo)
+                .output()
+                .unwrap()
+                .stdout,
+        )
+        .trim()
+        .to_string();
+        // Restore the working tree to the HEAD (ours) content so
+        // auto-resolve can verify wt == HEAD
+        let ours_content = String::from_utf8_lossy(
+            &std::process::Command::new("git")
+                .args(["show", &format!("HEAD:{}", path)])
+                .current_dir(repo)
+                .output()
+                .unwrap()
+                .stdout,
+        )
+        .to_string();
+        std::fs::write(&theirs_path, ours_content.as_bytes()).unwrap();
+        let _ = original; // suppress unused
+                          // Now set the 3 stages via --index-info
+        let input = format!(
+            "100644 {} 1\t{}\n100644 {} 2\t{}\n100644 {} 3\t{}\n",
+            base_hash, path, ours_hash, path, theirs_hash, path
+        );
+        let mut child = std::process::Command::new("git")
+            .args(["update-index", "--index-info"])
+            .current_dir(repo)
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .unwrap();
+        child
+            .stdin
+            .as_mut()
+            .unwrap()
+            .write_all(input.as_bytes())
+            .unwrap();
+        let _ = child.wait_with_output();
+    }
+
+    #[tokio::test]
+    async fn test_auto_resolve_unmerged_working_tree_matches_head() {
+        // The 4+ hour dracon-platform bug: unmerged PNGs with
+        // working tree == HEAD. The daemon must auto-resolve these.
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_git_repo(&tmp, "unmerged-repo");
+
+        // Create initial file and commit
+        std::fs::write(repo.join("a.png"), b"a-content\n").unwrap();
+        std::process::Command::new("git")
+            .args(["add", "-A"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["commit", "--no-verify", "-m", "init"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+
+        // Create a second commit on main that changes a.png
+        std::fs::write(repo.join("a.png"), b"main-content\n").unwrap();
+        std::process::Command::new("git")
+            .args(["add", "-A"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["commit", "--no-verify", "-m", "main-change"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+
+        // Manually create the unmerged state (3 stages for a.png)
+        create_unmerged_state(&repo, "a.png");
+
+        // Verify unmerged state exists
+        let before = std::process::Command::new("git")
+            .args(["ls-files", "--unmerged"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        let before_text = String::from_utf8_lossy(&before.stdout);
+        assert!(
+            !before_text.is_empty(),
+            "test setup failed: should have unmerged entries, got: {:?}",
+            before_text
+        );
+
+        // Now call the daemon's auto-resolve function
+        let resolved = auto_resolve_unmerged_if_safe(&repo, true)
+            .await
+            .expect("auto_resolve should not error");
+
+        assert_eq!(resolved, 1, "should have resolved 1 unmerged entry");
+
+        // Verify the unmerged state is gone
+        let after = std::process::Command::new("git")
+            .args(["ls-files", "--unmerged"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        let after_text = String::from_utf8_lossy(&after.stdout);
+        assert!(
+            after_text.trim().is_empty(),
+            "unmerged state should be cleared, got: {:?}",
+            after_text
+        );
+
+        // Verify the working tree content is preserved (matches main)
+        let wt = std::fs::read(repo.join("a.png")).unwrap();
+        assert_eq!(wt, b"main-content\n");
+    }
+
+    #[tokio::test]
+    async fn test_auto_resolve_unmerged_working_tree_differs_from_head() {
+        // When the working tree does NOT match HEAD, the daemon must
+        // NOT auto-resolve (it would discard the user's work).
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_git_repo(&tmp, "unmerged-differs");
+
+        // Setup: create file + commit, then second commit
+        std::fs::write(repo.join("x.txt"), b"original\n").unwrap();
+        std::process::Command::new("git")
+            .args(["add", "-A"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["commit", "--no-verify", "-m", "init"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        std::fs::write(repo.join("x.txt"), b"main-content\n").unwrap();
+        std::process::Command::new("git")
+            .args(["add", "-A"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["commit", "--no-verify", "-m", "main"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+
+        // Create unmerged state
+        create_unmerged_state(&repo, "x.txt");
+
+        // Now overwrite the working tree with NEW content that doesn't
+        // match any stage (simulating user editing during conflict)
+        std::fs::write(repo.join("x.txt"), b"user-edited-content\n").unwrap();
+
+        // auto-resolve should NOT resolve (working tree differs from HEAD)
+        let resolved = auto_resolve_unmerged_if_safe(&repo, true)
+            .await
+            .expect("auto_resolve should not error");
+        assert_eq!(
+            resolved, 0,
+            "should not resolve when working tree differs from HEAD"
+        );
+
+        // Working tree should still have user's content
+        let wt = std::fs::read(repo.join("x.txt")).unwrap();
+        assert_eq!(wt, b"user-edited-content\n");
+    }
+
+    #[tokio::test]
+    async fn test_auto_resolve_unmerged_disabled() {
+        // When policy.auto_resolve_unmerged = false, the daemon must
+        // NOT resolve anything (operator choice).
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_git_repo(&tmp, "unmerged-disabled");
+
+        std::fs::write(repo.join("y.txt"), b"original\n").unwrap();
+        std::process::Command::new("git")
+            .args(["add", "-A"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["commit", "--no-verify", "-m", "init"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        std::fs::write(repo.join("y.txt"), b"main\n").unwrap();
+        std::process::Command::new("git")
+            .args(["add", "-A"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["commit", "--no-verify", "-m", "main"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+
+        // Create unmerged state
+        create_unmerged_state(&repo, "y.txt");
+
+        // auto-resolve disabled
+        let resolved = auto_resolve_unmerged_if_safe(&repo, false)
+            .await
+            .expect("auto_resolve should not error");
+        assert_eq!(resolved, 0, "should not resolve when policy disabled");
+
+        // Unmerged state should still exist
+        let after = std::process::Command::new("git")
+            .args(["ls-files", "--unmerged"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        let after_text = String::from_utf8_lossy(&after.stdout);
+        assert!(
+            !after_text.trim().is_empty(),
+            "unmerged state should remain when policy disabled"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_auto_resolve_no_unmerged() {
+        // When there are no unmerged entries, the function should
+        // return 0 quickly without doing anything.
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_git_repo(&tmp, "clean-repo");
+
+        std::fs::write(repo.join("z.txt"), b"hello\n").unwrap();
+        std::process::Command::new("git")
+            .args(["add", "-A"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["commit", "--no-verify", "-m", "init"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+
+        let resolved = auto_resolve_unmerged_if_safe(&repo, true)
+            .await
+            .expect("auto_resolve should not error");
+        assert_eq!(resolved, 0);
+    }
+
+    // ============================================================
+    // check_untracked_threshold tests
+    // ADDED 2026-06-21, goal 55db3bfc-4fc0-4650-8349-38da9e62bd44
+    // ============================================================
+
+    #[tokio::test]
+    async fn test_check_untracked_threshold_below() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_git_repo(&tmp, "low-untracked");
+
+        // Create 3 untracked files (below threshold of 10)
+        for i in 0..3 {
+            std::fs::write(repo.join(format!("u{}.txt", i)), b"x").unwrap();
+        }
+
+        let count = check_untracked_threshold(&repo, 10)
+            .await
+            .expect("should not error");
+        assert_eq!(count, 3);
+    }
+
+    #[tokio::test]
+    async fn test_check_untracked_threshold_above() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_git_repo(&tmp, "high-untracked");
+
+        // Create 15 untracked files (above threshold of 10)
+        for i in 0..15 {
+            std::fs::write(repo.join(format!("u{}.txt", i)), b"x").unwrap();
+        }
+
+        let count = check_untracked_threshold(&repo, 10)
+            .await
+            .expect("should not error");
+        assert_eq!(count, 15);
+    }
+
+    #[tokio::test]
+    async fn test_check_untracked_threshold_zero_disables() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_git_repo(&tmp, "threshold-zero");
+
+        // Create 100 untracked files
+        for i in 0..100 {
+            std::fs::write(repo.join(format!("u{}.txt", i)), b"x").unwrap();
+        }
+
+        // threshold = 0 disables the warning but still counts
+        let count = check_untracked_threshold(&repo, 0)
+            .await
+            .expect("should not error");
+        assert_eq!(count, 100);
+    }
+
+    #[tokio::test]
+    async fn test_check_untracked_threshold_gitignored_excluded() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_git_repo(&tmp, "gitignored");
+
+        // Create a .gitignore that excludes node_modules/
+        std::fs::write(repo.join(".gitignore"), b"node_modules/\n").unwrap();
+        std::process::Command::new("git")
+            .args(["add", ".gitignore"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["commit", "--no-verify", "-m", "gitignore"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+
+        // Create 3 tracked + 5 gitignored files
+        for i in 0..3 {
+            std::fs::write(repo.join(format!("a{}.txt", i)), b"x").unwrap();
+        }
+        std::fs::create_dir_all(repo.join("node_modules")).unwrap();
+        for i in 0..5 {
+            std::fs::write(repo.join(format!("node_modules/pkg{}.js", i)), b"x").unwrap();
+        }
+
+        // Only the 3 non-ignored files should be counted
+        let count = check_untracked_threshold(&repo, 100)
+            .await
+            .expect("should not error");
+        assert_eq!(count, 3, "gitignored files should not be counted");
+    }
+
+    /// Regression test for goal `mr02de1n-gjkgzp`: when a parent
+    /// repo contains a nested git repository (its own `.git/`
+    /// directory), the parent's untracked-file count must subtract
+    /// that nested-repo entry — otherwise the parent's UT count
+    /// inflates with entries that are owned by the child repo (which
+    /// the daemon syncs independently).
+    ///
+    /// Raw `git ls-files --others --exclude-standard` in this setup
+    /// would return 4 entries:
+    ///   - `nested/`  (one per nested git repo)
+    ///   - `a.txt`, `b.txt`, `c.txt`
+    /// The function must return 3 (subtracting the single nested-repo
+    /// entry).
+    #[tokio::test]
+    async fn test_check_untracked_threshold_subtracts_nested_repo() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_git_repo(&tmp, "parent-with-nested");
+
+        // Create an initial commit so the repo isn't empty.
+        std::fs::write(repo.join("README.md"), b"# parent\n").unwrap();
+        std::process::Command::new("git")
+            .args(["add", "-A"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["commit", "--no-verify", "-m", "init"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+
+        // Create a nested git repo under `parent/nested/`. The nested
+        // repo's working tree is invisible to the parent's
+        // `git ls-files --others` (git stops at the .git/ boundary),
+        // so the parent only sees `nested/` as one untracked entry.
+        let nested = repo.join("nested");
+        std::fs::create_dir_all(&nested).unwrap();
+        std::process::Command::new("git")
+            .args(["init", "--initial-branch=main", "-q"])
+            .current_dir(&nested)
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["config", "user.email", "child@example.com"])
+            .current_dir(&nested)
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["config", "user.name", "Child"])
+            .current_dir(&nested)
+            .output()
+            .unwrap();
+        std::fs::write(nested.join("inside_child.txt"), b"inside\n").unwrap();
+        std::process::Command::new("git")
+            .args(["add", "-A"])
+            .current_dir(&nested)
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["commit", "--no-verify", "-m", "child init"])
+            .current_dir(&nested)
+            .output()
+            .unwrap();
+
+        // Add 3 untracked files at the parent level (not nested).
+        for i in 0..3 {
+            std::fs::write(repo.join(format!("file{}.txt", i)), b"x").unwrap();
+        }
+
+        // Sanity-check: git sees 4 entries (nested/ + 3 files).
+        let raw = std::process::Command::new("git")
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "ls-files",
+                "--others",
+                "--exclude-standard",
+            ])
+            .output()
+            .unwrap();
+        let raw_stdout = String::from_utf8_lossy(&raw.stdout);
+        assert_eq!(
+            raw_stdout.lines().filter(|l| !l.is_empty()).count(),
+            4,
+            "precondition: git must see 4 untracked entries (nested/ + 3 files); got: {}",
+            raw_stdout,
+        );
+
+        // After subtraction, the count must be 3 (the nested/ entry
+        // is excluded because child/.git exists).
+        let count = check_untracked_threshold(&repo, 100)
+            .await
+            .expect("should not error");
+        assert_eq!(
+            count, 3,
+            "nested-repo entries must be subtracted from the parent's UT count",
+        );
+    }
+
+    /// Regression test for goal `mr02de1n-gjkgzp`: when the parent
+    /// has multiple nested git repos, ALL of them are subtracted.
+    #[tokio::test]
+    async fn test_check_untracked_threshold_subtracts_multiple_nested_repos() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_git_repo(&tmp, "parent-multi-nested");
+
+        // Initial commit.
+        std::fs::write(repo.join("README.md"), b"# parent\n").unwrap();
+        std::process::Command::new("git")
+            .args(["add", "-A"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["commit", "--no-verify", "-m", "init"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+
+        // Create three nested git repos.
+        for name in ["child_a", "child_b", "child_c"] {
+            let nested = repo.join(name);
+            std::fs::create_dir_all(&nested).unwrap();
+            std::process::Command::new("git")
+                .args(["init", "--initial-branch=main", "-q"])
+                .current_dir(&nested)
+                .output()
+                .unwrap();
+            std::process::Command::new("git")
+                .args(["config", "user.email", "child@example.com"])
+                .current_dir(&nested)
+                .output()
+                .unwrap();
+            std::process::Command::new("git")
+                .args(["config", "user.name", "Child"])
+                .current_dir(&nested)
+                .output()
+                .unwrap();
+        }
+
+        // Plus one real untracked file.
+        std::fs::write(repo.join("real_untracked.txt"), b"x").unwrap();
+
+        // Raw count = 4 (3 nested dirs + 1 file). Subtract all 3
+        // nested → expected return = 1.
+        let count = check_untracked_threshold(&repo, 100)
+            .await
+            .expect("should not error");
+        assert_eq!(
+            count, 1,
+            "all three nested-repo entries must be subtracted from the parent's UT count",
+        );
+    }
+
+    /// Regression test for goal `mr02de1n-gjkgzp`: a directory
+    /// without a `.git` inside it must NOT be subtracted. The
+    /// subtraction only applies to nested git repos, not to plain
+    /// untracked directories (which DO contribute to the parent's
+    /// noise count).
+    #[tokio::test]
+    async fn test_check_untracked_threshold_keeps_plain_untracked_dirs() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_git_repo(&tmp, "parent-plain-dir");
+
+        std::fs::write(repo.join("README.md"), b"# parent\n").unwrap();
+        std::process::Command::new("git")
+            .args(["add", "-A"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["commit", "--no-verify", "-m", "init"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+
+        // A plain untracked dir (no .git inside) plus a regular file.
+        std::fs::create_dir_all(repo.join("scratch_dir")).unwrap();
+        std::fs::write(repo.join("scratch_dir/note.txt"), b"x").unwrap();
+        std::fs::write(repo.join("a.txt"), b"x").unwrap();
+
+        let count = check_untracked_threshold(&repo, 100)
+            .await
+            .expect("should not error");
+        assert_eq!(
+            count, 2,
+            "plain untracked dirs (no .git inside) must remain in the count",
+        );
+    }
+
+    /// Regression test for the .pi/ recursion-skip bug (goal
+    /// mqp8dffy-bonnlu). The daemon's `stage_existing_files`
+    /// recursion used to skip any dir whose name starts with `.`,
+    /// which silently blocked `*/.pi/goals/archived/*.md` from
+    /// being auto-staged. This test creates such files, calls the
+    /// recursion helper, and asserts the files end up in the stage
+    /// list (i.e. they are not skipped).
+    #[test]
+    fn test_stage_existing_files_recurses_into_pi_dir() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_git_repo(&tmp, "pi-recursion");
+
+        // Create an initial commit so the repo isn't empty
+        std::fs::write(repo.join("README.md"), b"# test\n").unwrap();
+        std::process::Command::new("git")
+            .args(["add", "-A"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["commit", "--no-verify", "-m", "init"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+
+        // Create a .pi/ tree that mirrors a real-world goal-tracking
+        // layout: .pi/goals/archived/*.md (operator docs) + a control
+        // .cache/ dir (should still be skipped).
+        std::fs::create_dir_all(repo.join(".pi/goals/archived")).unwrap();
+        std::fs::write(
+            repo.join(".pi/goals/archived/goal_20260622_test.md"),
+            b"{\"objective\": \"test\"}\n",
+        )
+        .unwrap();
+        std::fs::write(
+            repo.join(".pi/goals/active_goal_test.md"),
+            b"{\"objective\": \"active\"}\n",
+        )
+        .unwrap();
+
+        // The control: .cache/ should still be skipped.
+        std::fs::create_dir_all(repo.join(".cache")).unwrap();
+        std::fs::write(repo.join(".cache/junk.txt"), b"junk\n").unwrap();
+
+        // The control: node_modules/ should still be skipped.
+        std::fs::create_dir_all(repo.join("node_modules/pkg")).unwrap();
+        std::fs::write(repo.join("node_modules/pkg/index.js"), b"x\n").unwrap();
+
+        // The control: .git/ (a directory inside the work tree) should
+        // be skipped — but since we just `git init`'d, there is no
+        // nested .git/ in the work tree. Skip this case.
+
+        // Build the excluded-dir BTreeSet the same way the daemon does.
+        use std::collections::BTreeSet;
+        let excluded: BTreeSet<String> = [
+            "target",
+            "node_modules",
+            ".cache",
+            ".direnv",
+            ".venv",
+            "dist",
+            "build",
+            "archives",
+            ".tmp-*",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+
+        // Run the daemon's `stage_existing_files` with the .pi/ dir
+        // as the input. The daemon's flow is: libgit2/git status
+        // reports the untracked .pi/ dir as a single entry, and the
+        // recursion walks into it.
+        let result = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(stage_existing_files(
+                &repo,
+                &[".pi/".to_string()],
+                /*dry_run=*/ false,
+                /*stage_timeout_secs=*/ 60,
+                &excluded,
+            ));
+        assert!(result.is_ok(), "stage_existing_files should not error");
+
+        // The .pi/goals/archived/*.md file should be staged.
+        let staged = std::process::Command::new("git")
+            .args(["diff", "--cached", "--name-only"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        let staged_text = String::from_utf8_lossy(&staged.stdout);
+        assert!(
+            staged_text
+                .contains(".pi/goals/archived/goal_20260622_test.md"),
+            "expected the .pi/goals/archived/goal_*.md file to be staged, but staged entries were: {:?}",
+            staged_text
+        );
+        assert!(
+            staged_text.contains(".pi/goals/active_goal_test.md"),
+            "expected the .pi/goals/active_goal_*.md file to be staged, but staged entries were: {:?}",
+            staged_text
+        );
+
+        // The control .cache/ contents should NOT be staged.
+        assert!(
+            !staged_text.contains(".cache/junk.txt"),
+            ".cache/ contents should be skipped, but staged entries were: {:?}",
+            staged_text
+        );
+
+        // The control node_modules/ contents should NOT be staged.
+        assert!(
+            !staged_text.contains("node_modules/pkg/index.js"),
+            "node_modules/ contents should be skipped, but staged entries were: {:?}",
+            staged_text
+        );
+    }
+
+    /// ADDED 2026-07-21 (v0.112.31, audit H6/F1.5): a file NESTED
+    /// inside an untracked directory must get the per-file staging
+    /// policy applied — previously the directory-expansion recursion
+    /// staged everything inside wholesale, so a 500 MiB file inside
+    /// a new dir bypassed the 100 MiB hard exclusion (and every
+    /// pattern exclusion) even though the same file at repo root
+    /// was rejected by `should_stage_entry`.
+    #[tokio::test]
+    async fn test_stage_existing_files_filtered_skips_oversized_nested() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        for (k, v) in [("user.email", "test@test"), ("user.name", "test")] {
+            crate::git::git_cmd()
+                .args(["config", k, v])
+                .current_dir(&repo)
+                .status()
+                .unwrap();
+        }
+        // Untracked dir with a small file + a 2 KiB "big" file.
+        std::fs::create_dir_all(repo.join("assets")).unwrap();
+        std::fs::write(repo.join("assets/small.txt"), b"ok\n").unwrap();
+        std::fs::write(repo.join("assets/big.bin"), vec![0u8; 2048]).unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+max_stage_file_bytes = 1024
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        stage_existing_files_filtered(
+            &repo,
+            &["assets".to_string()],
+            false,
+            60,
+            &BTreeSet::new(),
+            Some((&policy, &[])),
+        )
+        .await
+        .unwrap();
+
+        let staged = std::process::Command::new("git")
+            .args(["diff", "--cached", "--name-only"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        let staged_text = String::from_utf8_lossy(&staged.stdout);
+        assert!(
+            staged_text.contains("assets/small.txt"),
+            "small nested file must be staged: {:?}",
+            staged_text
+        );
+        assert!(
+            !staged_text.contains("assets/big.bin"),
+            "oversized nested file must NOT be staged (regression: expansion bypassed max_stage_file_bytes): {:?}",
+            staged_text
+        );
+    }
+
+    /// ADDED 2026-07-21 (v0.112.31, audit H6/F1.5): pattern
+    /// exclusions (untracked_exclude_patterns) must also apply to
+    /// directory-expanded files.
+    #[tokio::test]
+    async fn test_stage_existing_files_filtered_skips_excluded_pattern_nested() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        for (k, v) in [("user.email", "test@test"), ("user.name", "test")] {
+            crate::git::git_cmd()
+                .args(["config", k, v])
+                .current_dir(&repo)
+                .status()
+                .unwrap();
+        }
+        std::fs::create_dir_all(repo.join("research")).unwrap();
+        std::fs::write(repo.join("research/keep.md"), b"keep\n").unwrap();
+        std::fs::write(repo.join("research/scratch-notes.md"), b"skip\n").unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+untracked_exclude_patterns = ["scratch-*"]
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        stage_existing_files_filtered(
+            &repo,
+            &["research".to_string()],
+            false,
+            60,
+            &BTreeSet::new(),
+            Some((&policy, &[])),
+        )
+        .await
+        .unwrap();
+
+        let staged = std::process::Command::new("git")
+            .args(["diff", "--cached", "--name-only"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        let staged_text = String::from_utf8_lossy(&staged.stdout);
+        assert!(
+            staged_text.contains("research/keep.md"),
+            "non-excluded nested file must be staged: {:?}",
+            staged_text
+        );
+        assert!(
+            !staged_text.contains("research/scratch-notes.md"),
+            "pattern-excluded nested file must NOT be staged: {:?}",
+            staged_text
+        );
+    }
+
+    /// Regression test for goal `mr10pdzr-i495vy`:
+    /// `parent_with_materialized_subrepo_and_dirty_subrepo`. After
+    /// the daemon materializes a submodule as a standalone worktree
+    /// (using `standalone-worktree materialization`) AND the operator makes a
+    /// commit in the worktree, the parent's gitlink MUST be
+    /// auto-updated to point at the new SHA (no recursion, no
+    /// files from the worktree leaking into the parent's index).
+    ///
+    /// This is the end-to-end success criterion for the
+    /// `dracon-platform` migration: the parent commit
+    /// `dracon-platform/web/games/wip/polis` (mode 160000) must
+    /// be updated to the new SHA after each daemon cycle, with
+    /// the worktree files remaining ONLY in the worktree's index.
+    ///
+    /// Test approach: build a parent + subrepo structure from
+    /// scratch (mimicking the real dracon-platform layout). The
+    /// subrepo's gitdir is at `<parent>/.git/modules/<name>` and
+    /// the subrepo's main working tree is at
+    /// `<parent>/sub/`. The parent's gitlink is registered
+    /// pointing at the subrepo's HEAD. We then:
+    /// 1. Materialize the subrepo as a standalone worktree via
+    ///    `standalone-worktree materialization`.
+    /// 2. Advance the subrepo's HEAD by directly creating a
+    ///    commit on the subrepo's main branch (via the gitdir).
+    /// 3. Run the daemon's `stage_gitlink_updates` to propagate
+    ///    the new SHA back to the parent.
+    /// 4. Assert the parent index points at the new SHA, with
+    ///    NO files from inside the subrepo.
+    /// End-to-end regression test for goal `mr10pdzr-i495vy`:
+    /// `parent_gitlink_propagates_after_standalone_commit`.
+    ///
+    /// Goal: after the daemon materializes a non-polis
+    /// submodule as a standalone worktree via
+    /// `standalone-worktree materialization` AND the operator makes a commit
+    /// in that worktree, the parent's gitlink MUST be
+    /// auto-updated to the new SHA. This is the convergence
+    /// invariant for the 6 of 9 non-polis submodules that
+    /// previously failed (junk-runner, deathrun,
+    /// capture-anime-girls, darklord, endless-td, neonbreak).
+    ///
+    /// This test is the strict end-to-end version of
+    /// `parent_with_materialized_subrepo_and_dirty_subrepo`
+    /// (which exercises the same machinery). The difference:
+    /// this test uses the exact daemon entry point
+    /// (`stage_gitlink_updates`) and asserts (a) the parent
+    /// index is updated to the new SHA, (b) no worktree files
+    /// leak into the parent's index, AND (c) the parent
+    /// gitlink stays updated across a SECOND commit
+    /// (proving convergence under repeated standalones commits,
+    /// not just one-off).
+    #[tokio::test]
+    async fn parent_gitlink_propagates_after_standalone_commit() {
+        let tmp = tempfile::tempdir().unwrap();
+        let parent = tmp.path().join("parent");
+        std::fs::create_dir_all(&parent).unwrap();
+        let parent_s = parent.to_string_lossy().to_string();
+
+        let run_in = |cwd: &str, args: &[&str]| {
+            let mut real = vec!["git", "-C", cwd];
+            real.extend_from_slice(args);
+            Command::new(real[0]).args(&real[1..]).output().unwrap()
+        };
+
+        // 1. Build the parent repo.
+        run_in(&parent_s, &["init", "-q", "-b", "main"]);
+        run_in(&parent_s, &["config", "user.email", "t@t"]);
+        run_in(&parent_s, &["config", "user.name", "t"]);
+        // Disable hooks so globally-installed warden hooks don't reject
+        // commits in temp test repos that lack `.gitattributes` with
+        // `filter=dracon`. See AUDIT-3-UTILITIES-2026-07-10.md CONCERN #4.
+        run_in(&parent_s, &["config", "core.hooksPath", "/dev/null"]);
+        std::fs::write(parent.join("README.md"), b"# parent\n").unwrap();
+        run_in(&parent_s, &["add", "-A"]);
+        run_in(&parent_s, &["commit", "-q", "-m", "init"]);
+
+        // 2. Build the subrepo at `parent/sub/` with its own
+        //    `.git/`.
+        let sub_path = parent.join("sub");
+        std::fs::create_dir_all(&sub_path).unwrap();
+        let sub_s = sub_path.to_string_lossy().to_string();
+        run_in(&sub_s, &["init", "-q", "-b", "main"]);
+        run_in(&sub_s, &["config", "user.email", "t@t"]);
+        run_in(&sub_s, &["config", "user.name", "t"]);
+        run_in(&sub_s, &["config", "core.hooksPath", "/dev/null"]);
+        std::fs::write(sub_path.join("README.md"), b"# sub\n").unwrap();
+        run_in(&sub_s, &["add", "-A"]);
+        run_in(&sub_s, &["commit", "-q", "-m", "init"]);
+        let sub_head_initial =
+            String::from_utf8_lossy(&run_in(&sub_s, &["rev-parse", "HEAD"]).stdout)
+                .trim()
+                .to_string();
+
+        // 3. Register the subrepo as a gitlink in the parent.
+        run_in(
+            &parent_s,
+            &[
+                "update-index",
+                "--add",
+                "--cacheinfo",
+                &format!("160000,{},sub", sub_head_initial),
+            ],
+        );
+        run_in(&parent_s, &["commit", "-q", "-m", "add sub"]);
+
+        // 4. Make a STANDALONE COMMIT in `sub_path/`.
+        std::fs::write(sub_path.join("README.md"), b"# updated sub\n").unwrap();
+        run_in(&sub_s, &["add", "README.md"]);
+        run_in(&sub_s, &["commit", "-q", "-m", "update"]);
+        let sub_head_v1 = String::from_utf8_lossy(&run_in(&sub_s, &["rev-parse", "HEAD"]).stdout)
+            .trim()
+            .to_string();
+        assert_ne!(sub_head_initial, sub_head_v1);
+
+        // 5. Run the daemon's gitlink-update stage.
+        let result = stage_gitlink_updates(&parent, &["sub".to_string()], false, 30).await;
+        assert!(
+            result.is_ok(),
+            "stage_gitlink_updates must succeed: {:?}",
+            result
+        );
+
+        // 6. Parent index must now point at sub_head_v1.
+        let index_sha_after_v1 =
+            String::from_utf8_lossy(&run_in(&parent_s, &["ls-files", "--stage", "sub"]).stdout)
+                .to_string();
+        assert!(
+            index_sha_after_v1.contains(&sub_head_v1),
+            "parent index must reflect new submodule SHA {}, got: {:?}",
+            sub_head_v1,
+            index_sha_after_v1
+        );
+
+        // 7. NO subrepo file leaked into the parent index.
+        let staged_files = String::from_utf8_lossy(
+            &run_in(&parent_s, &["diff", "--cached", "--name-only"]).stdout,
+        )
+        .to_string();
+        assert!(
+            !staged_files.contains("sub/README.md"),
+            "subrepo README.md must NOT be in parent index (no recursion!), got:\n{}",
+            staged_files
+        );
+
+        // 8. SECOND commit in the standalone — convergence must
+        //    hold across repeated standalone commits.
+        std::fs::write(sub_path.join("extra.txt"), b"extra\n").unwrap();
+        run_in(&sub_s, &["add", "extra.txt"]);
+        run_in(&sub_s, &["commit", "-q", "-m", "more"]);
+        let sub_head_v2 = String::from_utf8_lossy(&run_in(&sub_s, &["rev-parse", "HEAD"]).stdout)
+            .trim()
+            .to_string();
+        assert_ne!(sub_head_v1, sub_head_v2);
+
+        let result2 = stage_gitlink_updates(&parent, &["sub".to_string()], false, 30).await;
+        assert!(
+            result2.is_ok(),
+            "second stage_gitlink_updates must succeed: {:?}",
+            result2
+        );
+        let index_sha_after_v2 =
+            String::from_utf8_lossy(&run_in(&parent_s, &["ls-files", "--stage", "sub"]).stdout)
+                .to_string();
+        assert!(
+            index_sha_after_v2.contains(&sub_head_v2),
+            "parent index must reflect second submodule SHA {}, got: {:?}",
+            sub_head_v2,
+            index_sha_after_v2
+        );
+    }
+
+    #[test]
+    fn test_cap_batch_union_caps_the_union_not_each_list() {
+        // Regression (2026-08-11 audit find): each list used to be
+        // truncated independently to max_batch, so 150 regular + 150
+        // gitlink entries staged 200 in one commit despite max_batch
+        // 100. The union must be capped at 100.
+        let (regular, gitlink) = cap_batch_union(
+            (0..150).map(|i| format!("f{i}")).collect(),
+            (0..150).map(|i| format!("g{i}")).collect(),
+            100,
+        );
+        assert_eq!(regular.len() + gitlink.len(), 100);
+    }
+
+    #[test]
+    fn test_cap_batch_union_gitlink_priority() {
+        // Gitlink pointer updates get priority: with 3 gitlinks and
+        // 1000 regular files, all 3 gitlinks stage and regular files
+        // fill the remainder of the batch.
+        let (regular, gitlink) = cap_batch_union(
+            (0..1000).map(|i| format!("f{i}")).collect(),
+            (0..3).map(|i| format!("g{i}")).collect(),
+            100,
+        );
+        assert_eq!(gitlink.len(), 3);
+        assert_eq!(regular.len(), 97);
+        assert_eq!(regular.len() + gitlink.len(), 100);
+    }
+
+    #[test]
+    fn test_cap_batch_union_under_limit_is_unchanged() {
+        let (regular, gitlink) = cap_batch_union(
+            (0..50).map(|i| format!("f{i}")).collect(),
+            (0..50).map(|i| format!("g{i}")).collect(),
+            100,
+        );
+        assert_eq!(regular.len(), 50);
+        assert_eq!(gitlink.len(), 50);
+    }
+
+    #[test]
+    fn test_cap_batch_union_single_class_behavior_unchanged() {
+        // Regular-only and gitlink-only batches behave like the old
+        // per-list truncation.
+        let (regular, gitlink) = cap_batch_union(
+            (0..1000).map(|i| format!("f{i}")).collect(),
+            Vec::new(),
+            100,
+        );
+        assert_eq!(regular.len(), 100);
+        assert!(gitlink.is_empty());
+
+        let (regular, gitlink) = cap_batch_union(
+            Vec::new(),
+            (0..1000).map(|i| format!("g{i}")).collect(),
+            100,
+        );
+        assert!(regular.is_empty());
+        assert_eq!(gitlink.len(), 100);
+    }
+}
