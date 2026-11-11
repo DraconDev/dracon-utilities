@@ -215,9 +215,27 @@ $ journalctl -u dracon-sync-operator.service --since "2026-11-11 16:28:00" \
 (The largest remaining figure is `browser-extensions-shared`'s real churn, not a
 mirror skew — its `gitlab`/`origin` refs agree with `HEAD` there.)
 
-The same repair-and-nothing-repeats behaviour shows in the per-repo table in
-section B, where every repo's tracking refs equal their real `ls-remote` tips at
-capture time.
+The same per-name fetch shows up independently on `browser-extensions-shared`,
+which is the repo the original bug report was about — successive
+`fetch github: fast-forward` entries, one per cycle, each moving only the mirror
+name:
+
+```
+$ git -C /home/dracon/Dev/browser-extensions-shared reflog show refs/remotes/github/main --date=iso | head -6
+8a4b604229 refs/remotes/github/main@{2026-11-11 16:51:56 +0000}: fetch github: fast-forward
+42a44d4d90 refs/remotes/github/main@{2026-11-11 16:50:41 +0000}: fetch github: fast-forward   (manual, see B)
+c079823322 refs/remotes/github/main@{2026-11-11 16:40:48 +0000}: fetch github: fast-forward
+923effea2e refs/remotes/github/main@{2026-11-11 16:39:07 +0000}: fetch github: fast-forward
+3cd8c01775 refs/remotes/github/main@{2026-11-11 16:13:57 +0000}: fetch github: fast-forward
+0d1cbb2ddd refs/remotes/github/main@{2026-11-11 16:00:07 +0000}: fetch github: fast-forward
+```
+
+The `15:38:11`, `15:54:00`, `16:00:07` and `16:13:57` entries predate the fixed
+binary (installed 16:24:46); the `16:39:07`, `16:40:48` and `16:51:56` entries
+were produced after it and therefore by the fixed daemon itself (`16:50:41` is
+the one manual fetch noted in section B). And the same repair-and-nothing-repeats behaviour shows in the
+per-repo table in section B, where every repo's tracking refs equal their real
+`ls-remote` tips at capture time.
 
 ## A3 — epoch-spool reclamation: OVERSTATED
 
