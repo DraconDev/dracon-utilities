@@ -979,6 +979,25 @@ $ journalctl -u dracon-sync-operator.service --since "2026-11-11 16:24:46" | gre
 0
 ```
 
+## Second-round capture at the end of the rework (`2026-11-11T20:47:15Z`)
+
+Full transcript: `docs/evidence/audit-remediation-2026-11-11/final-r2.txt`.
+
+```
+capture_at=2026-11-11T20:47:15Z
+pid=268859 active=active
+379d448da69f6bb3722d44e4a561b9e919c8c45928e8f7b893669a2c15029205  /proc/268859/exe
+379d448da69f6bb3722d44e4a561b9e919c8c45928e8f7b893669a2c15029205  ~/.local/bin/dracon-sync
+379d448da69f6bb3722d44e4a561b9e919c8c45928e8f7b893669a2c15029205  target-audit-…/release/dracon-sync
+marker=ABSENT
+✅ no stuck repos
+233-ahead since 16:28: 0
+df: /dev/nvme0n1p2  907G  634G  228G  74% /
+```
+
+The binary identity is unchanged from the first round — the fix has been running
+for four hours and the daemon has never re-read a deleted image.
+
 ## Changes made by this audit
 
 1. **Code fix in `dracon-sync/src/sync.rs`, `refresh_stale_upstream_ref`** — the
