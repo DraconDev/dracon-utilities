@@ -1,0 +1,9 @@
+capture_at=2026-11-11T20:47:15Z
+pid=268859 active=active
+379d448da69f6bb3722d44e4a561b9e919c8c45928e8f7b893669a2c15029205  /proc/268859/exe
+379d448da69f6bb3722d44e4a561b9e919c8c45928e8f7b893669a2c15029205  /home/dracon/.local/bin/dracon-sync
+379d448da69f6bb3722d44e4a561b9e919c8c45928e8f7b893669a2c15029205  /home/dracon/dracon/build/target-audit-2026-11-11/release/dracon-sync
+marker=ABSENT
+✅ no stuck repos
+233-ahead since 16:28: 0
+df: /dev/nvme0n1p2  907G  634G  228G  74% /
