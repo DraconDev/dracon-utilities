@@ -136,15 +136,30 @@ decision that replaced the early return):
 ```
 $ cd /home/dracon/Dev/dracon-utilities/dracon-sync
 $ git show HEAD:src/sync.rs | grep -n "list_remotes(repo)"
-6270:    for candidate in super::git::multi_remote::list_remotes(repo) {
-$ git show HEAD:src/sync.rs | grep -n "let stale: Vec<String> = names"
-6281:    let stale: Vec<String> = names
-$ git show HEAD:src/sync.rs | sed -n '6292,6306p'
+6266:    for candidate in super::git::multi_remote::list_remotes(repo) {
+$ git show HEAD:src/sync.rs | sed -n '6271,6283p'
+    let stale: Vec<String> = names
+        .iter()
+        .filter(|name| {
+            let tracking = format!("refs/remotes/{}/{}", name, short);
+            output(&["rev-parse", &tracking])
+                .zip(head_sha.clone())
+                .is_some_and(|(tracking_sha, head)| tracking_sha != head)
+        })
+        .cloned()
+        .collect();
+    if stale.is_empty() {
         return; // every name already agrees with HEAD — zero network cost
-    ...
+    }
+$ git show HEAD:src/sync.rs | sed -n '6292,6299p'
     for name in &stale {
         let _ = super::git::run_git_with_timeout_env_progress(
-            repo, &["fetch", name], 30, "upstream-refresh", ...
+            repo,
+            &["fetch", name],
+            30,
+            "upstream-refresh",
+            &[("GIT_TERMINAL_PROMPT", "0")],
+        )
 ```
 
 Then a raw `strings` probe of the binary the daemon is **actually executing**
