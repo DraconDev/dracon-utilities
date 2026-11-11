@@ -544,7 +544,7 @@ Class-by-class, with the exact evidence:
 | class | state at end of goal |
 |---|---|
 | stale mirror tracking refs | 0 at `16:53` and again at `2026-11-11T17:10:22Z` (re-probed: `0` skewed refs across all 38 repos). 2 needed repair during the run: the mirror-only skew `gitlab/main d191dde3` on `capture-anime-girls` (the A2 defect, repaired by the fixed daemon at 16:27:34) and `github/main` churn on `browser-extensions-shared`. |
-| epoch-spool backlog | 19 repos, 12876 spool dirs; largest `/home/dracon/.dracon` 5141 (992.3 MiB), `browser-extensions-shared` 452 (1189.1 MiB), `dracon-platform` 454 (849.3 MiB), `ai-auto-writer` 105 (1542.2 MiB), `tiles-tui-file-manager` 50 (624.9 MiB). Exact commands in A3. |
+| epoch-spool backlog | 19 repos, 6597 spool dirs (6048 MiB) per the gitdir-resolved census at `16:50:18Z`; largest `/home/dracon/.dracon` 5141 (992.3 MiB), `browser-extensions-shared` 452 (1189.1 MiB), `dracon-platform` 454 (849.3 MiB), `ai-auto-writer` 105 (1542.2 MiB), `tiles-tui-file-manager` 50 (624.9 MiB). Exact commands in A3. |
 | stuck-push ledger | empty — `dracon-sync repair stuck-list` → `✅ no stuck repos` (16:50, section A5) |
 | hook-blocked pushes | none — the previously refused `dracon-platform` 91-commit push dry-runs as `c7ad5a2641..645e1add76  main -> main` (16:50:50Z, section A1) |
 | freeze markers | not frozen at end of goal (marker absent `16:55:05Z`, `frozen_secs` all `None` at `16:53:39Z`). **Four pause episodes occurred during the run — see section C.** |
