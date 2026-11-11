@@ -1,0 +1,16 @@
+=== inflation proof: the exact string the bug produced, before vs after ===
+$ journalctl -u dracon-sync-operator.service --since "2026-11-11 16:00:00" \
+    --until "2026-11-11 16:24:46" | grep -c "233 commits ahead"
+69
+$ journalctl -u dracon-sync-operator.service --since "2026-11-11 16:28:00" \
+    | grep -c "233 commits ahead"
+0
+$ journalctl -u dracon-sync-operator.service --since "2026-11-11 16:28:00" | grep -c "5400s"
+0
+$ journalctl -u dracon-sync-operator.service --since "2026-11-11 16:28:00" | grep -c "232 unpushed"
+0
+$ journalctl -u dracon-sync-operator.service --since "2026-11-11 16:28:00" \
+    | grep -oE "\([0-9]+ commits ahead\)" | tr -d '()' | sort -rn | head -3
+35 commits ahead
+16 commits ahead
+11 commits ahead

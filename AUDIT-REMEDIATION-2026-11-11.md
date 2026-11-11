@@ -201,16 +201,35 @@ $ git -C $C rev-list --count gitlab/main..HEAD
 0
 ```
 
-The inflation stopped at that moment. Push-timeout scaling for that repository
-has not appeared since:
+The inflation stopped at that moment. Counting the exact string the bug produced,
+before and after:
+
+```
+$ journalctl -u dracon-sync-operator.service --since "2026-11-11 16:00:00" \
+    --until "2026-11-11 16:24:46" | grep -c "233 commits ahead"
+69                                                                   # pre-fix, ~3/min
+$ journalctl -u dracon-sync-operator.service --since "2026-11-11 16:28:00" \
+    | grep -c "233 commits ahead"
+0                                                                    # post-fix
+$ journalctl -u dracon-sync-operator.service --since "2026-11-11 16:28:00" \
+    | grep -c "5400s"
+0
+$ journalctl -u dracon-sync-operator.service --since "2026-11-11 16:28:00" \
+    | grep -c "232 unpushed"
+0
+```
+
+The largest ahead figure the daemon has quoted anywhere since the fix:
 
 ```
 $ journalctl -u dracon-sync-operator.service --since "2026-11-11 16:28:00" \
-    | grep "scaling push timeout" | sed -E 's/.*\(([0-9]+) commits.*/\1/' | sort -rn | head -3
-35
-16
-11
+    | grep -oE "\([0-9]+ commits ahead\)" | tr -d '()' | sort -rn | head -3
+35 commits ahead
+16 commits ahead
+11 commits ahead
 ```
+
+Captured in `docs/evidence/audit-remediation-2026-11-11/inflation.txt`.
 
 Honest caveat on those three figures: the largest one (`35`, at `16:34:58`) is
 `browser-extensions-shared`, which commits every few seconds and whose push was
