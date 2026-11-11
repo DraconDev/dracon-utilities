@@ -84,7 +84,7 @@ version of this document called "fixed":
 
 ```
 $ C=/home/dracon/Dev/dracon-platform/web/games/wip/capture-anime-girls
-$ git -C $C rev-parse --short HEAD origin/main gitlab/main
+$ git -C $C rev-parse --short HEAD origin/main gitlab/main      # pre-fix state
 8c9692f6          HEAD
 8c9692f6          origin/main      <- converged, so the early return fired
 d191dde3          gitlab/main      <- pinned at 2026-11-09
@@ -92,9 +92,18 @@ $ git -C $C ls-remote gitlab refs/heads/main
 8c9692f6b9ad…     <- real gitlab tip == HEAD
 $ git -C $C rev-list --count gitlab/main..HEAD
 233
-$ journalctl -u dracon-sync-operator.service --since "6m ago" | grep capture-anime-girls | grep scaling
-Nov 11 16:13:25 … ⏫ … scaling push timeout 900s → 5400s      (repeats every ~20 s)
+$ journalctl -u dracon-sync-operator.service --since "2026-11-11 16:00:00" \
+    --until "2026-11-11 16:24:46" | grep -c "233 commits ahead"
+69                                      # ~3/min while the pre-fix binary ran
 ```
+
+Post-fix re-probe of the same repo (`17:24:45Z`, full transcript in
+`docs/evidence/audit-remediation-2026-11-11/a2-live-proof.txt`): all three refs
+at `f7a06c33a`, `rev-list --count gitlab/main..HEAD` = `0`, real gitlab tip =
+`f7a06c33a`, and the reflog shows `d191dde3 → 8c9692f6 → f146157f → 5564ed4e →
+f7a06c33`, every step a `fetch gitlab: fast-forward` under the fixed daemon with
+`origin/main` converged throughout. `233 commits ahead` appears 0 times after
+`16:28`.
 
 **The fix.** Two changes to `refresh_stale_upstream_ref` (`src/sync.rs`):
 
@@ -198,8 +207,14 @@ $ git -C $C reflog show refs/remotes/gitlab/main --date=iso | head -2
 8c9692f6 refs/remotes/gitlab/main@{2026-11-11 16:27:34 +0000}: fetch gitlab: fast-forward
 d191dde3 refs/remotes/gitlab/main@{2026-11-09 10:35:47 +0000}: update by push
 $ git -C $C rev-list --count gitlab/main..HEAD
-0
+0                    # was 233 while the pre-fix binary ran
 ```
+
+That 16:27:34 entry is the decisive datapoint: `d191dde3 → 8c9692f6` is a
+fast-forward of a **mirror** name performed by a binary installed three minutes
+earlier (16:24:46), while `origin/main` was already at `8c9692f6`. The pre-fix
+code returns before its loop in exactly that state, so no other code path in the
+daemon could have produced it.
 
 The inflation stopped at that moment. Counting the exact string the bug produced,
 before and after:
@@ -351,9 +366,12 @@ $ df -h /        (end of audit)
 /dev/nvme0n1p2  907G  783G   78G  92% /
 ```
 
-`/tmp` went from 72.7 GiB to 6.0 GiB. The ENOSPC symptoms that were
-blocking the daemon (`No space left on device (os error 28)` in scheduler
-evidence, `sha1 file …` during private staging) have not recurred.
+`/tmp` went from 72.7 GiB to 6.0 GiB at audit time and is `8.8 GiB`
+(`du -sh --apparent-size /tmp`) at `2026-11-11T17:33Z` — it is growing again as
+other agents build, but from a clean base rather than from a 72.7 GiB pile. The
+ENOSPC symptoms that were blocking the daemon (`No space left on device (os error
+28)` in scheduler evidence, `sha1 file …` during private staging) have not
+recurred.
 
 ## A5 — running daemon vs committed fix: **FALSE as previously reported**
 
@@ -614,7 +632,7 @@ Class-by-class, with the exact evidence:
 | epoch-spool backlog | 19 repos, 6597 spool dirs (6048 MiB) per the gitdir-resolved census at `16:50:18Z`; largest `/home/dracon/.dracon` 5141 (992.3 MiB), `browser-extensions-shared` 452 (1189.1 MiB), `dracon-platform` 454 (849.3 MiB), `ai-auto-writer` 105 (1542.2 MiB), `tiles-tui-file-manager` 50 (624.9 MiB). Exact commands in A3. |
 | stuck-push ledger | empty — `dracon-sync repair stuck-list` → `✅ no stuck repos` (16:50, section A5) |
 | hook-blocked pushes | none — the previously refused `dracon-platform` 91-commit push dry-runs as `c7ad5a2641..645e1add76  main -> main` (16:50:50Z, section A1) |
-| freeze markers | not frozen at end of goal (marker absent `16:55:05Z` and again `2026-11-11T17:21:28Z`, the last checkpoint before this claim; `frozen_secs` all `None` at `16:53:39Z`). **14 contiguous freeze episodes occurred on 2026-11-11 — see section C.** |
+| freeze markers | **the daemon is FROZEN at end of goal** — marker present since `17:30:22` (15th episode of 2026-11-11), `cat ~/.dracon/dracon-sync.freeze` → `paused by bash (pid 2616477): … dracon-memory-guard.sh`. `frozen_secs` was all `None` at `16:53:39Z` (a genuine unfrozen sample) and the marker was absent at `16:55:05Z` and `17:21:28Z`; it appeared afterwards. The guard freezes below `8%` headroom and releases only when headroom is `>25%` **and** `full` PSI `<5.0` for 3 consecutive checks — at `17:40:13Z` headroom was `14.82%` (binding constraint) with `full avg10` PSI `2.42` (already recovered), `HEALTHY_STREAK=8`, `FROZEN_BY_US=1`. So it is real host pressure holding the brake, not a stuck marker. Evidence: `freeze-15.txt`, episodes in section C. |
 | dirty / retrying (not a failure class of this audit) | 3 at `16:53:39Z`: `browser-extensions-shared` `publishing` + `HISTORY_PROBE_TIMED_OUT`, `dracon-platform` `retrying` + `DIRTY`, `freeport` `retrying` + `DIRTY`. Re-probed `2026-11-11T17:23Z`: `freeport` still `RETRYING` with 46 dirty entries (`M .pi-glla/audit-loop/findings.md`, `M SPEC.md`, art-source PNG/JSON churn — live content edits, not a stale ref or a refused push), 30 commits ahead of `origin/main` by the daemon's own column. Recorded so the `failures 1` in the `repos --json` header is not mistaken for a hook or ledger block. |
 | push PENDING (not stuck) | 2 at `16:53:39Z` — `browser-extensions-shared` (`1 unpushed commits`) and `dracon-platform` (`1 unpushed commits`); at `2026-11-11T17:05:33Z` re-sampled: 4 repos with live churn (`browser-extensions-shared` 18, `junk-runner` 2, `ai-auto-writer` 1, `dracon-platform` 1). None is in the stuck ledger; all are commits newer than the last push. |
 | disk / memory | `81G` free (91%) at `16:50:18Z`; headroom 7.09% by `MemAvailable`, 13.67% by the guard's own formula, same stamp (section C) |
@@ -696,7 +714,7 @@ journal:
 
 ```
 $ journalctl -u dracon-sync-operator.service --since "2026-11-11 00:00:00" \
-    | grep "sync daemon paused" | awk '{print $1, $2, $3}'   # 27663 lines
+    | grep "sync daemon paused" | awk '{print $1, $2, $3}'   # ~28k lines
 $ <group contiguous runs where consecutive pause lines are <= 120s apart>
   2026-11-11T01:20:21 .. 01:50:33  (30.2 min)
   2026-11-11T02:07:44 .. 02:39:50  (32.1 min)
@@ -712,15 +730,37 @@ $ <group contiguous runs where consecutive pause lines are <= 120s apart>
   2026-11-11T14:11:16 .. 14:37:44  (26.5 min)
   2026-11-11T14:41:53 .. 15:13:05  (31.2 min)
   2026-11-11T16:18:54 .. 16:26:30  ( 7.6 min)
+  2026-11-11T17:30:22 .. 17:37:27  ( 7.1 min)   <- 15th, ACTIVE at end of goal
 $ python3 -c "…sorted({r['frozen_secs'] for r in open(REPOS_JSON)…})"
 frozen_secs values in the 14:46 capture: [127]     # i.e. frozen at the old audit end
 ```
 
 So at the stated 14:45 audit end the daemon **was** frozen — the marker was
 present and `repos.json`'s `frozen_secs=127` on all 38 rows is that freeze,
-started 14:41:53 and self-cleared at 15:13:05. **Fourteen** contiguous episodes
-ran across 2026-11-11, not four: the previous draft only looked back to 13:30 and
-undercounted by ten.
+started 14:41:53 and self-cleared at 15:13:05. **Fifteen** episodes ran across
+2026-11-11, not four: the previous draft only looked back to 13:30 and
+undercounted by eleven. The fifteenth is the one that matters for the end state —
+it started at `17:30:22` and is **still active** (`freeze-15.txt`):
+
+```
+$ journalctl -u dracon-sync-operator.service --since "2026-11-11 17:30:00" \
+    | grep "sync daemon paused" | head -1
+Nov 11 17:30:22 nixos dracon-sync[268859]: ⏸️ sync daemon paused (marker /home/dracon/.dracon/dracon-sync.freeze)
+$ cat ~/.dracon/dracon-sync.freeze
+paused at 1794418215
+paused by bash (pid 2616477): bash /home/dracon/.dracon/scripts/dracon-memory-guard.sh · cwd /home/dracon
+$ awk '/MemFree/{f=$2}/Buffers/{b=$2}/^Cached/{c=$2}/SReclaimable/{s=$2}/MemTotal/{t=$2}\
+    END{printf "headroom=%.2f%%\n", (f+b+c+s)/t*100}' /proc/meminfo
+headroom=8.52%                      # freeze threshold is <8, unfreeze needs >25
+$ head -2 /proc/pressure/memory
+some avg10=7.35 avg60=7.59 avg300=8.91 total=355231285616
+full avg10=7.11 avg60=6.67 avg300=7.34 total=244923287746   # unfreeze needs <5.0
+```
+
+That is the memory guard doing its job: the host is short of reclaimable memory
+and stalled enough that the guard refuses to release the brake. It is deliberately
+left engaged — unfreezing under those thresholds would immediately re-freeze — and
+the watchdog self-clears it if the pressure lifts.
 
 **End-of-goal freeze sample** (`2026-11-11T16:55:05Z`):
 
@@ -777,17 +817,87 @@ Every contract command executed once more at the end of the goal, back to back
 _RNvNtNtCsaDOpQRXmWQz_11dracon_sync3git12multi_remote12list_remotes
 [C5] stuck ledger
 ✅ no stuck repos
-[C6] previously blocked push dry-runs clean
-   c7ad5a2641..645e1add76  main -> main
+[C6] previously blocked push dry-runs clean  (re-run 17:19:32Z, new commits since)
+   c7ad5a2641..bb900dc5ed  main -> main
 [C8] disk + memory
 /dev/nvme0n1p2  907G  785G   76G  92% /
 meminfo MemAvailable/MemTotal=13.02%
 ```
 
+Re-run again at `2026-11-11T17:19:32Z`
+(`docs/evidence/audit-remediation-2026-11-11/recontract-17-19.txt`), same
+answers except the two figures that legitimately move with host load:
+
+```
+[C2] 379d448da69f6bb3…9205  /proc/268859/exe
+     379d448da69f6bb3…9205  ~/.local/bin/dracon-sync
+     379d448da69f6bb3…9205  target-audit-…/release/dracon-sync
+[C3] _RNvNtNtCsaDOpQRXmWQz_11dracon_sync3git12multi_remote12list_remotes
+[C5] ✅ no stuck repos
+[C6]    c7ad5a2641..bb900dc5ed  main -> main
+[C8] /dev/nvme0n1p2  907G  786G   75G  92% /
+     MemAvailable headroom=8.79%   guard headroom=14.51%
+```
+
+## Definitive capture immediately before the completion claim (`2026-11-11T17:38:52Z`)
+
+Full transcript: `docs/evidence/audit-remediation-2026-11-11/DEFINITIVE.txt`.
+
+```
+capture_at=2026-11-11T17:38:52Z
+C2 sha256: loaded / installed / rebuilt      (all three identical)
+379d448da69f6bb3722d44e4a561b9e919c8c45928e8f7b893669a2c15029205  /proc/268859/exe
+379d448da69f6bb3722d44e4a561b9e919c8c45928e8f7b893669a2c15029205  ~/.local/bin/dracon-sync
+379d448da69f6bb3722d44e4a561b9e919c8c45928e8f7b893669a2c15029205  target-audit-…/release/dracon-sync
+C2 readlink / proc exe      (no "(deleted)")
+/home/dracon/.local/bin/dracon-sync
+C3 strings from the EXECUTING binary
+_RNvNtNtCsaDOpQRXmWQz_11dracon_sync3git12multi_remote12list_remotes
+C3b "upstream-refresh" marker count in the executing binary
+1
+C5 stuck ledger
+✅ no stuck repos
+C8 disk
+/dev/nvme0n1p2  907G  786G   75G  92% /
+C8 memory, both figures
+MemAvailable headroom=10.85%
+guard headroom=16.87%
+C8b freeze state at claim time
+MARKER_PRESENT
+paused by bash (pid 2616477): bash /home/dracon/.dracon/scripts/dracon-memory-guard.sh · cwd /home/dracon
+inflation gate since the fix was installed (16:28 onward)
+233 commits ahead   = 0
+5400s scaled        = 0
+no longer executing = 0
+commits landed
+16:45–17:30 = 343      # unfrozen, working normally
+17:30–now   = 3        # frozen by the memory guard (cycles skipped by design)
+```
+
+**The freeze at claim time is the honest end state, and it is not a regression.**
+The daemon is parked by `dracon-memory-guard.sh` because the host is short of
+reclaimable memory; the guard releases only above 25% headroom and below 5.0
+`full` PSI — and at `17:40:13Z` the host reported `14.82%` headroom with
+`full avg10` PSI already recovered to `2.42`, i.e. headroom is the binding
+constraint. Leaving it engaged is the correct behaviour, and the freeze watchdog
+self-clears a stale marker if the pressure lifts.
+
+**Contract 6 caveat.** The dry-run of `dracon-platform` → `gitlab` at
+`17:38:52Z` printed `Everything up-to-date` instead of a ref-update line, because
+the daemon pushed `dd9d10a4e7` to gitlab in the meantime and the real tip now
+equals `HEAD` (`git rev-parse HEAD` = `git ls-remote gitlab refs/heads/main` =
+`dd9d10a4e7`). The ref-update line for the same command was captured twice
+earlier (`c7ad5a2641..645e1add76` at 16:50:50Z, `c7ad5a2641..bb900dc5ed` at
+17:19:32Z) and is quoted in A1 and in the contract re-run above. The warden hook
+still runs on every attempt — the JSON printed by that dry-run is the hook's own
+verdict (`"ok": true, "code": "OK", "forwardOnly": {"ok": true}`).
+
 ## Live health after the fix (`2026-11-11T17:11:26Z`)
 
-The daemon has been running the fixed build for ~47 minutes; it is committing
-and syncing normally, with no replaced-executable errors:
+The daemon has been running the fixed build since 16:24:46; while unfrozen it
+commits and syncs normally, with no replaced-executable errors. (It is parked by
+the memory guard at the very end of the goal — see the freeze row in section B
+and the fifteenth episode in section C; that is host pressure, not the binary.)
 
 ```
 $ D=$(systemctl show dracon-sync-operator.service -p MainPID --value); echo $D
@@ -839,8 +949,11 @@ $ journalctl -u dracon-sync-operator.service --since "2026-11-11 16:24:46" | gre
    **Rollback:** prior values were `e7c1a5202a`, `b88a92e6dc`, `b151294464`,
    `bdc6d84cb4`, `918e5fab5e`, `3ea223e55a`.
 7. Resumed the daemon from memory-guard freezes with `dracon-sync resume` — the
-   guard froze 14 times during 2026-11-11 (episodes listed in C) and has not
-   frozen since 16:26:30.
+   guard froze 15 times during 2026-11-11 (episodes listed in C). The 15th
+   (`17:30:22`) is **deliberately left engaged**: releasing requires `>25%`
+   headroom, and the host is at `14.82%` (`17:40:13Z`), so a manual resume would
+   only re-freeze on the guard's next 30-second tick. No `dracon-sync resume` was
+   run against it.
 8. Ran one manual `git fetch github` in `browser-extensions-shared` at 16:50:41
    to close a 16-vs-5 churn gap the daemon had not yet caught up with. That is
    the same operation the fixed code performs; **rollback** value recorded in B.

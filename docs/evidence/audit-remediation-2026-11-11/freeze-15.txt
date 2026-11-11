@@ -1,0 +1,28 @@
+capture_at=2026-11-11T17:36:37Z
+
+=== 15th freeze episode: started 17:30:22, ACTIVE at end of goal ===
+$ journalctl -u dracon-sync-operator.service --since "2026-11-11 17:30:00" | grep -E "paused|resumed" | head -2
+Nov 11 17:30:22 nixos dracon-sync[268859]: ⏸️ sync daemon paused (marker /home/dracon/.dracon/dracon-sync.freeze)
+Nov 11 17:30:23 nixos dracon-sync[268859]: ⏸️ sync daemon paused (marker /home/dracon/.dracon/dracon-sync.freeze)
+
+$ cat ~/.dracon/dracon-sync.freeze
+paused at 1794418215
+paused by bash (pid 2616477): bash /home/dracon/.dracon/scripts/dracon-memory-guard.sh · cwd /home/dracon
+
+=== why: real host memory pressure, guard acting as designed ===
+$ awk guard formula /proc/meminfo  (freeze below 8%)
+headroom=8.52%
+$ head -2 /proc/pressure/memory  (unfreeze needs full avg60 < 5.0)
+some avg10=7.35 avg60=7.59 avg300=8.91 total=355231285616
+full avg10=7.11 avg60=6.67 avg300=7.34 total=244923287746
+$ grep pswpin /proc/vmstat  (machine-lifetime swap-in; nonzero velocity is a 4th freeze trigger)
+pswpin 79417403991
+
+=== guard state ===
+LAST_PSWPIN=79416711066
+LAST_CHECK_ISO=2026-11-11T17:36:20
+HEALTHY_STREAK=1
+BAD_STREAK=0
+MARKER_INODE=8547476
+MARKER_MTIME=1794418215
+FROZEN_BY_US=1

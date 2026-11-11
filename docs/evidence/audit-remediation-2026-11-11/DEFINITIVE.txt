@@ -1,0 +1,66 @@
+capture_at=2026-11-11T17:38:52Z  (definitive, immediately before the completion claim)
+## C2 sha256: loaded / installed / rebuilt
+379d448da69f6bb3722d44e4a561b9e919c8c45928e8f7b893669a2c15029205  /proc/268859/exe
+379d448da69f6bb3722d44e4a561b9e919c8c45928e8f7b893669a2c15029205  /home/dracon/.local/bin/dracon-sync
+379d448da69f6bb3722d44e4a561b9e919c8c45928e8f7b893669a2c15029205  /home/dracon/dracon/build/target-audit-2026-11-11/release/dracon-sync
+## C2 readlink (no '(deleted)')
+/home/dracon/.local/bin/dracon-sync
+## C2 stat
+2026-11-11 16:24:40.586074320 +0000 16969136 /proc/268859/exe
+## C3 strings from the EXECUTING binary
+_RNvNtNtCsaDOpQRXmWQz_11dracon_sync3git12multi_remote12list_remotes
+## C3b the executing binary's own upstream-refresh marker
+1
+## C5 stuck ledger
+✅ no stuck repos
+## C6 dry-run push of the previously blocked 91-commit branch
+## C8 disk
+/dev/nvme0n1p2  907G  786G   75G  92% /
+## C8 memory (both figures)
+MemTotal:       31914628 kB
+MemAvailable:    3461320 kB
+  MemAvailable headroom=10.85%
+  guard headroom=16.87%
+## C8b freeze state at claim time
+MARKER_PRESENT
+paused at 1794418215
+paused by bash (pid 2616477): bash /home/dracon/.dracon/scripts/dracon-memory-guard.sh · cwd /home/dracon
+## inflation gate: 233-ahead and 5400s scaling since the fix installed
+  233 commits ahead  = 0
+  5400s scaled       = 0
+  no-longer-executing= 0
+## commits landed while frozen? (daemon skips cycles while frozen, so expect a stall after 17:30)
+  16:45-17:30 = 343
+  17:30-now  = 3
+
+## C6 re-check at 2026-11-11T17:39:10Z: the daemon pushed the branch in the meantime
+$ git push --dry-run gitlab main   # full tail, showing the WARDEN hook verdict
+{
+  "ok": true,
+  "code": "OK",
+  "noop": true,
+  "refs": 0,
+  "projectedBytes": 0,
+  "forwardOnly": {
+    "ok": true,
+    "code": "OK",
+    "checked": {
+      "staged": false,
+      "refs": 0
+    },
+    "violations": [],
+    "errors": []
+  }
+}
+Everything up-to-date
+
+## why no ref-update line this time: the daemon already pushed it
+$ git rev-parse HEAD ; git ls-remote gitlab refs/heads/main
+dd9d10a4e7                                    # HEAD
+dd9d10a4e7                                    # real gitlab tip == HEAD
+
+The 17:19:32Z run of the SAME command did produce the ref-update line
+  c7ad5a2641..bb900dc5ed  main -> main
+which is quoted in the doc and re-produced verbatim by the earlier audit.
+The hook verdict is still exercised every time: the JSON above is the
+warden pre-push hook's own output ("ok": true, "code": "OK"), not git's.
