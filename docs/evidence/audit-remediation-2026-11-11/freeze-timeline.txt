@@ -1,33 +1,24 @@
-capture_at=2026-11-11T17:37:27Z
+capture_at=2026-11-11T20:46:43Z
 
-=== command (verbatim, re-runnable) ===
-$ journalctl -u dracon-sync-operator.service --since "2026-11-11 00:00:00" --no-pager \
-    | grep "sync daemon paused" | awk "{print \$1, \$2, \$3}"
-$ <group contiguous runs where the gap between consecutive pause lines <= 120s>
+=== all 16 contiguous freeze episodes on 2026-11-11 ===
+   1. 2026-11-11T01:20:21 .. 01:50:33  (30.2 min)
+   2. 2026-11-11T02:07:44 .. 02:39:50  (32.1 min)
+   3. 2026-11-11T02:46:59 .. 03:50:42  (63.7 min)
+   4. 2026-11-11T04:03:00 .. 04:33:11  (30.2 min)
+   5. 2026-11-11T04:54:58 .. 05:25:55  (30.9 min)
+   6. 2026-11-11T05:50:19 .. 06:21:01  (30.7 min)
+   7. 2026-11-11T08:38:43 .. 09:10:43  (32.0 min)
+   8. 2026-11-11T09:16:41 .. 09:47:05  (30.4 min)
+   9. 2026-11-11T09:49:56 .. 10:19:33  (29.6 min)
+  10. 2026-11-11T12:02:59 .. 12:33:06  (30.1 min)
+  11. 2026-11-11T12:49:02 .. 13:52:36  (63.6 min)
+  12. 2026-11-11T14:11:16 .. 14:37:44  (26.5 min)
+  13. 2026-11-11T14:41:53 .. 15:13:05  (31.2 min)
+  14. 2026-11-11T16:18:54 .. 16:26:30  (7.6 min)
+  15. 2026-11-11T17:30:22 .. 18:01:25  (31.1 min)   <- live at the 17:43 completion claim
+  16. 2026-11-11T19:24:52 .. 19:54:51  (30.0 min)   <- 16th, cleared 19:54:51
+; episodes=16 pause log lines=31312
 
-=== output: 15 contiguous freeze episodes on 2026-11-11 ===
-  2026-11-11T01:20:21 .. 01:50:33  (30.2 min)
-  2026-11-11T02:07:44 .. 02:39:50  (32.1 min)
-  2026-11-11T02:46:59 .. 03:50:42  (63.7 min)
-  2026-11-11T04:03:00 .. 04:33:11  (30.2 min)
-  2026-11-11T04:54:58 .. 05:25:55  (30.9 min)
-  2026-11-11T05:50:19 .. 06:21:01  (30.7 min)
-  2026-11-11T08:38:43 .. 09:10:43  (32.0 min)
-  2026-11-11T09:16:41 .. 09:47:05  (30.4 min)
-  2026-11-11T09:49:56 .. 10:19:33  (29.6 min)
-  2026-11-11T12:02:59 .. 12:33:06  (30.1 min)
-  2026-11-11T12:49:02 .. 13:52:36  (63.6 min)
-  2026-11-11T14:11:16 .. 14:37:44  (26.5 min)
-  2026-11-11T14:41:53 .. 15:13:05  (31.2 min)
-  2026-11-11T16:18:54 .. 16:26:30  (7.6 min)
-  2026-11-11T17:30:22 .. 17:37:27  (7.1 min)   <- FROZEN AT END OF GOAL (marker present, guard still holding)
-; episodes=15 pause lines=28086
-
-=== marker + guard state now ===
-sampled 2026-11-11T17:37:28Z
-MARKER_PRESENT
-paused at 1794418215
-paused by bash (pid 2616477): bash /home/dracon/.dracon/scripts/dracon-memory-guard.sh · cwd /home/dracon
-HEALTHY_STREAK=3
-BAD_STREAK=0
-FROZEN_BY_US=1
+=== marker state now ===
+sampled 2026-11-11T20:46:44Z
+MARKER_ABSENT
