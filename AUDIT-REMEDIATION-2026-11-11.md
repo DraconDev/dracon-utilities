@@ -940,7 +940,10 @@ commits landed
 17:30–now   = 3        # frozen by the memory guard (cycles skipped by design)
 ```
 
-**The freeze at claim time is the honest end state, and it is not a regression.**
+**The freeze at claim time was the honest state then, and it is not a regression.**
+It has since cleared exactly as the mechanism predicts — marker absent at
+`2026-11-11T20:46:11Z`, after episodes 15 (`17:30:22–18:01:25`) and 16
+(`19:24:52–19:54:51`) ran and released.
 The daemon is parked by `dracon-memory-guard.sh` because the host is short of
 reclaimable memory; the guard releases only above 25% headroom and below 5.0
 `full` PSI — and at `17:40:13Z` the host reported `14.82%` headroom with
