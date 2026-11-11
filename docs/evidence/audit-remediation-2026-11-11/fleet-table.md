@@ -1,18 +1,18 @@
-| # | repo | head | ahead | spools @16:50 | freeze @16:29 | remotes: `name` tracking-ref / real `ls-remote` tip |
+| # | repo | head | ahead | spools @16:50 | freeze @16:53 | remotes: `name` tracking-ref / real `ls-remote` tip @16:53 |
 |---|---|---|---|---|---|---|
-| 1 | `/home/dracon/Dev/browser-extensions-shared` | 99361c8e94 | 16 | 452 (1189.1 MiB) | none | `github` 3cd8c01775/f9549506c6 **SKEW** `gitlab` f9549506c6/f9549506c6 `origin` f9549506c6/f9549506c6 |
-| 2 | `/home/dracon/Dev/dracon-platform/web/games/wip/deathrun` | 3185b7a641 | 0 | 4 (2.4 MiB) | none | `gitlab` 3185b7a641/3185b7a641 `origin` 3185b7a641/3185b7a641 |
-| 3 | `/home/dracon/.dracon` | 76088286cc | 1 | 5141 (992.3 MiB) | none | `gitlab` 1768b65f38/1768b65f38 `origin` 1768b65f38/1768b65f38 |
-| 4 | `/home/dracon/Dev/dracon-strategy` | 1d50be13e2 | 0 | 3 (4.8 MiB) | none | `github` 1d50be13e2/1d50be13e2 `gitlab` 1d50be13e2/1d50be13e2 `origin` 1d50be13e2/1d50be13e2 |
-| 5 | `/home/dracon/Dev/dracon-utilities/dracon-sync` | b76168ccd6 | 0 | 7 (4.5 MiB) | none | `github` b76168ccd6/b76168ccd6 `gitlab` b76168ccd6/b76168ccd6 `origin` b76168ccd6/b76168ccd6 |
-| 6 | `/home/dracon/Dev/dracon-platform/web/games/wip/junk-runner` | ee0f6838c3 | 0 | 277 (150.0 MiB) | none | `gitlab` ee0f6838c3/ee0f6838c3 `origin` ee0f6838c3/ee0f6838c3 |
-| 7 | `/home/dracon/Dev/dracon-strategy/ai-auto-writer` | f1d61c4053 | 0 | 105 (1542.2 MiB) | none | `gitlab` f1d61c4053/f1d61c4053 `origin` f1d61c4053/f1d61c4053 |
-| 8 | `/home/dracon/Dev/dracon-platform/web/games/wip/endless-td` | a98013936f | 0 | 29 (9.6 MiB) | none | `github` a98013936f/a98013936f `gitlab` a98013936f/a98013936f `origin` a98013936f/a98013936f |
-| 9 | `/home/dracon/Dev/dracon-platform/web/games/wip/freeport` | 50200a2f35 | 0 | 11 (297.1 MiB) | none | `gitlab` 50200a2f35/50200a2f35 `origin` 50200a2f35/50200a2f35 |
-| 10 | `/home/dracon/Dev/dracon-platform/web/games/wip/capture-anime-girls` | 8c9692f6b9 | 0 | 13 (4.3 MiB) | none | `github` 8c9692f6b9/8c9692f6b9 `gitlab` 8c9692f6b9/8c9692f6b9 `origin` 8c9692f6b9/8c9692f6b9 |
-| 11 | `/home/dracon/Dev/dracon-utilities` | 59d6f10510 | 0 | 25 (1.8 MiB) | none | `gitlab` 59d6f10510/59d6f10510 `origin` 59d6f10510/59d6f10510 |
-| 12 | `/home/dracon/Dev/dracon-platform` | 645e1add76 | 1 | 454 (849.3 MiB) | none | `github` c7ad5a2641/c7ad5a2641 `gitlab` c7ad5a2641/c7ad5a2641 `origin` c7ad5a2641/c7ad5a2641 |
-| 13 | `/home/dracon/Dev/dracon-platform/web/games/wip/doomtap` | d4eb2095d2 | 0 | 11 (4.2 MiB) | none | `gitlab` d4eb2095d2/d4eb2095d2 `origin` d4eb2095d2/d4eb2095d2 |
+| 1 | `/home/dracon/.dracon` | 86ea75bd61 | 0 | 5141 (992.3 MiB) | none | `gitlab` 86ea75bd61/86ea75bd61 `origin` 86ea75bd61/86ea75bd61 |
+| 2 | `/home/dracon/Dev/dracon-utilities` | 58c8de64f0 | 0 | 25 (1.8 MiB) | none | `gitlab` 58c8de64f0/58c8de64f0 `origin` 58c8de64f0/58c8de64f0 |
+| 3 | `/home/dracon/Dev/browser-extensions-shared` | 353eb149ca | 1 | 452 (1189.1 MiB) | none | `github` 8a4b604229/8a4b604229 `gitlab` 8a4b604229/8a4b604229 `origin` 8a4b604229/8a4b604229 |
+| 4 | `/home/dracon/Dev/dracon-platform/web/games/wip/junk-runner` | 884260c100 | 0 | 277 (150.0 MiB) | none | `gitlab` 884260c100/884260c100 `origin` 884260c100/884260c100 |
+| 5 | `/home/dracon/Dev/dracon-utilities/dracon-sync` | c0ce164259 | 0 | 7 (4.5 MiB) | none | `github` c0ce164259/c0ce164259 `gitlab` c0ce164259/c0ce164259 `origin` c0ce164259/c0ce164259 |
+| 6 | `/home/dracon/Dev/dracon-platform/web/games/wip/doomtap` | 612816059e | 0 | 11 (4.2 MiB) | none | `gitlab` 612816059e/612816059e `origin` 612816059e/612816059e |
+| 7 | `/home/dracon/Dev/dracon-platform/web/games/wip/deathrun` | 3185b7a641 | 0 | 4 (2.4 MiB) | none | `gitlab` 3185b7a641/3185b7a641 `origin` 3185b7a641/3185b7a641 |
+| 8 | `/home/dracon/Dev/dracon-strategy` | 1d50be13e2 | 0 | 3 (4.8 MiB) | none | `github` 1d50be13e2/1d50be13e2 `gitlab` 1d50be13e2/1d50be13e2 `origin` 1d50be13e2/1d50be13e2 |
+| 9 | `/home/dracon/Dev/dracon-strategy/ai-auto-writer` | f1d61c4053 | 0 | 105 (1542.2 MiB) | none | `gitlab` f1d61c4053/f1d61c4053 `origin` f1d61c4053/f1d61c4053 |
+| 10 | `/home/dracon/Dev/dracon-platform/web/games/wip/endless-td` | a98013936f | 0 | 29 (9.6 MiB) | none | `github` a98013936f/a98013936f `gitlab` a98013936f/a98013936f `origin` a98013936f/a98013936f |
+| 11 | `/home/dracon/Dev/dracon-platform/web/games/wip/freeport` | 50200a2f35 | 0 | 11 (297.1 MiB) | none | `gitlab` 50200a2f35/50200a2f35 `origin` 50200a2f35/50200a2f35 |
+| 12 | `/home/dracon/Dev/dracon-platform/web/games/wip/capture-anime-girls` | 8c9692f6b9 | 0 | 13 (4.3 MiB) | none | `github` 8c9692f6b9/8c9692f6b9 `gitlab` 8c9692f6b9/8c9692f6b9 `origin` 8c9692f6b9/8c9692f6b9 |
+| 13 | `/home/dracon/Dev/dracon-platform` | 645e1add76 | 1 | 454 (849.3 MiB) | none | `github` c7ad5a2641/c7ad5a2641 `gitlab` c7ad5a2641/c7ad5a2641 `origin` c7ad5a2641/c7ad5a2641 |
 | 14 | `/home/dracon/Dev/dracon-strategy/ai-auto-video` | 9812c69852 | 0 | 8 (371.2 MiB) | none | `gitlab` 9812c69852/9812c69852 `origin` 9812c69852/9812c69852 |
 | 15 | `/home/dracon/Dev/dracon-utilities/dracon-warden` | 303480c161 | 0 | 1 (0.2 MiB) | none | `gitlab` 303480c161/303480c161 `origin` 303480c161/303480c161 |
 | 16 | `/home/dracon/Dev/pi-plugins` | d6822ac953 | 0 | 2 (0.1 MiB) | none | `gitlab` d6822ac953/d6822ac953 `origin` d6822ac953/d6822ac953 |

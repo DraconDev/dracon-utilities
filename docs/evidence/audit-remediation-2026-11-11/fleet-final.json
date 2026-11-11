@@ -1,0 +1,740 @@
+[
+ {
+  "repo": "/home/dracon/.dracon",
+  "branch": "main",
+  "head": "86ea75bd61",
+  "upstream": "origin/main",
+  "refs": {
+   "github": "-",
+   "gitlab": "86ea75bd61",
+   "origin": "86ea75bd61"
+  },
+  "real": {
+   "gitlab": "86ea75bd61",
+   "origin": "86ea75bd61"
+  },
+  "spools": 10294,
+  "frozen_secs": null,
+  "ahead": 0,
+  "push_state": "Ok"
+ },
+ {
+  "repo": "/home/dracon/Dev/dracon-utilities",
+  "branch": "main",
+  "head": "58c8de64f0",
+  "upstream": "origin/main",
+  "refs": {
+   "github": "-",
+   "gitlab": "58c8de64f0",
+   "origin": "58c8de64f0"
+  },
+  "real": {
+   "gitlab": "58c8de64f0",
+   "origin": "58c8de64f0"
+  },
+  "spools": 52,
+  "frozen_secs": null,
+  "ahead": 0,
+  "push_state": "Ok"
+ },
+ {
+  "repo": "/home/dracon/Dev/browser-extensions-shared",
+  "branch": "main",
+  "head": "353eb149ca",
+  "upstream": "origin/main",
+  "refs": {
+   "github": "8a4b604229",
+   "gitlab": "8a4b604229",
+   "origin": "8a4b604229"
+  },
+  "real": {
+   "github": "8a4b604229",
+   "gitlab": "8a4b604229",
+   "origin": "8a4b604229"
+  },
+  "spools": 906,
+  "frozen_secs": null,
+  "ahead": 1,
+  "push_state": "Ok"
+ },
+ {
+  "repo": "/home/dracon/Dev/dracon-platform/web/games/wip/junk-runner",
+  "branch": "main",
+  "head": "884260c100",
+  "upstream": "origin/main",
+  "refs": {
+   "github": "-",
+   "gitlab": "884260c100",
+   "origin": "884260c100"
+  },
+  "real": {
+   "gitlab": "884260c100",
+   "origin": "884260c100"
+  },
+  "spools": 277,
+  "frozen_secs": null,
+  "ahead": 0,
+  "push_state": "Ok"
+ },
+ {
+  "repo": "/home/dracon/Dev/dracon-utilities/dracon-sync",
+  "branch": "main",
+  "head": "c0ce164259",
+  "upstream": "origin/main",
+  "refs": {
+   "github": "c0ce164259",
+   "gitlab": "c0ce164259",
+   "origin": "c0ce164259"
+  },
+  "real": {
+   "github": "c0ce164259",
+   "gitlab": "c0ce164259",
+   "origin": "c0ce164259"
+  },
+  "spools": 14,
+  "frozen_secs": null,
+  "ahead": 0,
+  "push_state": "Ok"
+ },
+ {
+  "repo": "/home/dracon/Dev/dracon-platform/web/games/wip/doomtap",
+  "branch": "main",
+  "head": "612816059e",
+  "upstream": "origin/main",
+  "refs": {
+   "github": "-",
+   "gitlab": "612816059e",
+   "origin": "612816059e"
+  },
+  "real": {
+   "gitlab": "612816059e",
+   "origin": "612816059e"
+  },
+  "spools": 11,
+  "frozen_secs": null,
+  "ahead": 0,
+  "push_state": "Ok"
+ },
+ {
+  "repo": "/home/dracon/Dev/dracon-platform/web/games/wip/deathrun",
+  "branch": "main",
+  "head": "3185b7a641",
+  "upstream": "origin/main",
+  "refs": {
+   "github": "-",
+   "gitlab": "3185b7a641",
+   "origin": "3185b7a641"
+  },
+  "real": {
+   "gitlab": "3185b7a641",
+   "origin": "3185b7a641"
+  },
+  "spools": 4,
+  "frozen_secs": null,
+  "ahead": 0,
+  "push_state": "Ok"
+ },
+ {
+  "repo": "/home/dracon/Dev/dracon-strategy",
+  "branch": "main",
+  "head": "1d50be13e2",
+  "upstream": "origin/main",
+  "refs": {
+   "github": "1d50be13e2",
+   "gitlab": "1d50be13e2",
+   "origin": "1d50be13e2"
+  },
+  "real": {
+   "github": "1d50be13e2",
+   "gitlab": "1d50be13e2",
+   "origin": "1d50be13e2"
+  },
+  "spools": 6,
+  "frozen_secs": null,
+  "ahead": 0,
+  "push_state": "Ok"
+ },
+ {
+  "repo": "/home/dracon/Dev/dracon-strategy/ai-auto-writer",
+  "branch": "main",
+  "head": "f1d61c4053",
+  "upstream": "origin/main",
+  "refs": {
+   "github": "-",
+   "gitlab": "f1d61c4053",
+   "origin": "f1d61c4053"
+  },
+  "real": {
+   "gitlab": "f1d61c4053",
+   "origin": "f1d61c4053"
+  },
+  "spools": 210,
+  "frozen_secs": null,
+  "ahead": 0,
+  "push_state": "Ok"
+ },
+ {
+  "repo": "/home/dracon/Dev/dracon-platform/web/games/wip/endless-td",
+  "branch": "main",
+  "head": "a98013936f",
+  "upstream": "origin/main",
+  "refs": {
+   "github": "a98013936f",
+   "gitlab": "a98013936f",
+   "origin": "a98013936f"
+  },
+  "real": {
+   "github": "a98013936f",
+   "gitlab": "a98013936f",
+   "origin": "a98013936f"
+  },
+  "spools": 29,
+  "frozen_secs": null,
+  "ahead": 0,
+  "push_state": "Ok"
+ },
+ {
+  "repo": "/home/dracon/Dev/dracon-platform/web/games/wip/freeport",
+  "branch": "main",
+  "head": "50200a2f35",
+  "upstream": "origin/main",
+  "refs": {
+   "github": "-",
+   "gitlab": "50200a2f35",
+   "origin": "50200a2f35"
+  },
+  "real": {
+   "gitlab": "50200a2f35",
+   "origin": "50200a2f35"
+  },
+  "spools": 22,
+  "frozen_secs": null,
+  "ahead": 0,
+  "push_state": "Ok"
+ },
+ {
+  "repo": "/home/dracon/Dev/dracon-platform/web/games/wip/capture-anime-girls",
+  "branch": "main",
+  "head": "8c9692f6b9",
+  "upstream": "origin/main",
+  "refs": {
+   "github": "8c9692f6b9",
+   "gitlab": "8c9692f6b9",
+   "origin": "8c9692f6b9"
+  },
+  "real": {
+   "github": "8c9692f6b9",
+   "gitlab": "8c9692f6b9",
+   "origin": "8c9692f6b9"
+  },
+  "spools": 13,
+  "frozen_secs": null,
+  "ahead": 0,
+  "push_state": "Ok"
+ },
+ {
+  "repo": "/home/dracon/Dev/dracon-platform",
+  "branch": "main",
+  "head": "645e1add76",
+  "upstream": "origin/main",
+  "refs": {
+   "github": "c7ad5a2641",
+   "gitlab": "c7ad5a2641",
+   "origin": "c7ad5a2641"
+  },
+  "real": {
+   "github": "c7ad5a2641",
+   "gitlab": "c7ad5a2641",
+   "origin": "c7ad5a2641"
+  },
+  "spools": 908,
+  "frozen_secs": null,
+  "ahead": 1,
+  "push_state": "Ok"
+ },
+ {
+  "repo": "/home/dracon/Dev/dracon-strategy/ai-auto-video",
+  "branch": "main",
+  "head": "9812c69852",
+  "upstream": "origin/main",
+  "refs": {
+   "github": "-",
+   "gitlab": "9812c69852",
+   "origin": "9812c69852"
+  },
+  "real": {
+   "gitlab": "9812c69852",
+   "origin": "9812c69852"
+  },
+  "spools": 16,
+  "frozen_secs": null,
+  "ahead": 0,
+  "push_state": "Ok"
+ },
+ {
+  "repo": "/home/dracon/Dev/dracon-utilities/dracon-warden",
+  "branch": "main",
+  "head": "303480c161",
+  "upstream": "origin/main",
+  "refs": {
+   "github": "-",
+   "gitlab": "303480c161",
+   "origin": "303480c161"
+  },
+  "real": {
+   "gitlab": "303480c161",
+   "origin": "303480c161"
+  },
+  "spools": 2,
+  "frozen_secs": null,
+  "ahead": 0,
+  "push_state": "Ok"
+ },
+ {
+  "repo": "/home/dracon/Dev/pi-plugins",
+  "branch": "main",
+  "head": "d6822ac953",
+  "upstream": "origin/main",
+  "refs": {
+   "github": "-",
+   "gitlab": "d6822ac953",
+   "origin": "d6822ac953"
+  },
+  "real": {
+   "gitlab": "d6822ac953",
+   "origin": "d6822ac953"
+  },
+  "spools": 4,
+  "frozen_secs": null,
+  "ahead": 0,
+  "push_state": "Ok"
+ },
+ {
+  "repo": "/home/dracon/Dev/pi-plugins/pi-goal-list-loop-audit",
+  "branch": "main",
+  "head": "ac10c340b6",
+  "upstream": "origin/main",
+  "refs": {
+   "github": "-",
+   "gitlab": "ac10c340b6",
+   "origin": "ac10c340b6"
+  },
+  "real": {
+   "gitlab": "ac10c340b6",
+   "origin": "ac10c340b6"
+  },
+  "spools": 2,
+  "frozen_secs": null,
+  "ahead": 0,
+  "push_state": "Ok"
+ },
+ {
+  "repo": "/home/dracon/Dev/tiles-tui-file-manager",
+  "branch": "main",
+  "head": "95d01f21dd",
+  "upstream": "origin/main",
+  "refs": {
+   "github": "95d01f21dd",
+   "gitlab": "95d01f21dd",
+   "origin": "95d01f21dd"
+  },
+  "real": {
+   "github": "95d01f21dd",
+   "gitlab": "95d01f21dd",
+   "origin": "95d01f21dd"
+  },
+  "spools": 100,
+  "frozen_secs": null,
+  "ahead": 0,
+  "push_state": "Ok"
+ },
+ {
+  "repo": "/home/dracon/Dev/pi-plugins/pi-agnes-tools",
+  "branch": "main",
+  "head": "86319e6559",
+  "upstream": "origin/main",
+  "refs": {
+   "github": "-",
+   "gitlab": "86319e6559",
+   "origin": "86319e6559"
+  },
+  "real": {
+   "gitlab": "86319e6559",
+   "origin": "86319e6559"
+  },
+  "spools": 0,
+  "frozen_secs": null,
+  "ahead": 0,
+  "push_state": "Ok"
+ },
+ {
+  "repo": "/home/dracon/.dracon/convos",
+  "branch": "main",
+  "head": "fa3f3b83f1",
+  "upstream": "origin/main",
+  "refs": {
+   "github": "-",
+   "gitlab": "fa3f3b83f1",
+   "origin": "fa3f3b83f1"
+  },
+  "real": {
+   "gitlab": "fa3f3b83f1",
+   "origin": "fa3f3b83f1"
+  },
+  "spools": 0,
+  "frozen_secs": null,
+  "ahead": 0,
+  "push_state": "Ok"
+ },
+ {
+  "repo": "/home/dracon/Dev/terhub",
+  "branch": "main",
+  "head": "98a49f5368",
+  "upstream": "origin/main",
+  "refs": {
+   "github": "98a49f5368",
+   "gitlab": "98a49f5368",
+   "origin": "98a49f5368"
+  },
+  "real": {
+   "github": "98a49f5368",
+   "gitlab": "98a49f5368",
+   "origin": "98a49f5368"
+  },
+  "spools": 6,
+  "frozen_secs": null,
+  "ahead": 0,
+  "push_state": "Ok"
+ },
+ {
+  "repo": "/home/dracon/Dev/empire",
+  "branch": "main",
+  "head": "1f5bd6c836",
+  "upstream": "origin/main",
+  "refs": {
+   "github": "1f5bd6c836",
+   "gitlab": "1f5bd6c836",
+   "origin": "1f5bd6c836"
+  },
+  "real": {
+   "github": "1f5bd6c836",
+   "gitlab": "1f5bd6c836",
+   "origin": "1f5bd6c836"
+  },
+  "spools": 0,
+  "frozen_secs": null,
+  "ahead": 0,
+  "push_state": "Ok"
+ },
+ {
+  "repo": "/home/dracon/Dev/dracon-utilities/dracon-system",
+  "branch": "main",
+  "head": "83722c0b07",
+  "upstream": "origin/main",
+  "refs": {
+   "github": "83722c0b07",
+   "gitlab": "83722c0b07",
+   "origin": "83722c0b07"
+  },
+  "real": {
+   "github": "83722c0b07",
+   "gitlab": "83722c0b07",
+   "origin": "83722c0b07"
+  },
+  "spools": 0,
+  "frozen_secs": null,
+  "ahead": 0,
+  "push_state": "Ok"
+ },
+ {
+  "repo": "/home/dracon/Dev/mcode-plugins",
+  "branch": "main",
+  "head": "d044331087",
+  "upstream": "origin/main",
+  "refs": {
+   "github": "-",
+   "gitlab": "d044331087",
+   "origin": "d044331087"
+  },
+  "real": {
+   "gitlab": "d044331087",
+   "origin": "d044331087"
+  },
+  "spools": 0,
+  "frozen_secs": null,
+  "ahead": 0,
+  "push_state": "Ok"
+ },
+ {
+  "repo": "/home/dracon/Dev/pi-plugins/pi-use-last-selected-thinking-level",
+  "branch": "main",
+  "head": "152b727a5b",
+  "upstream": "origin/main",
+  "refs": {
+   "github": "-",
+   "gitlab": "152b727a5b",
+   "origin": "152b727a5b"
+  },
+  "real": {
+   "gitlab": "152b727a5b",
+   "origin": "152b727a5b"
+  },
+  "spools": 0,
+  "frozen_secs": null,
+  "ahead": 0,
+  "push_state": "Ok"
+ },
+ {
+  "repo": "/home/dracon/Dev/pi-plugins/pi-codebuddy-sdk",
+  "branch": "main",
+  "head": "cc4130115a",
+  "upstream": "origin/main",
+  "refs": {
+   "github": "-",
+   "gitlab": "cc4130115a",
+   "origin": "cc4130115a"
+  },
+  "real": {
+   "gitlab": "cc4130115a",
+   "origin": "cc4130115a"
+  },
+  "spools": 0,
+  "frozen_secs": null,
+  "ahead": 0,
+  "push_state": "Ok"
+ },
+ {
+  "repo": "/home/dracon/Dev/dracon-strategy/DraconDev",
+  "branch": "main",
+  "head": "77f32a0045",
+  "upstream": "origin/main",
+  "refs": {
+   "github": "-",
+   "gitlab": "77f32a0045",
+   "origin": "77f32a0045"
+  },
+  "real": {
+   "gitlab": "77f32a0045",
+   "origin": "77f32a0045"
+  },
+  "spools": 0,
+  "frozen_secs": null,
+  "ahead": 0,
+  "push_state": "Ok"
+ },
+ {
+  "repo": "/home/dracon/Dev/db-gateway",
+  "branch": "main",
+  "head": "d9cdc7ab3a",
+  "upstream": "origin/main",
+  "refs": {
+   "github": "-",
+   "gitlab": "d9cdc7ab3a",
+   "origin": "d9cdc7ab3a"
+  },
+  "real": {
+   "gitlab": "d9cdc7ab3a",
+   "origin": "d9cdc7ab3a"
+  },
+  "spools": 0,
+  "frozen_secs": null,
+  "ahead": 0,
+  "push_state": "Ok"
+ },
+ {
+  "repo": "/home/dracon/Dev/opencode-plugins",
+  "branch": "main",
+  "head": "803f967d13",
+  "upstream": "origin/main",
+  "refs": {
+   "github": "803f967d13",
+   "gitlab": "803f967d13",
+   "origin": "803f967d13"
+  },
+  "real": {
+   "github": "803f967d13",
+   "gitlab": "803f967d13",
+   "origin": "803f967d13"
+  },
+  "spools": 0,
+  "frozen_secs": null,
+  "ahead": 0,
+  "push_state": "Ok"
+ },
+ {
+  "repo": "/home/dracon/Dev/dracon-platform/web/games/wip/polis",
+  "branch": "main",
+  "head": "7acb5df4dc",
+  "upstream": "origin/main",
+  "refs": {
+   "github": "7acb5df4dc",
+   "gitlab": "7acb5df4dc",
+   "origin": "7acb5df4dc"
+  },
+  "real": {
+   "github": "7acb5df4dc",
+   "gitlab": "7acb5df4dc",
+   "origin": "7acb5df4dc"
+  },
+  "spools": 0,
+  "frozen_secs": null,
+  "ahead": 0,
+  "push_state": "Ok"
+ },
+ {
+  "repo": "/home/dracon/Dev/dracon-platform/web/games/released/one-mil-girls",
+  "branch": "main",
+  "head": "5c593b17a1",
+  "upstream": "origin/main",
+  "refs": {
+   "github": "5c593b17a1",
+   "gitlab": "5c593b17a1",
+   "origin": "5c593b17a1"
+  },
+  "real": {
+   "github": "5c593b17a1",
+   "gitlab": "5c593b17a1",
+   "origin": "5c593b17a1"
+  },
+  "spools": 0,
+  "frozen_secs": null,
+  "ahead": 0,
+  "push_state": "Ok"
+ },
+ {
+  "repo": "/home/dracon/Dev/dracon-platform/web/games/released/come-get-me",
+  "branch": "main",
+  "head": "de5c80aa86",
+  "upstream": "origin/main",
+  "refs": {
+   "github": "-",
+   "gitlab": "de5c80aa86",
+   "origin": "de5c80aa86"
+  },
+  "real": {
+   "gitlab": "de5c80aa86",
+   "origin": "de5c80aa86"
+  },
+  "spools": 0,
+  "frozen_secs": null,
+  "ahead": 0,
+  "push_state": "Ok"
+ },
+ {
+  "repo": "/home/dracon/Dev/dracon-platform/web/games/wip/football-forever",
+  "branch": "main",
+  "head": "44be560b82",
+  "upstream": "origin/main",
+  "refs": {
+   "github": "-",
+   "gitlab": "44be560b82",
+   "origin": "44be560b82"
+  },
+  "real": {
+   "gitlab": "44be560b82",
+   "origin": "44be560b82"
+  },
+  "spools": 0,
+  "frozen_secs": null,
+  "ahead": 0,
+  "push_state": "Ok"
+ },
+ {
+  "repo": "/home/dracon/Dev/dracon-platform/web/games/wip/hellhunter",
+  "branch": "main",
+  "head": "0881c940df",
+  "upstream": "origin/main",
+  "refs": {
+   "github": "0881c940df",
+   "gitlab": "0881c940df",
+   "origin": "0881c940df"
+  },
+  "real": {
+   "github": "0881c940df",
+   "gitlab": "0881c940df",
+   "origin": "0881c940df"
+  },
+  "spools": 0,
+  "frozen_secs": null,
+  "ahead": 0,
+  "push_state": "Ok"
+ },
+ {
+  "repo": "/home/dracon/Dev/dracon-platform/web/games/wip/neonbreak",
+  "branch": "main",
+  "head": "8d801a03b5",
+  "upstream": "origin/main",
+  "refs": {
+   "github": "8d801a03b5",
+   "gitlab": "8d801a03b5",
+   "origin": "8d801a03b5"
+  },
+  "real": {
+   "github": "8d801a03b5",
+   "gitlab": "8d801a03b5",
+   "origin": "8d801a03b5"
+  },
+  "spools": 0,
+  "frozen_secs": null,
+  "ahead": 0,
+  "push_state": "Ok"
+ },
+ {
+  "repo": "/home/dracon/Dev/dracon-platform/web/games/wip/space-trucker",
+  "branch": "main",
+  "head": "00ba2e8733",
+  "upstream": "origin/main",
+  "refs": {
+   "github": "-",
+   "gitlab": "00ba2e8733",
+   "origin": "00ba2e8733"
+  },
+  "real": {
+   "gitlab": "00ba2e8733",
+   "origin": "00ba2e8733"
+  },
+  "spools": 0,
+  "frozen_secs": null,
+  "ahead": 0,
+  "push_state": "Ok"
+ },
+ {
+  "repo": "/home/dracon/Dev/dracon-platform/web/games/wip/darklord",
+  "branch": "main",
+  "head": "265cf18887",
+  "upstream": "origin/main",
+  "refs": {
+   "github": "-",
+   "gitlab": "265cf18887",
+   "origin": "265cf18887"
+  },
+  "real": {
+   "gitlab": "265cf18887",
+   "origin": "265cf18887"
+  },
+  "spools": 0,
+  "frozen_secs": null,
+  "ahead": 0,
+  "push_state": "Ok"
+ },
+ {
+  "repo": "/home/dracon/dracon/bridge-fixture",
+  "branch": "main",
+  "head": "cf0a8c0b24",
+  "upstream": "origin/main",
+  "refs": {
+   "github": "cf0a8c0b24",
+   "gitlab": "cf0a8c0b24",
+   "origin": "cf0a8c0b24"
+  },
+  "real": {
+   "github": "cf0a8c0b24",
+   "gitlab": "cf0a8c0b24",
+   "origin": "cf0a8c0b24"
+  },
+  "spools": 0,
+  "frozen_secs": null,
+  "ahead": 0,
+  "push_state": "Ok"
+ }
+]
