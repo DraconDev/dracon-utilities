@@ -212,8 +212,14 @@ $ journalctl -u dracon-sync-operator.service --since "2026-11-11 16:28:00" \
 11
 ```
 
-(The largest remaining figure is `browser-extensions-shared`'s real churn, not a
-mirror skew — its `gitlab`/`origin` refs agree with `HEAD` there.)
+Honest caveat on those three figures: the largest one (`35`, at `16:34:58`) is
+`browser-extensions-shared`, which commits every few seconds and whose push was
+occupied by a long-running hook. Its `github` ref lags its real tip between
+pushes — at `16:50:33` the ref gave 16-ahead against 5-ahead by real tip — so part
+of that figure is ref lag, not unpushed work. The difference from the A2 bug is
+that this lag *converges*: the reflog above shows the fetch closing the gap each
+time, whereas the pre-fix code could never repair a mirror ref at all once the
+upstream was converged.
 
 The same per-name fetch shows up independently on `browser-extensions-shared`,
 which is the repo the original bug report was about — successive
