@@ -679,6 +679,27 @@ MemAvailable/MemTotal=13.35%
 0
 ```
 
+## Final contract re-run (`2026-11-11T17:10:33Z`)
+
+Every contract command executed once more at the end of the goal, back to back
+(`docs/evidence/audit-remediation-2026-11-11/final-contract.txt`):
+
+```
+[C2] loaded == installed == rebuilt
+379d448da69f6bb3722d44e4a561b9e919c8c45928e8f7b893669a2c15029205  /proc/268859/exe
+379d448da69f6bb3722d44e4a561b9e919c8c45928e8f7b893669a2c15029205  ~/.local/bin/dracon-sync
+379d448da69f6bb3722d44e4a561b9e919c8c45928e8f7b893669a2c15029205  target-audit-…/release/dracon-sync
+[C3] executing binary carries the marker
+_RNvNtNtCsaDOpQRXmWQz_11dracon_sync3git12multi_remote12list_remotes
+[C5] stuck ledger
+✅ no stuck repos
+[C6] previously blocked push dry-runs clean
+   c7ad5a2641..645e1add76  main -> main
+[C8] disk + memory
+/dev/nvme0n1p2  907G  785G   76G  92% /
+meminfo MemAvailable/MemTotal=13.02%
+```
+
 ## Changes made by this audit
 
 1. **Code fix in `dracon-sync/src/sync.rs`, `refresh_stale_upstream_ref`** — the

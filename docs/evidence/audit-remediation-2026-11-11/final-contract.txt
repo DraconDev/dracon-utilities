@@ -1,0 +1,16 @@
+=== final verification: run every contract command once more, capture ===
+utc=2026-11-11T17:10:33Z
+## C2
+379d448da69f6bb3722d44e4a561b9e919c8c45928e8f7b893669a2c15029205  /proc/268859/exe
+379d448da69f6bb3722d44e4a561b9e919c8c45928e8f7b893669a2c15029205  /home/dracon/.local/bin/dracon-sync
+379d448da69f6bb3722d44e4a561b9e919c8c45928e8f7b893669a2c15029205  /home/dracon/dracon/build/target-audit-2026-11-11/release/dracon-sync
+## C3
+_RNvNtNtCsaDOpQRXmWQz_11dracon_sync3git12multi_remote12list_remotes
+## C5
+✅ no stuck repos
+## C6
+   c7ad5a2641..645e1add76  main -> main
+## C8-disk
+/dev/nvme0n1p2  907G  785G   76G  92% /
+## C8-mem
+meminfo MemAvailable/MemTotal=13.02%
