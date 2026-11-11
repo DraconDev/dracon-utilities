@@ -409,7 +409,8 @@ after:  new MainPID 1358107
 ```
 
 Loaded artifact == installed artifact == rebuilt-from-HEAD artifact, and the
-paths agree on inode identity again. Re-verified at the end of the audit:
+paths agree on inode identity again. This was the state at `14:40`; it is a
+snapshot, not the end of the goal — a second reload followed (5c):
 
 ```
 $ sha256sum /proc/1358107/exe ; sha256sum ~/.local/bin/dracon-sync
