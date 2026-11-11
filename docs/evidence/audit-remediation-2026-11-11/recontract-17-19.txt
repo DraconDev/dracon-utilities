@@ -1,0 +1,18 @@
+capture_at=2026-11-11T17:19:32Z
+## stuck-list
+✅ no stuck repos
+## dryrun
+   c7ad5a2641..bb900dc5ed  main -> main
+## hashes
+379d448da69f6bb3722d44e4a561b9e919c8c45928e8f7b893669a2c15029205  /proc/268859/exe
+379d448da69f6bb3722d44e4a561b9e919c8c45928e8f7b893669a2c15029205  /home/dracon/.local/bin/dracon-sync
+379d448da69f6bb3722d44e4a561b9e919c8c45928e8f7b893669a2c15029205  /home/dracon/dracon/build/target-audit-2026-11-11/release/dracon-sync
+## strings
+_RNvNtNtCsaDOpQRXmWQz_11dracon_sync3git12multi_remote12list_remotes
+## df
+/dev/nvme0n1p2  907G  786G   75G  92% /
+## mem
+MemTotal:       31914628 kB
+MemAvailable:    2823704 kB
+MemAvailable headroom=8.79%
+guard headroom=14.51%

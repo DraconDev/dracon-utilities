@@ -620,12 +620,14 @@ headroom=13.67%
 freeze episodes recurred during this run and why the guard's own number, not
 `MemAvailable`, is the value that decides.
 
-**Epoch-spool counts**, exact command, stamped `2026-11-11T16:50:18Z`
-(`docs/evidence/audit-remediation-2026-11-11/spool-census.sh`, census output in
-`spool-census.txt`):
+**Epoch-spool counts**, stamped `2026-11-11T16:50:18Z`. The command is the same
+one quoted in full in A3 (nothing elided); the complete 19-row output with every
+MiB figure below is `docs/evidence/audit-remediation-2026-11-11/final-capture.txt`
+(`spool-census.txt` is the earlier 16:35 run and therefore differs slightly):
 
 ```
-$ for r in <each repo from dracon-sync repos>; do
+$ for r in $(python3 -c "import json;print('\n'.join(r['repo'] for r in
+    json.load(open('repos-final.json'))['rows']))"); do
     gd=$(git -C "$r" rev-parse --path-format=absolute --git-dir 2>/dev/null) || gd="$r/.git"
     n=$(ls -d "$gd"/dracon-staging-* 2>/dev/null | wc -l)
     k=$(du -sk "$gd"/dracon-staging-* 2>/dev/null | awk '{s+=$1} END {print s+0}')
@@ -636,7 +638,7 @@ $ for r in <each repo from dracon-sync repos>; do
 /home/dracon/Dev/dracon-platform\t454\t849.3\t/home/dracon/Dev/dracon-platform/.git
 /home/dracon/Dev/dracon-strategy/ai-auto-writer\t105\t1542.2\t/home/dracon/Dev/dracon-strategy/ai-auto-writer/.git
 /home/dracon/Dev/tiles-tui-file-manager\t50\t624.9\t/home/dracon/Dev/tiles-tui-file-manager/.git
-  … 14 more repos with 1–29 spools each; full list in spool-census.txt
+  … 14 more repos with 1–29 spools each; full list in final-capture.txt
 ```
 
 Nested submodule gitdirs are included by the same command (`--path-format=absolute
