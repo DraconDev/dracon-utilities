@@ -701,6 +701,22 @@ _RNvNtNtCsaDOpQRXmWQz_11dracon_sync3git12multi_remote12list_remotes
 meminfo MemAvailable/MemTotal=13.02%
 ```
 
+## Live health after the fix (`2026-11-11T17:11:26Z`)
+
+The daemon has been running the fixed build for ~47 minutes; it is committing
+and syncing normally, with no replaced-executable errors:
+
+```
+$ D=$(systemctl show dracon-sync-operator.service -p MainPID --value); echo $D
+268859
+$ journalctl -u dracon-sync-operator.service --since "2026-11-11 16:45:00" | grep -c "committed"
+175
+$ journalctl -u dracon-sync-operator.service --since "2026-11-11 16:45:00" | grep -cE "synced"
+76
+$ journalctl -u dracon-sync-operator.service --since "2026-11-11 16:24:46" | grep -c "no longer executing"
+0
+```
+
 ## Changes made by this audit
 
 1. **Code fix in `dracon-sync/src/sync.rs`, `refresh_stale_upstream_ref`** — the
