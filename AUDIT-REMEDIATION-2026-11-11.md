@@ -793,17 +793,20 @@ $ <group contiguous runs where consecutive pause lines are <= 120s apart>
   2026-11-11T14:11:16 .. 14:37:44  (26.5 min)
   2026-11-11T14:41:53 .. 15:13:05  (31.2 min)
   2026-11-11T16:18:54 .. 16:26:30  ( 7.6 min)
-  2026-11-11T17:30:22 .. 17:37:27  ( 7.1 min)   <- 15th, ACTIVE at end of goal
+  2026-11-11T17:30:22 .. 18:01:25  (31.1 min)
+  2026-11-11T19:24:52 .. 19:54:51  (30.0 min)   <- 16th; self-cleared
 $ python3 -c "…sorted({r['frozen_secs'] for r in open(REPOS_JSON)…})"
 frozen_secs values in the 14:46 capture: [127]     # i.e. frozen at the old audit end
 ```
 
 So at the stated 14:45 audit end the daemon **was** frozen — the marker was
 present and `repos.json`'s `frozen_secs=127` on all 38 rows is that freeze,
-started 14:41:53 and self-cleared at 15:13:05. **Fifteen** episodes ran across
+started 14:41:53 and self-cleared at 15:13:05. **Sixteen** episodes ran across
 2026-11-11, not four: the previous draft only looked back to 13:30 and
-undercounted by eleven. The fifteenth is the one that matters for the end state —
-it started at `17:30:22` and is **still active** (`freeze-15.txt`):
+undercounted. The 15th is the one that was live when the completion claim went in
+(`17:30:22`, still running then — `freeze-15.txt`), and it self-cleared at
+`18:01:25`; a 16th ran `19:24:52–19:54:51` and has also cleared. Both are the
+same mechanism:
 
 ```
 $ journalctl -u dracon-sync-operator.service --since "2026-11-11 17:30:00" \
