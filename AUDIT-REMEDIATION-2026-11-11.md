@@ -302,7 +302,8 @@ repeatable source is the guard's own disk monitor, not `df` at a moment nobody
 captured (`docs/evidence/audit-remediation-2026-11-11/disk-baseline.txt`):
 
 ```
-$ journalctl --since "2026-11-11 09:00:00" --until "2026-11-11 14:30:00"     | grep "GiB available"
+$ journalctl --since "2026-11-11 09:00:00" --until "2026-11-11 14:30:00" \
+    | grep "GiB available"
 09:42:44  disk/rapid-fill - … (100% used); 6.9 GiB available …      <- pre-cleanup floor
 10:16:02  disk/trend-warning - … (100% used, 8.4 GiB available) …   <- pre-cleanup
 11:40:53  disk/rapid-fill - … (91% used); 82.3 GiB available …      <- post-cleanup
@@ -323,8 +324,9 @@ $ journalctl --since "2026-11-11 00:00:00" | grep -cE "(3\.5|8\.1) GiB available
 
 The real root floor for 2026-11-11 was `6.9 GiB available at 100% used`, and it
 recovered to `82.3 GiB at 91%` after the cleanup. The A3 verdict does not change,
-but the number behind it is now the one the journal actually contains. What this audit cannot do is re-derive the *spool* half of the
-claim: the earlier pass's own counts (3059/3292 spools down to a few hundred)
+but the number behind it is now the one the journal actually contains. What this
+audit cannot do is re-derive the *spool* half of the claim: the earlier pass's
+own counts (3059/3292 spools down to a few hundred)
 were reported before any capture was written to disk, and no artifact here
 contains them, so they are taken on trust and flagged as such rather than quoted
 as verified numbers.
