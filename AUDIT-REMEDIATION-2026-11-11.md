@@ -395,6 +395,24 @@ $ df -h /        (end of audit)
 /dev/nvme0n1p2  907G  783G   78G  92% /
 ```
 
+**Contract 8 for this section, stated as the commands it rests on.** Every byte
+figure in A4 now comes from one of three reproducible sources and nothing else:
+
+| figure | source command | timestamp |
+|---|---|---|
+| `6.9 GiB available` / `100% used` | `journalctl --since "2026-11-11 09:00:00" --until "2026-11-11 14:30:00" \| grep "GiB available"` | `09:42:44` |
+| `8.4 GiB available` / `100% used` | same command | `10:16:02` |
+| `82.3 GiB available` / `91% used` | same command | `11:40:53` |
+| `80G` free (`df -h /`) | `df -h /` | `16:50:18Z` |
+| `6.0G` (`du -sh /tmp`) | `du -sh /tmp` | `16:50:18Z` |
+| `72.7 → 2.1 GiB` held scratch | `journalctl … \| grep "held by the age floor"` | `10:23:17` → `10:52:58` |
+| `19G` (`du -sh /tmp`, later) | `du -sh /tmp` | `20:43:09Z` |
+
+All seven are transcribed verbatim in
+`docs/evidence/audit-remediation-2026-11-11/disk-baseline.txt` and
+`baseline-correct.txt`, so a reader can re-run each one instead of trusting a
+prose figure.
+
 **The `/tmp` before/after pair is only meaningful within one metric.** The
 `72.7 GiB` figure is the guard's *age-floor-held scratch* reading, not a `du`
 total, so it is paired with the same key from the same monitor rather than with
