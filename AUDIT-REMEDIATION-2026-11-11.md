@@ -630,6 +630,32 @@ repos-final.json frozen_secs distinct: [None]       # not frozen
 
 The guard unfroze itself at 16:26:30 and did not re-freeze before the capture.
 
+**End-of-goal capture** (`2026-11-11T17:07:12Z`,
+`docs/evidence/audit-remediation-2026-11-11/end-of-goal.txt`):
+
+```
+captured_utc=2026-11-11T17:07:12Z
+dpid=268859
+loaded_sha=379d448da69f6bb3722d44e4a561b9e919c8c45928e8f7b893669a2c15029205
+installed_sha=379d448da69f6bb3722d44e4a561b9e919c8c45928e8f7b893669a2c15029205
+rebuilt_sha=379d448da69f6bb3722d44e4a561b9e919c8c45928e8f7b893669a2c15029205
+proc_exe=/home/dracon/.local/bin/dracon-sync
+started=Wed 2026-11-11 16:24:46 GMT
+unit_active=active
+--- stuck ledger ---
+✅ no stuck repos
+--- freeze ---
+no freeze marker
+BAD_STREAK=0
+FROZEN_BY_US=0
+--- disk ---
+/dev/nvme0n1p2  907G  783G   78G  92% /
+--- memory ---
+MemAvailable/MemTotal=13.35%
+--- inflation check: any 233/5400 scaling since 16:28? ---
+0
+```
+
 ## Changes made by this audit
 
 1. **Code fix in `dracon-sync/src/sync.rs`, `refresh_stale_upstream_ref`** — the
