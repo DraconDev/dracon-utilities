@@ -1,0 +1,5 @@
+=== SIGTERM-triggered restart (service runs as uid 1000, Restart=always) ===
+before_pid: 3117687
+before_loaded_sha: 0e4b543eebe7e8879ffe7f60acafe71b544a004e501b09ed8c13b960daa7429a
+before_proc_exe: /home/dracon/.local/bin/dracon-sync (deleted)
+installed_sha: 0e4b543eebe7e8879ffe7f60acafe71b544a004e501b09ed8c13b960daa7429a

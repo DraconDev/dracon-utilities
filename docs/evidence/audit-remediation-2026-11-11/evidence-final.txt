@@ -1,0 +1,22 @@
+=== FINAL loaded-vs-artifact identity ===
+MainPID: 1358107
+loaded_sha256:    458b46607480b4257fb684278d0089ae6ce3a4e12e0f1544a4c908003ea051af
+installed_sha256: 458b46607480b4257fb684278d0089ae6ce3a4e12e0f1544a4c908003ea051af
+audit_build_sha256: 458b46607480b4257fb684278d0089ae6ce3a4e12e0f1544a4c908003ea051af
+proc_exe: /home/dracon/.local/bin/dracon-sync
+daemon_started: Wed 2026-11-11 14:40:01 GMT
+
+=== POSTRESTART CLEANLINESS (contract item: replaced-executable cleared) ===
+$ journalctl -u dracon-sync-operator.service --since "14:40:05" | grep -c "no longer executing"
+0
+$ journalctl ... | grep "no longer executing" | tail -1
+Nov 11 14:39:53   (before the 14:40:01 restart)
+$ journalctl --since "14:40:05" | grep -c committed
+13
+=== MIRROR REF HONESTY UNDER THE FIX ===
+$ git -C /home/dracon/Dev/browser-extensions-shared rev-parse --short github/main
+f6ca17cc9e
+$ git ls-remote github refs/heads/main
+f6ca17cc9ee0...
+=== DISK / MEMORY ===
+/dev/nvme0n1p2  907G  783G   78G  92% /

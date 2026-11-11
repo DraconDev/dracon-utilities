@@ -1,0 +1,8 @@
+=== A5-GAP: loaded binary vs fix commit ===
+MainPID: 3117687
+loaded_path: /home/dracon/.local/bin/dracon-sync
+loaded_sha256: 0e4b543eebe7e8879ffe7f60acafe71b544a004e501b09ed8c13b960daa7429a
+loaded_mtime: 2026-11-10 13:13:36.239805779 +0000
+daemon_started: Tue 2026-11-10 13:13:41 GMT
+fix_commit: d2f2e72b86639eba2c66e0db85ab3a34a4439566 2026-11-11 03:19:08 +0000
+HEAD_at_binary_build: 74452591 3 file(s) in docs [docs/design/forge-identity-dedupe-and-rem-truth-2026-11-09.md, CHANGELOG.md, Cargo.toml] DELTA:+41/-1 | EXT:md,toml DEPS:+version,-version
