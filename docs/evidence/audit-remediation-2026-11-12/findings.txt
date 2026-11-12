@@ -142,3 +142,17 @@ FROZEN_BY_US=0
 capture_at=2026-11-12T12:20:10Z
 
 $ ~/.local/bin/dracon-sync repos --json | header
+{'policy': '/home/dracon/.dracon/utilities/sync/dracon-sync.toml', 'filter': 'all', 'repos': 38, 'ok': 33, 'active': 3, 'warn': 2, 'concern': 0, 'pending': 0, 'failures': 0}
+
+$ ~/.local/bin/dracon-sync repair stuck-list
+🔒 stuck repos (expire after 24h):
+   /home/dracon/Dev/browser-extensions-shared (0h ago, 0 consecutive failures)
+
+$ test -e ~/.dracon/dracon-sync.freeze
+ABSENT
+
+$ sha256sum /proc/<MainPID>/exe
+704a500fe53ee870dda23eeb5d6900af31a059237fa3483788e4e15049781ff0  /proc/1538038/exe
+
+$ df -h /
+/dev/nvme0n1p2  907G  678G  183G  79% /
