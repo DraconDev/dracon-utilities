@@ -66,34 +66,46 @@ The gate passes when **either**:
 
 ### Two measurement traps found while building it, both fixed
 
-**(a) RSS is the wrong number.** A `ps -o rss=` walk of the main PID and its
-children answered **81 MiB** while the unit was holding **1533 MiB** — the
-memory sat in page cache and in gate-runner descendants the walk did not
-reach:
+**(a) RSS is too coarse, and `MemoryCurrent` is too generous — both wrong.**
+Three different numbers for the same daemon within minutes:
 
 ```
+$ ps -o rss= -p <MainPID>                                  # main process only
+42532                          #  42 MiB
 $ systemctl show -p MemoryCurrent --value dracon-sync-operator.service
-1607172096                           # bytes -> 1533 MiB
-$ ps -o rss= -p 268859
-42532                                # 42 MiB
+1607172096                     # 1533 MiB   (bytes)
+$ grep -E '^anon |^slab_unreclaimable |^kernel_stack ' \
+    /sys/fs/cgroup/system.slice/dracon-sync-operator.service/memory.stat
+anon 243568640                 # 232 MiB
+kernel_stack 344064
+slab_unreclaimable 686496
 ```
 
-The gate now reads `MemoryCurrent` from systemd (falling back to a full
-descendant walk only if that is unavailable), and explicitly falls back to
-`systemctl --user` because this guard is itself a user service.
+RSS misses descendants (a gate runner is a tree). `MemoryCurrent` **over**-counts,
+because it includes reclaimable page cache — measured **477 MiB of `file`**
+inside that total, which frees itself under pressure and cannot cause swap
+thrash. It is also bounded by `MemoryHigh`/`MemoryMax`, so with no cap set it
+drifts with host-wide free memory rather than with the daemon's own work.
 
-**(b) "a push is running" is not the incident shape.** A healthy 4-gate push
-on this fleet took **26 minutes over 52 workspaces**; freezing on "busy"
-would park the fleet most of the day. Measured false positive:
+The decision therefore uses the cgroup's own `memory.stat`:
+`anon + slab_unreclaimable + kernel_stack` — exactly "memory we cannot get
+back without swapping or killing". One trap inside that too: **cgroup v2
+`memory.stat` values are BYTES, not kB**, and treating them as kB inflates the
+reading 1024× (a bug this pass actually wrote and then caught by
+cross-checking against `MemoryCurrent`).
 
-```
-$ pgrep -f 'git push'
-(matched a shell whose command line merely CONTAINED the string)
-```
+**(b) Neither "a push is running" nor "a push is stuck" belongs in a memory
+decision.** A healthy 4-gate push here runs **26 minutes over 52 workspaces**,
+so "busy" would park the fleet most of the day. And a repo in the stuck
+ledger means pushes are *failing* — it costs CPU for one gate run and then
+stops; it holds no memory. A ledger entry was in fact present during testing
+(`browser-extensions-shared`, `consecutive_failures: 0`, "lockfile is frozen")
+and that arm alone re-created the false positive while the daemon held 155 MiB.
 
-The gate therefore requires **stuck** (ledger entry), not **busy**, and the
-argv matcher (when used) requires `argv[0]` end in `git` and `argv[1]` be
-exactly `push`.
+So the gate is now **one test only**: does the daemon hold enough
+non-reclaimable memory to be part of the pressure? A *hung* push shows up
+there as growing `anon` — the actual 2026-11-11 shape — while an idle page
+cache or a failing hook never does.
 
 ### Live proof
 
