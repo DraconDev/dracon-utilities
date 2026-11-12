@@ -105,3 +105,7 @@ error: lockfile had changes, but lockfile is frozen
 note: try re-running without --frozen-lockfile and commit the updated lockfile
 
 $ git push --dry-run origin main   (the warden 4-gate refuses)
+❌ Pre-push: 4-gate FAILED: snapshot dependency installation exited 1; see /home/dracon/.local/state/dracon/sync/gates/browser-extensions-shared/dracon-pre-push.BH2sYW/c40b09e54a00-INSTALL.log
+error: lockfile had changes, but lockfile is frozen
+
+  bun.lock last touched: 7b6faee2e6 1 file(s) [bun.lock] DELTA:+3/-2 | EXT:lock LOCK
