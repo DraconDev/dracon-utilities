@@ -316,11 +316,27 @@ GiB free". Those two literals are *not* free-space readings at all — they are
 
 ```
 $ journalctl --until "2026-11-11 00:00:00" | grep -E "Tmp: (3\.5|8\.1) GiB"
+#  captured 2026-11-11T20:42:40Z — transcribed in baseline-correct.txt
 Nov 09 06:54:49 … 🧹 Tmp: 3.5 GiB held by the age floor across 3354 entries …
+Nov 10 10:07:40 … 🧹 Tmp: 8.1 GiB held by the age floor across 4123 entries …
+$ journalctl --until "2026-11-11 00:00:00" | grep -E "Tmp: (3\.5|8\.1) GiB"
+#  the same command re-run today (journal rotation, see below)
+Nov 09 21:32:46 … 🧹 Tmp: 3.5 GiB held by the age floor across 4577 entries …
 Nov 10 10:07:40 … 🧹 Tmp: 8.1 GiB held by the age floor across 4123 entries …
 $ journalctl --since "2026-11-11 00:00:00" | grep -cE "(3\.5|8\.1) GiB available"
 0
 ```
+
+**Why two outputs for one command, and which one is the finding.** The Nov 09
+`06:54:49` line rotated out of the journal between the `20:42:40Z` capture and a
+re-run; the first surviving Nov 09 match is now `21:32:46 … 4577 entries`, a
+*different* age-floor snapshot of the same 3.5 GiB metric. Both are transcribed
+in `baseline-correct.txt`, so neither is a typo and neither is a fresh reading.
+The invalidation of the old baseline holds under either line: the point is that
+`3.5 GiB` appears as `held by the age floor` and never as `GiB available`, and
+`grep -cE` returns `0` for the latter on 2026-11-11. A duck-typed re-runner who
+sees only the rotated line still reaches the same conclusion, which is why the
+conclusion is stated as a count and not as a quoted line.
 
 The real root floor for 2026-11-11 was `6.9 GiB available at 100% used`, and it
 recovered to `82.3 GiB at 91%` after the cleanup. The A3 verdict does not change,
@@ -378,16 +394,23 @@ execute blind while the fleet is live.
 ## A4 — /tmp disk recovery: VERIFIED
 
 ```
-$ df -h /
-/dev/nvme0n1p2  907G  781G   80G  91% /       # 2026-11-11T16:50:18Z
-$ du -sh /tmp
-6.0G	/tmp                                   # 2026-11-11T16:50:18Z
+$ df -h /                                     # 2026-11-11T16:50:18Z
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/nvme0n1p2  907G  780G   81G  91% /
+$ du -sh /tmp                                 # 2026-11-11T16:50:18Z
+6.0G	/tmp
 ```
+
+That block is byte-identical to `final-capture.txt:25` (the same-stamp capture),
+which is the point of quoting it rather than a re-typed figure. (An earlier
+draft of this section wrote `781G   80G` here; that number was never in a
+capture at this stamp — 780/81 is what the probe actually printed, and the 1 GiB
+difference is the live-moving measurement, not a different reading.)
 
 Root was `6.9 GiB available at 100% used` immediately before the cleanup
 (`09:42:44`) and `8.4 GiB` at `10:16:02`, per the guard journal command quoted in
 A3 — **not** the "3.5–8.1 GiB" the earlier draft claimed (see the correction in
-A3). It is 80 GiB free (91%) at audit time (783G used / 78 GiB free / 92% by the
+A3). It is 81 GiB free (91%) at audit time (783G used / 78 GiB free / 92% by the
 end of the sweep as other agents kept building):
 
 ```
@@ -403,15 +426,18 @@ figure in A4 now comes from one of three reproducible sources and nothing else:
 | `6.9 GiB available` / `100% used` | `journalctl --since "2026-11-11 09:00:00" --until "2026-11-11 14:30:00" \| grep "GiB available"` | `09:42:44` |
 | `8.4 GiB available` / `100% used` | same command | `10:16:02` |
 | `82.3 GiB available` / `91% used` | same command | `11:40:53` |
-| `80G` free (`df -h /`) | `df -h /` | `16:50:18Z` |
+| `81G` free (`df -h /`) | `df -h /` → `907G 780G 81G 91% /`, transcribed verbatim in `final-capture.txt:25` | `16:50:18Z` |
 | `6.0G` (`du -sh /tmp`) | `du -sh /tmp` (transcribed in `du-tmp-16-50.txt`, together with the current `19G`) | `16:50:18Z` |
 | `72.7 → 2.1 GiB` held scratch | `journalctl … \| grep "held by the age floor"` | `10:23:17` → `10:52:58` |
 | `19G` (`du -sh /tmp`, later) | `du -sh /tmp` | `20:43:09Z` |
 
 All seven are transcribed in
 `docs/evidence/audit-remediation-2026-11-11/disk-baseline.txt`,
-`baseline-correct.txt` and `du-tmp-16-50.txt`, so a reader can re-run each one
-instead of trusting a prose figure.
+`baseline-correct.txt`, `du-tmp-16-50.txt` and `final-capture.txt`, so a reader
+can re-run each one instead of trusting a prose figure. The `df -h /` row is the
+one that had to be corrected twice: it is quoted from the capture file, not
+re-typed, precisely because a re-typed live measurement drifts by a GiB between
+probes.
 
 **The `/tmp` before/after pair is only meaningful within one metric.** The
 `72.7 GiB` figure is the guard's *age-floor-held scratch* reading, not a `du`
