@@ -109,3 +109,31 @@ $ git push --dry-run origin main   (the warden 4-gate refuses)
 error: lockfile had changes, but lockfile is frozen
 
   bun.lock last touched: 7b6faee2e6 1 file(s) [bun.lock] DELTA:+3/-2 | EXT:lock LOCK
+
+=== [F1 final] footprint metric: MemoryCurrent vs anon+unreclaimable ===
+$ systemctl show -p MemoryCurrent --value dracon-sync-operator.service
+1007611904
+$ grep -E 'anon |slab_unreclaimable |kernel_stack ' /sys/fs/cgroup$CG/memory.stat
+anon 243568640
+kernel_stack 344064
+slab_unreclaimable 686496
+  -> MemoryCurrent counts 477 MiB of reclaimable PAGE CACHE that a naive floor test would count as pressure
+
+$ daemon_footprint_kb()
+bash: line 1: /bin/true: No such file or directory
+  (see the live proof block below)
+
+=== [F1 final] live proof A: forced pressure + real daemon => NOT frozen ===
+guard: host pressure not caused by sync -- headroom 17% < 99% (daemon holds 260346 kB of non-reclaimable memory < 512 MB); not freezing   [marker: NONE]
+
+=== [F1 final] live proof B: same, floor 100MB => FROZE ===
+guard: FROZE sync daemon -- headroom 17% < 99%   [marker: CREATED]
+
+=== [F1 final] live guard state (real timer, 30s) ===
+LAST_PSWPIN=79923786552
+LAST_CHECK_ISO=2026-11-12T12:18:28
+HEALTHY_STREAK=0
+BAD_STREAK=0
+MARKER_INODE=8578838
+MARKER_MTIME=1794444848
+FROZEN_BY_US=0
