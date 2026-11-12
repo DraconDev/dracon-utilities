@@ -1,0 +1,45 @@
+capture_at=2026-11-12T11:40:21Z
+
+=== [F1] guard: the new knob ===
+39:#     a) the dracon-sync main process RSS >= FREEZE_RSS_FLOOR_MB (default 512),
+46:#   not brake. Set MEMORY_GUARD_FREEZE_RSS_FLOOR_MB to tune, or to 0 to
+84:FREEZE_RSS_FLOOR_MB="${MEMORY_GUARD_FREEZE_RSS_FLOOR_MB:-512}"
+246:    if [ "${FREEZE_RSS_FLOOR_MB:-512}" -le 0 ]; then
+249:    floor_kb=$((FREEZE_RSS_FLOOR_MB * 1024))
+266:    echo "guard: host pressure not caused by sync -- ${REASON} (daemon footprint $(daemon_footprint_kb) kB < ${FREEZE_RSS_FLOOR_MB} MB and no stuck push); not freezing"
+
+=== [F1] syntax ===
+bash -n exit=0
+
+=== [F1] daemon footprint sources ===
+$ systemctl show -p MainPID --value dracon-sync-operator.service
+1538038
+$ systemctl show -p MemoryCurrent --value dracon-sync-operator.service
+8138752
+$ ps -o rss= -p 1538038
+ 7116
+
+=== [F1] live proof A: forced pressure, real daemon (18MB < 512MB) -> NO freeze ===
+  guard: host pressure not caused by sync -- headroom 10% < 99% (daemon footprint 7948 kB < 512 MB and no stuck push); not freezing
+  synthetic marker: NONE
+
+=== [F1] live proof B: forced pressure + heavy 634MB unit -> FROZE ===
+  (see the transcript in the report; unit was a bounded transient)
+
+=== [F1] the real operator marker untouched ===
+paused at 1794481884
+paused by bash (pid 934128): /run/current-system/sw/bin/bash -c dracon-sync pause && echo "DAEMON PAUSED" ; cd /home/dracon/Dev/dracon-platform && mkdir -p web/docs/strategy && ln -s ../../docs/strategy/AI-BENCH-LANDSCAPE-RESEARC… · cwd /home/dracon/Dev/dracon-platform/web
+
+=== [F2] prove-tol exclusion ===
+302:  # 2026-11-12 audit: prove-tol is NOT its own checkout. Every top-level
+305:  # `git -C web/games/wip/prove-tol rev-parse --show-toplevel` answers
+322:  "/home/dracon/Dev/dracon-platform/web/games/wip/prove-tol",
+$ git -C <prove-tol> rev-parse --show-toplevel
+/home/dracon/Dev/dracon-platform/web/games/wip/deathrun
+$ git -C <prove-tol> rev-parse --git-dir
+/home/dracon/Dev/dracon-platform/.git/modules/web-games-deathrun
+$ readlink <prove-tol>/.git
+../deathrun/.git
+
+=== [F2] fleet header after the exclusion ===
+{'policy': '/home/dracon/.dracon/utilities/sync/dracon-sync.toml', 'filter': 'all', 'repos': 38, 'ok': 26, 'active': 0, 'warn': 0, 'concern': 0, 'pending': 12, 'failures': 0}
