@@ -330,8 +330,17 @@ $ journalctl --since "2026-11-11 00:00:00" | grep -cE "(3\.5|8\.1) GiB available
 **Why two outputs for one command, and which one is the finding.** The Nov 09
 `06:54:49` line rotated out of the journal between the `20:42:40Z` capture and a
 re-run; the first surviving Nov 09 match is now `21:32:46 … 4577 entries`, a
-*different* age-floor snapshot of the same 3.5 GiB metric. Both are transcribed
-in `baseline-correct.txt`, so neither is a typo and neither is a fresh reading.
+*different* age-floor snapshot of the same 3.5 GiB metric. The retention
+boundary is the reason: `journalctl | head -1` now starts at
+`Nov 09 10:13:51`, `journalctl --disk-usage` reports `507.9M`, and
+`journald.conf` sets no explicit `SystemMaxUse`/`MaxRetentionSec`, so the
+journal keeps rolling by size rather than by a stated age. A targeted query for
+the old stamp
+(`journalctl --since "2026-11-09 06:00:00" --until "2026-11-09 07:30:00" |
+grep -c "Tmp: 3.5 GiB"`) returns `0`, confirming it is gone rather than
+misspelled. Both captures are transcribed in `baseline-correct.txt` and the
+re-run is recorded in `a3-rotation.txt`, so neither is a typo and neither is a
+fresh reading.
 The invalidation of the old baseline holds under either line: the point is that
 `3.5 GiB` appears as `held by the age floor` and never as `GiB available`, and
 `grep -cE` returns `0` for the latter on 2026-11-11. A duck-typed re-runner who
