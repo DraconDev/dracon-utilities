@@ -85,3 +85,23 @@ $ ~/.local/bin/dracon-sync repair stuck-list
 
 === [F1] real marker state at end of pass ===
 ABSENT
+
+=== [F3b] why the github leg is still refused: a REAL repo defect, not a ref defect ===
+$ cd /home/dracon/Dev/browser-extensions-shared && bun install --frozen-lockfile
+Resolved, downloaded and extracted [2]
+error: lockfile had changes, but lockfile is frozen
+note: try re-running without --frozen-lockfile and commit the updated lockfile
+
+$ git push --dry-run origin main   (the warden 4-gate refuses)
+❌ Pre-push: 4-gate FAILED: snapshot dependency installation exited 1; see /home/dracon/.local/state/dracon/sync/gates/browser-extensions-shared/dracon-pre-push.Ip6duW/c40b09e54a00-INSTALL.log
+error: lockfile had changes, but lockfile is frozen
+
+  bun.lock last touched: 7b6faee2e6 1 file(s) [bun.lock] DELTA:+3/-2 | EXT:lock LOCK
+
+=== [F3b] why the github leg is still refused: a REAL repo defect, not a ref defect ===
+$ cd /home/dracon/Dev/browser-extensions-shared && bun install --frozen-lockfile
+bun install v1.3.3 (274e01c7)
+error: lockfile had changes, but lockfile is frozen
+note: try re-running without --frozen-lockfile and commit the updated lockfile
+
+$ git push --dry-run origin main   (the warden 4-gate refuses)
