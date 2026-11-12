@@ -64,3 +64,24 @@ $ git show c0ce1642:src/sync.rs | grep -c "refresh_stale_upstream_ref(ctx.repo).
 704a500fe53ee870dda23eeb5d6900af31a059237fa3483788e4e15049781ff0  /home/dracon/.local/bin/dracon-sync
 704a500fe53ee870dda23eeb5d6900af31a059237fa3483788e4e15049781ff0  /home/dracon/dracon/build/target-audit-2026-11-11/release/dracon-sync
 MainPID=1538038
+
+=== [F3] the fix commit and the new test ===
+$ git -C dracon-sync log -1 --format="%h %s"
+da6ffe04 1 file(s) in src/sync.rs DELTA:+94/-0 | EXT:rs
+$ git -C dracon-sync show --stat --oneline HEAD | head -3
+da6ffe04 1 file(s) in src/sync.rs DELTA:+94/-0 | EXT:rs
+ src/sync.rs | 94 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 94 insertions(+)
+$ grep -n "test_refresh_after_partial_push_converges_every_name" src/sync.rs
+12492:    async fn test_refresh_after_partial_push_converges_every_name() {
+
+=== [F6] stuck ledger ===
+$ ~/.local/bin/dracon-sync repair stuck-list
+🔒 stuck repos (expire after 24h):
+   /home/dracon/Dev/browser-extensions-shared (0h ago, 0 consecutive failures)
+
+=== [F6] fleet header at end of pass ===
+{'policy': '/home/dracon/.dracon/utilities/sync/dracon-sync.toml', 'filter': 'all', 'repos': 38, 'ok': 33, 'active': 4, 'warn': 1, 'concern': 0, 'pending': 0, 'failures': 0}
+
+=== [F1] real marker state at end of pass ===
+ABSENT
