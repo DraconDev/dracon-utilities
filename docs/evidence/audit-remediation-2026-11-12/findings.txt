@@ -137,3 +137,8 @@ BAD_STREAK=0
 MARKER_INODE=8578838
 MARKER_MTIME=1794444848
 FROZEN_BY_US=0
+
+=== [FINAL] end-of-pass captures ===
+capture_at=2026-11-12T12:20:10Z
+
+$ ~/.local/bin/dracon-sync repos --json | header
