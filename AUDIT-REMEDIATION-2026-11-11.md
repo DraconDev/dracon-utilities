@@ -332,9 +332,34 @@ $ journalctl --since "2026-11-11 00:00:00" | grep -cE "(3\.5|8\.1) GiB available
 re-run; the first surviving Nov 09 match is now `21:32:46 … 4577 entries`, a
 *different* age-floor snapshot of the same 3.5 GiB metric. The retention
 boundary is the reason: `journalctl | head -1` now starts at
-`Nov 09 10:13:51`, `journalctl --disk-usage` reports `507.9M`, and
-`journald.conf` sets no explicit `SystemMaxUse`/`MaxRetentionSec`, so the
-journal keeps rolling by size rather than by a stated age. A targeted query for
+`Nov 09 10:13:51`, and `journalctl --disk-usage` reports `507.9M` — which is
+the cap being hit, not a coincidence:
+
+```
+$ systemd-analyze cat-config systemd/journald.conf | grep -vE '^\s*#|^\s*$'
+[Journal]
+Storage=persistent
+RateLimitInterval=30s
+RateLimitBurst=10000
+Audit=keep
+[Journal]
+SystemMaxUse=500M
+RuntimeMaxUse=100M
+$ stat -c '%n mtime=%y' /etc/systemd/journald.conf.d/99-size-cap.conf
+/etc/systemd/journald.conf.d/99-size-cap.conf mtime=2026-09-12 14:51:25 +0100
+```
+
+`/etc/systemd/journald.conf.d/99-size-cap.conf` sets `SystemMaxUse=500M` (no
+`MaxRetentionSec`), so the journal rolls **by size only** — exactly why a
+`Nov 09 06:54:49` line can vanish while the 09th is still nominally in range.
+The usage figures confirm the cap rather than a coincidence: `507.9M` at the
+`00:16:40Z` capture and `515.9M` on a re-read at `01:04:41Z` (both in
+`a3-rotation.txt`), pinned just above the 500M watermark that triggers
+rotation. An earlier draft of this section said
+"`journald.conf` sets no explicit `SystemMaxUse`/`MaxRetentionSec`"; that was a
+probe error, not a config fact — `grep` over the main `/etc/systemd/journald.conf`
+returns nothing because the cap lives in the drop-in, and only
+`systemd-analyze cat-config` shows the merged effective configuration. A targeted query for
 the old stamp
 (`journalctl --since "2026-11-09 06:00:00" --until "2026-11-09 07:30:00" |
 grep -c "Tmp: 3.5 GiB"`) returns `0`, confirming it is gone rather than
@@ -737,7 +762,7 @@ Class-by-class, with the exact evidence:
 | epoch-spool backlog | 19 repos, 6597 spool dirs (6048 MiB) per the gitdir-resolved census at `16:50:18Z`; largest `/home/dracon/.dracon` 5141 (992.3 MiB), `browser-extensions-shared` 452 (1189.1 MiB), `dracon-platform` 454 (849.3 MiB), `ai-auto-writer` 105 (1542.2 MiB), `tiles-tui-file-manager` 50 (624.9 MiB). Exact commands in A3. |
 | stuck-push ledger | empty at end of goal — `dracon-sync repair stuck-list` → `✅ no stuck repos` (16:50, section A5); empty again at `2026-11-12T00:22:55Z` after one transient external GitLab 500 entry (`/home/dracon/.dracon`, 00:08Z) auto-cleared (`stuck-recheck.txt`) |
 | hook-blocked pushes | none — the previously refused `dracon-platform` 91-commit push dry-runs as `c7ad5a2641..645e1add76  main -> main` (16:50:50Z, section A1) |
-| freeze markers | **the daemon was FROZEN at the completion claim and is not frozen now.** Marker present from `17:30:22` (15th episode of 2026-11-11), `cat ~/.dracon/dracon-sync.freeze` → `paused by bash (pid 2616477): … dracon-memory-guard.sh`. `frozen_secs` was all `None` at `16:53:39Z` (a genuine unfrozen sample) and the marker was absent at `16:55:05Z` and `17:21:28Z`; it appeared afterwards. The guard freezes below `8%` headroom and releases only when headroom is `>25%` **and** `full` PSI `<5.0` for 3 consecutive checks — at `17:40:13Z` headroom was `14.82%` (binding constraint) with `full avg10` PSI `2.42` (already recovered), `HEALTHY_STREAK=8`, `FROZEN_BY_US=1`. So it is real host pressure holding the brake, not a stuck marker. It self-cleared at `18:01:25`, re-froze `19:24:52`–`19:54:51` (16th), and is **absent at `2026-11-11T20:46:11Z`**. Evidence: `freeze-15.txt`, episodes in section C. |
+| freeze markers | **the daemon was FROZEN at the completion claim, unfroze, and is FROZEN again now** (17th episode, `2026-11-12T00:54:10` onward; marker present at the `01:05:03Z` capture). Marker was present from `17:30:22` (15th episode of 2026-11-11), `cat ~/.dracon/dracon-sync.freeze` → `paused by bash (pid 2616477): … dracon-memory-guard.sh`. `frozen_secs` was all `None` at `16:53:39Z` (a genuine unfrozen sample) and the marker was absent at `16:55:05Z` and `17:21:28Z`; it appeared afterwards. The guard freezes below `8%` headroom and releases only when headroom is `>25%` **and** `full` PSI `<5.0` for 3 consecutive checks — at `17:40:13Z` headroom was `14.82%` (binding constraint) with `full avg10` PSI `2.42` (already recovered), `HEALTHY_STREAK=8`, `FROZEN_BY_US=1`. So it is real host pressure holding the brake, not a stuck marker. It self-cleared at `18:01:25`, re-froze `19:24:52`–`19:54:51` (16th), was **absent at `2026-11-11T20:46:11Z`**, and re-engaged at `2026-11-12T00:54:10` (17th) — the host keeps re-entering the guard's band, which is the documented behaviour, not a stuck marker. Evidence: `freeze-15.txt`, `freeze-17.txt`, episodes in section C. |
 | dirty / retrying (not a failure class of this audit) | 3 at `16:53:39Z`: `browser-extensions-shared` `publishing` + `HISTORY_PROBE_TIMED_OUT`, `dracon-platform` `retrying` + `DIRTY`, `freeport` `retrying` + `DIRTY`. Re-probed `2026-11-11T17:23Z`: `freeport` still `RETRYING` with 46 dirty entries (`M .pi-glla/audit-loop/findings.md`, `M SPEC.md`, art-source PNG/JSON churn — live content edits, not a stale ref or a refused push), 30 commits ahead of `origin/main` by the daemon's own column. Recorded so the `failures 1` in the `repos --json` header is not mistaken for a hook or ledger block. |
 | push PENDING (not stuck) | 2 at `16:53:39Z` — `browser-extensions-shared` (`1 unpushed commits`) and `dracon-platform` (`1 unpushed commits`); at `2026-11-11T17:05:33Z` re-sampled: 4 repos with live churn (`browser-extensions-shared` 18, `junk-runner` 2, `ai-auto-writer` 1, `dracon-platform` 1). None is in the stuck ledger; all are commits newer than the last push. |
 | disk / memory | `81G` free (91%) at `16:50:18Z`; headroom 7.09% by `MemAvailable`, 13.67% by the guard's own formula, same stamp (section C) |
@@ -837,18 +862,21 @@ $ <group contiguous runs where consecutive pause lines are <= 120s apart>
   2026-11-11T16:18:54 .. 16:26:30  ( 7.6 min)
   2026-11-11T17:30:22 .. 18:01:25  (31.1 min)
   2026-11-11T19:24:52 .. 19:54:51  (30.0 min)   <- 16th; self-cleared
+  2026-11-12T00:54:10 ..           (ongoing)   <- 17th, still engaged at 01:11:05Z
 $ python3 -c "…sorted({r['frozen_secs'] for r in open(REPOS_JSON)…})"
 frozen_secs values in the 14:46 capture: [127]     # i.e. frozen at the old audit end
 ```
 
 So at the stated 14:45 audit end the daemon **was** frozen — the marker was
 present and `repos.json`'s `frozen_secs=127` on all 38 rows is that freeze,
-started 14:41:53 and self-cleared at 15:13:05. **Sixteen** episodes ran across
-2026-11-11, not four: the previous draft only looked back to 13:30 and
-undercounted. The 15th is the one that was live when the completion claim went in
+started 14:41:53 and self-cleared at 15:13:05. **Seventeen** episodes have run
+across 2026-11-11 and into 2026-11-12, not four: the previous draft only looked
+back to 13:30 and undercounted. The 15th is the one that was live when the completion claim went in
 (`17:30:22`, still running then — `freeze-15.txt`), and it self-cleared at
-`18:01:25`; a 16th ran `19:24:52–19:54:51` and has also cleared. Both are the
-same mechanism:
+`18:01:25`; a 16th ran `19:24:52–19:54:51` and cleared as well; a 17th began
+`2026-11-12T00:54:10` and was still engaged at the `01:05:03Z` capture, with the
+marker present again (`paused by bash (pid 1029840): … dracon-memory-guard.sh`).
+The episodes share one mechanism:
 
 ```
 $ journalctl -u dracon-sync-operator.service --since "2026-11-11 17:30:00" \
@@ -985,7 +1013,9 @@ commits landed
 **The freeze at claim time was the honest state then, and it is not a regression.**
 It has since cleared exactly as the mechanism predicts — marker absent at
 `2026-11-11T20:46:11Z`, after episodes 15 (`17:30:22–18:01:25`) and 16
-(`19:24:52–19:54:51`) ran and released. Each episode engages for the same cause:
+(`19:24:52–19:54:51`) ran and released, and it engaged again at
+`2026-11-12T00:54:10` (17th, marker present at the `01:05:03Z` capture — section
+C has the current list, not a claim that it stayed clear). Each episode engages for the same cause:
 the guard parks the daemon while the host is short of reclaimable memory, and
 releases only above 25% headroom and below 5.0 `full` PSI — at `17:40:13Z`
 headroom was `14.82%` (so it stayed parked) while `full avg10` PSI had already
@@ -1100,6 +1130,29 @@ for four hours and the daemon has never re-read a deleted image.
    transcribed in `disk-baseline.txt`, `baseline-correct.txt` and
    `du-tmp-16-50.txt`. **Rollback:** none needed — this is a documentation
    correction, and the A3/A4 verdicts themselves are unchanged.
+
+10. **Corrected my own journald claim (this round).** A3 said "`journald.conf`
+   sets no explicit `SystemMaxUse`/`MaxRetentionSec`". That was a **probe error
+   of exactly the class this report keeps catching**: I grepped
+   `/etc/systemd/journald.conf` (which genuinely has no such key) and concluded
+   there was no cap anywhere. The cap lives in a drop-in —
+   `/etc/systemd/journald.conf.d/99-size-cap.conf` sets `SystemMaxUse=500M` (and
+   `RuntimeMaxUse=100M`) since 2026-09-12 — and only
+   `systemd-analyze cat-config systemd/journald.conf` shows the merged effective
+   config. The corrected statement is *stronger* than the wrong one: the journal
+   rolls by size because of an explicit 500M cap, and `507.9M`/`515.9M` of usage
+   are that cap being enforced, not a coincidence. **Rollback:** none needed —
+   documentation correction only; the A3 verdict (OVERSTATED) and every figure
+   are unchanged.
+
+11. **Re-sampled the freeze history (this round).** The episode count is **17**,
+    not 15 or 16: the 15th (`17:30:22–18:01:25`) and 16th
+    (`19:24:52–19:54:51`) self-cleared, and a 17th began
+    `2026-11-12T00:54:10` and was still engaged at `01:11:23Z` with the marker
+    present. Recording the two later episodes is not a regression claim — it is
+    the same guard cycling on the same host pressure, and the doc now says the
+    daemon is frozen *now* rather than claiming it stayed clear. **Rollback:**
+    none needed — documentation only.
 
 No history was rewritten, no force-push was performed, no hook was bypassed or
 weakened, and no spool was deleted during this audit.
