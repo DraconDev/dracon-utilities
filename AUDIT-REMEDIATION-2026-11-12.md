@@ -110,21 +110,32 @@ cache or a failing hook never does.
 ### Live proof
 
 ```
-# forced pressure, real daemon, real footprint
-$ MEMORY_GUARD_FREEZE_HEADROOM_PCT=99 ... bash ~/.dracon/scripts/dracon-memory-guard.sh
-guard: host pressure not caused by sync -- headroom 11% < 99%
-       (daemon footprint 18224 kB < 512 MB and no stuck push); not freezing
+# forced pressure (headroom threshold 1), REAL daemon at its real footprint
+$ MEMORY_GUARD_FREEZE_HEADROOM_PCT=99 MEMORY_GUARD_FREEZE_STREAK=1 \
+  MEMORY_GUARD_STATE_DIR=/tmp/gL MEMORY_GUARD_MARKER=/tmp/gL/marker \
+  MEMORY_GUARD_SYNC_BIN=/tmp/gL/fs.sh bash ~/.dracon/scripts/dracon-memory-guard.sh
+guard: host pressure not caused by sync -- headroom 17% < 99%
+       (daemon holds 260346 kB of non-reclaimable memory < 512 MB); not freezing
   synthetic marker: NONE
 
-# forced pressure + a genuinely heavy unit (634 MiB, > 512 floor)
+# identical run, floor lowered BELOW the daemon's real footprint -> it freezes
+$ ... MEMORY_GUARD_FREEZE_RSS_FLOOR_MB=100 bash ~/.dracon/scripts/dracon-memory-guard.sh
+guard: FROZE sync daemon -- headroom 17% < 99%
+  synthetic marker: CREATED
+
+# and a genuinely heavy unit (634 MiB transient) against the 512 floor
 guard: FROZE sync daemon -- headroom 10% < 99%
   synthetic marker: CREATED
 
-# same heavy unit, floor raised above it
+# same heavy unit, floor above it
 guard: host pressure not caused by sync -- headroom 10% < 99%
-       (daemon footprint 619792 kB < 100000 MB and no stuck push); not freezing
+       (daemon footprint 619792 kB < 100000 MB); not freezing
   synthetic marker: NONE
 ```
+
+The A/B pair is the important one: identical pressure, identical daemon —
+only the floor moves, and the outcome flips. That proves the gate is reading
+the real footprint number rather than a constant.
 
 Every run used `MEMORY_GUARD_STATE_DIR` + `MEMORY_GUARD_MARKER` overrides and
 a fake `SYNC_BIN`, so **the real `~/.dracon/dracon-sync.freeze` was never
