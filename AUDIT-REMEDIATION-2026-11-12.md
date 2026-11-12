@@ -375,9 +375,13 @@ edit). `failures: 0` — the prove-tol inspection failure is gone.
 ## Changes made by this pass
 
 1. **`~/.dracon/scripts/dracon-memory-guard.sh`** — footprint-gated freeze
-   (`FREEZE_RSS_FLOOR_MB`, default 512; `0` disables), cgroup-based footprint
-   with a user-manager fallback, stuck-ledger-based push signal, header
-   documentation of both traps. **Rollback:** `/tmp/mg-before.sh`.
+   (`FREEZE_RSS_FLOOR_MB`, default 512; `0` disables): the freeze now also
+   requires the daemon to hold ≥512 MiB of **non-reclaimable** memory
+   (`anon + slab_unreclaimable + kernel_stack` from the unit's cgroup
+   `memory.stat`, with a bytes→kB conversion and a descendant-RSS fallback),
+   so page cache, a merely-running push and a failing hook can no longer
+   brake the fleet. Header documents all three measurement traps.
+   **Rollback:** `/tmp/mg-before.sh`.
 2. **`~/.dracon/utilities/sync/dracon-sync.toml`** — `prove-tol` excluded with
    evidence + recovery inline. **Rollback:** `/tmp/dracon-sync.toml.bak-prove-tol`.
 3. **`dracon-sync/src/sync.rs`** (committed `da6ffe04`) — refresh tracking refs
