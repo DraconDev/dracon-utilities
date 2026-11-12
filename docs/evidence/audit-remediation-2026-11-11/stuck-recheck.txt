@@ -1,0 +1,15 @@
+capture_at=2026-11-12T00:22:55Z
+
+=== stuck ledger now (the re-check for contract 5) ===
+$ ~/.local/bin/dracon-sync repair stuck-list
+✅ no stuck repos
+
+$ cat ~/.local/state/dracon/dracon-sync-stuck-push-repos.json
+[]
+=== the transient entry seen by the auditor at 2026-11-12T00:08-00:12Z (from the daemon journal) ===
+Nov 12 00:08:09 nixos dracon-sync[268859]: ⚠️ push to gitlab failed for /home/dracon/.dracon: git push-to-gitlab failed in /home/dracon/.dracon with status exit status: 1: remote: calling pre_receive endpoint: http post to gitlab api /pre_receive endpoint: Internal API error (500)
+Nov 12 00:08:09 nixos dracon-sync[268859]: ⚠️ push failed for /home/dracon/.dracon (remotes: gitlab)
+Nov 12 00:08:10 nixos dracon-sync[268859]: ⚠️ /home/dracon/.dracon committed but push failed (late) (will retry)
+
+=== did the .dracon push recover? ===
+Everything up-to-date

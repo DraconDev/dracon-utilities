@@ -616,7 +616,14 @@ Every one of the 38 repos appears below. Columns:
 - **spools** — epoch-staging directory count and MiB, from the exact command
   quoted in A3 and stamped `2026-11-11T16:50:18Z`.
 - **stuck-ledger** — the stuck-push ledger at end of goal: `dracon-sync repair
-  stuck-list` → `✅ no stuck repos`, so no repo carried an entry.
+  stuck-list` → `✅ no stuck repos`, so no repo carried an entry. Re-run at
+  `2026-11-12T00:22:55Z` it still reports `✅ no stuck repos` with the ledger
+  file literally `[]` (`stuck-recheck.txt`). One *transient* entry appeared after
+  the end-of-goal capture — `/home/dracon/.dracon`, `00:08Z`, cause
+  `calling pre_receive endpoint: http post to gitlab api /pre_receive endpoint:
+  Internal API error (500)`, i.e. an external GitLab 500, not a hook or ledger
+  defect — and cleared on its own before the re-run; it is recorded here because
+  it happened, not because it was left.
 - **freeze** — `repos-final.json`'s `frozen_secs` at `2026-11-11T16:53:39Z`
   (`none` = not frozen). The freeze *history* for this run is in section C.
 - **push** — the daemon's own `push_status`/`push_error` at `16:53:39Z`.
