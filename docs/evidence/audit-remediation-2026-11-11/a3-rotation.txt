@@ -1,0 +1,8 @@
+capture_at=2026-11-12T00:16:40Z
+
+=== A3 rotation check: is the 06:54:49 line still present? ===
+$ journalctl --until "2026-11-11 00:00:00" | grep -c "Nov 09 06:54:49"
+(grep by full stamp)
+0
+
+=== the same command as the doc, re-run now ===
