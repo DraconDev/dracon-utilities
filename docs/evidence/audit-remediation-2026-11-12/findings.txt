@@ -35,3 +35,32 @@ $ sha256sum /proc/<MainPID>/exe ~/.local/bin/dracon-sync <rebuilt>
 704a500fe53ee870dda23eeb5d6900af31a059237fa3483788e4e15049781ff0  /home/dracon/dracon/build/target-audit-2026-11-11/release/dracon-sync
 $ systemctl show -p MainPID --value dracon-sync-operator.service
 1538038
+capture_at=2026-11-12T11:51:13Z
+
+=== [F3] the stale-ref defect, reproduced ===
+before the fix the daemon reported:
+  refs/remotes/github/main = 3ac4f74ccb   real github tip = c8981025de
+  tracking-ahead = 77   true-ahead = 50   (INFLATED by 27)
+
+=== [F3] live now (after the code fix + a tracking fetch) ===
+  github  tracking=0047a7f102 real=0047a7f1   true-ahead=45  tracking-ahead=45  HONEST
+  gitlab  tracking=0047a7f102 real=0047a7f1   true-ahead=45  tracking-ahead=45  HONEST
+  origin  tracking=0047a7f102 real=0047a7f1   true-ahead=45  tracking-ahead=45  HONEST
+  HEAD=c40b09e54a
+
+=== [F3] root cause: refresh ran ONLY on the success branch ===
+$ grep -n "refresh_stale_upstream_ref(ctx.repo).await" src/sync.rs
+6406:                refresh_stale_upstream_ref(ctx.repo).await;
+6488:                refresh_stale_upstream_ref(ctx.repo).await;
+
+  (pre-fix HEAD c0ce1642 had exactly ONE call site)
+$ git show c0ce1642:src/sync.rs | grep -c "refresh_stale_upstream_ref(ctx.repo).await"
+1
+
+=== [F3] diff stat ===
+
+=== [F3] binary identity after rebuild + restart ===
+704a500fe53ee870dda23eeb5d6900af31a059237fa3483788e4e15049781ff0  /proc/1538038/exe
+704a500fe53ee870dda23eeb5d6900af31a059237fa3483788e4e15049781ff0  /home/dracon/.local/bin/dracon-sync
+704a500fe53ee870dda23eeb5d6900af31a059237fa3483788e4e15049781ff0  /home/dracon/dracon/build/target-audit-2026-11-11/release/dracon-sync
+MainPID=1538038
