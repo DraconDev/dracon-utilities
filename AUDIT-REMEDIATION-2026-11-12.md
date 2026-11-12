@@ -288,6 +288,23 @@ the repo in the stuck ledger with the gate's own error text:
    installation exited 1 ... lockfile had changes, but lockfile is frozen
 ```
 
+### The count is honest now, proved
+
+```
+$ cd /home/dracon/Dev/browser-extensions-shared
+$ for r in github gitlab origin; do
+    rt=$(git ls-remote $r refs/heads/main | cut -f1)
+    echo "$r true=$(git rev-list --count $rt..HEAD) tracking=$(git rev-list --count $r/main..HEAD)"
+  done
+github  tracking=0047a7f102 real=0047a7f1   true-ahead=39  tracking-ahead=39  HONEST
+gitlab  tracking=0047a7f102 real=0047a7f1   true-ahead=39  tracking-ahead=39  HONEST
+origin  tracking=0047a7f102 real=0047a7f1   true-ahead=39  tracking-ahead=39  HONEST
+```
+
+Before this pass the same measurement read `77` against a true `50`. The
+difference is exactly the defect F3 describes, and it is gone on all three
+names (`tracking-ahead == true-ahead`).
+
 **Not fixed here on purpose.** Regenerating a lockfile is a content edit
 inside another repo with its own build consequences, and the objective allowed
 exactly this outcome ("if the github push is simply being refused by the gate,
