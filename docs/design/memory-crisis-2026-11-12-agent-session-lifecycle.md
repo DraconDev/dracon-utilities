@@ -153,11 +153,17 @@ Three more properties make the rule safe:
   until the idle window has genuinely passed.
 - **Every candidate is re-verified immediately before signalling**
   (`verify_retirement`): the same PID incarnation (`/proc/<pid>/stat`
-  field 22), still no CPU accrual, the activity files still stale, and
-  **no controlling terminal**. A session that woke up between the scan
-  and the signal is left alone, and an interactive session — one the
-  operator can see on a terminal — is never retired at all, which is the
-  same rule every other reap path in the guard applies.
+  field 22), still no CPU accrual, and the activity files still stale.
+  A session that woke up between the scan and the signal is left alone.
+
+A session with a controlling terminal is **not** disqualified outright.
+The transcript IS the terminal-activity record — it is written when the
+operator works with that session — so a session whose transcript has
+been silent for the whole idle window has not been worked with. The
+terminal is a weaker signal than six hours of complete silence, and
+treating it as an absolute disqualifier would make the fleet
+UNBOUNDABLE: every agent session runs in a terminal, so no session could
+ever be retired and the fleet would keep growing exactly as before.
 
 ### 3.3 The fleet rule
 
@@ -167,9 +173,16 @@ narrows to the sessions that are demonstrably active — which restores
 the guard's authority over a runaway fleet without touching a single
 working session.
 
+The fleet-over-bound trigger is also what unlocks **retirement**. An
+individual session keeps its protection: one parked session in a small
+fleet is never retired, because an operator who opens a session and
+leaves it overnight must not find it gone. It is the unbounded fleet
+that gives up the protection, and that is the case the rule exists for.
+
 An individual interactive session — the operator's own included — keeps
 exactly the protection it had before. The rule only ever acts on a
-session that has been demonstrably idle for the whole window.
+session that has been demonstrably idle for the whole window, in a
+fleet that has passed its bound.
 
 ### 3.4 What shipped
 
