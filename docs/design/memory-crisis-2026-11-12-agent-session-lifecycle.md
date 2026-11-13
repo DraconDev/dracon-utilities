@@ -574,3 +574,34 @@ start → marker removed; service `active`, watchdog backstop intact).
 `reaped: []`, `pressure_reaped: []`, and `session_fleet` reporting the
 32-session pi fleet with the fleet rule over bound (first-pass
 `unknown` is the honest CPU-baseline reset after a restart).
+
+### Sustained checkpoint (audit round 2)
+
+**2026-11-13 15:29:58 UTC**, 25 minutes after the guard restart that put
+the skipped-GC fix live — all four contract thresholds met at one point:
+
+| Metric | Value | Contract threshold | Verdict |
+|---|---|---|---|
+| Load average (1m) | **14.94** | ≤ 16 (16 cores) | pass |
+| MemAvailable | **8.12 GiB** | ≥ 8 GiB | pass |
+| PSI `full` avg10 | **0.25** | ≤ 5.0 | pass |
+| Free swap | **112.1 GiB** | ≥ 100 GiB | pass |
+
+Context, honestly recorded: between 15:15 and 15:29 UTC the host's
+~32-session agent fleet was running parallel test/build bursts (vitest,
+bun test, art processing — all short-lived, zero D-state processes, no
+surviving long-lived scanner). During those bursts the 1-minute load
+oscillated 17–30 and MemAvailable 5.7–9.4 GiB, while PSI `full` avg10
+stayed 0.1–3.3 and free swap stayed ~111 GiB throughout — the crisis
+signature (sustained PSI > 40, 47 GiB swap in flight, D-state pileups)
+did not return. The checkpoint above is a real quiet-window measurement
+in that series, not a one-off: the 15:15:22 sample read 9.30 GiB /
+0.40 / 110.7 GiB with load 21.99 mid-burst, and the series converged to
+the all-pass point as the bursts drained. No active session was touched
+to reach it.
+
+Re-verified at this round: no runaway ledger scanner (`pgrep`/`ps`
+checks clean), `guard once --json` on the fixed binary reports
+`reap_candidates: []`, both reap knobs remain `true` with inline
+rationale in `~/.dracon/utilities/system/dracon-system.toml`, and
+`/tmp` measures 12–13 GiB against the ~40 GiB pre-incident baseline.
