@@ -149,8 +149,11 @@ Three more properties make the rule safe:
   until the idle window has genuinely passed.
 - **Every candidate is re-verified immediately before signalling**
   (`verify_retirement`): the same PID incarnation (`/proc/<pid>/stat`
-  field 22), still no CPU accrual, and the activity files still stale.
-  A session that woke up between the scan and the signal is left alone.
+  field 22), still no CPU accrual, the activity files still stale, and
+  **no controlling terminal**. A session that woke up between the scan
+  and the signal is left alone, and an interactive session — one the
+  operator can see on a terminal — is never retired at all, which is the
+  same rule every other reap path in the guard applies.
 
 ### 3.3 The fleet rule
 
@@ -172,6 +175,32 @@ session that has been demonstrably idle for the whole window.
 | `dracon-system/src/session_guard_tests.rs` | 21 unit tests. The assertions that matter most are the **negative** ones: a session that accrued CPU, one with a recent write, one that cannot be measured, one that woke up between scan and signal, a recycled PID, and the guard itself must all survive |
 | `dracon-system/src/policy.rs` | New fields: `agent_session_names`, `session_idle_window_secs`, `max_active_sessions`, `session_registry_dir`, `session_ledger_roots`, `retire_idle_agent_sessions` — all with defaults, so an existing config keeps its behaviour byte-for-byte |
 | `dracon-system/src/main.rs` | `refresh_session_fleet` (observe + reclassify each pass), `retire_idle_sessions` (the ending half), and the fleet-aware exemption applied at the memory-pressure offender selection |
+| `dracon-system/src/reap.rs` | Two narrow reap signatures for the idle agent-runtime DAEMONS (see §3.6) |
+
+### 3.6 The idle agent-runtime daemons
+
+Two agent-runtime **daemons** were the 2026-11-12 residue that the
+guard could not touch:
+
+- `opencode serve --service` — resident 2.7 days, parent-dead, terminal-less,
+  idle, ~237 MiB resident.
+- `.cline --cline-hub-daemon` — resident **15 days**, parent-dead,
+  terminal-less, idle.
+
+Neither matched any reap signature, so neither was reclaimable: the
+guard had no rule for that class at all. Two narrow signatures were
+added to the default allowlist:
+
+- `opencode serve --service` — appears only on the SERVICE command line,
+  never on the interactive form.
+- `--cline-hub-daemon` — appears only on the daemon's command line.
+
+The interactive forms of the same runtimes still never match, and the
+terminal-less rule excludes them anyway. Neither daemon qualifies for the
+age-gated path (both have thousands of seconds of lifetime CPU, against
+that path's 60 s ceiling), so they are reclaimed **only under memory
+pressure**, by orphanhood — the same certainty bar every other pressure
+orphan gets.
 
 The exemption is applied per **pid**, not per name, in both the offender
 selection and the exempt-consumer footprint report — so an idle session
