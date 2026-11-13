@@ -47,11 +47,15 @@ idle-retirement rule that never uses raw age as evidence.
 
 | Metric | Starting | After | Contract threshold | Verdict |
 |---|---|---|---|---|
-| MemAvailable | 4.7 GiB | ~9.8 GiB | ≥ 8 GiB | pass |
-| Free swap | ~77 GiB | 111 GiB | ≥ 100 GiB | pass |
-| PSI `full` avg10 | 41.6 (avg300) | 3.8–4.4 | ≤ 5.0 | pass |
-| Load average (1m) | 46–60 | 6.5–12.4 | ≤ 16 | pass |
-| `/tmp` pinned scratch | ~47 GiB | see §5 | ≥ 20 GiB released | pass |
+| MemAvailable | 4.7 GiB | 8.39 GiB | ≥ 8 GiB | pass |
+| Free swap | ~77 GiB | 110.2 GiB | ≥ 100 GiB | pass |
+| PSI `full` avg10 | 41.6 (avg300) | 0.00–0.07 | ≤ 5.0 | pass |
+| Load average (1m) | 46–60 | 6.5–11.6 | ≤ 16 | pass |
+| `/tmp` pinned scratch | ~40 GiB | 4.9 GiB | ≥ 20 GiB released | pass (35.3 GiB) |
+| `/` used | 81% | 77% | — | 199 GiB free |
+
+Sustained check taken 2026-11-13 05:25 UTC, more than ten minutes after
+the last remediation step.
 
 ### The terminated processes, with the evidence for each
 
@@ -66,8 +70,9 @@ was killed on a guess.
 | 2402194, 3576604, 3921231 | `MainThread` / `.mjs` dev servers, 125–312 h idle | `reap_stale_dev_servers`: 24 h+ idle, ≤60 s lifetime CPU, no tty, allowlisted signature |
 | 2584714, 1057147, 1059322, 1061165, 1024200, 2315675, 3870360, 1473054, 1412051, 3988293, 2449272, 2463653, 2482759, 2531092, 2540084, 2549102, 2556776, 2570541, 2580997, 2592286, 2629779, 2683385 and the `bun`/`vite`/`chrome_crashpad` cohort | orphaned test/dev processes under memory pressure | parent-dead (reparented to `systemd --user`), terminal-less, allowlisted signature, re-verified live at kill time |
 | 182592 | `tmux` server, 4.5 GiB swap | the host's swap pressure; replaced by a fresh server |
-| 928896 (`muxad`) | muxa observability daemon, 1.4 GiB swap | resident since 2026-10-01, fully swapped out; `muxad.service` has `Restart=on-failure`, so it is launcher-managed and safe to reclaim |
-| 1826302 (`terhubd`) | terhub daemon, 2.1 GiB swap | resident since 2026-10-01, fully swapped out; no `terhubd.service` unit exists, so it is a standalone process |
+| 928896 (`muxad`) | muxa observability daemon, 1.4 GiB swap | resident since 2026-10-01, fully swapped out; `muxad.service` has `Restart=on-failure`, so it is launcher-managed and safe to reclaim. It stayed down (`muxad.service` → `inactive dead`) |
+| 1826302 (`terhubd`), 555692, 3486979 | terhub daemon, 2.1 GiB swap, then 237 MiB resident | resident since 2026-10-01, fully swapped out. Launcher verified: there is NO `terhubd.service` unit (neither user nor system); the launcher is a tmux pane scope, so the reclaim is transient by construction and it respawns |
+| 1108482 (`bun scripts/ingest.mjs --apply`) | 495 MiB RSS + 368 MiB swap | named in the objective; 2 h old with 3 CPU ticks accrued over 5 s (idle), wrapped in a `timeout` that keeps it out of the orphan rule |
 | 398517, 2740677, 824480, 1038956, 1106593, 1197523, 2647145, 3552627 | `pi` sessions with no CPU accrual and no ledger/transcript write in the idle window | the idle-retirement rule of §3 |
 
 The `pressure-reap` cohort is large because the guard was under memory
@@ -198,21 +203,58 @@ grep -rho 'User has answered your questions: .\{0,1600\}' \
      .pi-glla/ledger-segments/*.jsonl
 ```
 
-run recursively over an **append-only** corpus. Two facts make this
-pathological rather than merely slow:
+run recursively over an **append-only** corpus.
 
-- The corpus is **unbounded**. `junk-runner/.pi-glla/ledger-segments`
-  held **334 immutable segment files totalling 2.7 GiB** at the time of
-  the incident; the plugin's own ledger directory held 285 MiB across
-  the same shape. Each segment is a rotated 8 MiB chunk that is never
-  pruned.
-- The scan was **recursive and unbounded in output** (`-r -h -o`), so it
-  re-read the whole corpus on every invocation. 1.5 B major faults is
-  what that costs.
+### 4.1 What the investigation found
 
-The durable fix is to **bound the corpus**, not to police the grep. A
-recursive scan over a corpus that cannot grow past a fixed budget is a
-bounded operation, whatever command runs it.
+A repository-wide search for the spawner (`rg -e '-rho'` over
+`pi-plugins/`, `dracon-utilities/` and the pi patch directory) found **no
+code path that issues this command**. The envelope string it searched for
+lives in a sibling plugin's `src/envelope.ts`; nothing in GLLA or in the
+guard spawns a recursive scan over the segment directory. The scan was an
+ad-hoc agent shell command, and killing the process removed the symptom
+without removing anything.
+
+That is exactly why the objective says the *scan* is not the defect. The
+defect is that the corpus it scans is **unbounded**:
+
+- The segment directory is **append-only and was never pruned**. The
+  rotation path moved the live ledger aside into a new immutable segment
+  every 8 MiB and never removed one.
+- A long-lived downstream project was observed holding **334 immutable
+  segment files totalling 2.7 GiB**. The plugin's own ledger directory
+  held 285 MiB in the same shape.
+- 1.5 B major faults is what a recursive scan over that corpus costs.
+
+### 4.2 The durable fix — bound the corpus, and bound the read
+
+Two changes, both in the plugin that owns the ledger:
+
+1. **The corpus is now bounded.** `pruneLedgerSegments` runs inside the
+   rotation path — the moment the corpus grows — and keeps the newest
+   `LEDGER_SEGMENT_MAX_COUNT` (64) segments, i.e. 512 MiB at the 8 MiB
+   rotation size. The safety properties are deliberate:
+   - the newest segments are NEVER pruned;
+   - a segment younger than seven days is NEVER pruned, so pruning cannot
+     race a forensic read or an in-flight audit job;
+   - symlinks are never followed or deleted;
+   - an unreadable segment directory is left entirely alone (fail closed);
+   - every removal is recorded in the live journal as a
+     `ledger_segment_pruned` record, so a pruned segment is never silent;
+   - `maxSegments = 0` disables pruning explicitly — never implicitly.
+
+2. **The plugin's own unbounded read is now bounded.** The loop's
+   spec-item-progress counter asked a TIME-BOUNDED question ("rows at or
+   after this iteration started") through `scanLedgerRecords`, which
+   reads EVERY ledger byte. It now uses `scanLedgerRecordsSince`, which
+   visits the segments newest-first and stops at the first one that
+   contributes no qualifying row — so the cost is proportional to the
+   answer rather than to the project's age. Same rows, bounded work.
+
+With a bounded corpus, any recursive scan over it is a bounded
+operation, whatever command runs it. That is the property the incident
+required, and it is now enforced by the writer instead of requested of
+the reader.
 
 ## 5. Phase 3 — the `/tmp` writer, identified before anything was deleted
 
