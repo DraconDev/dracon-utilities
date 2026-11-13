@@ -382,16 +382,38 @@ incident. The `/tmp` sweep is the guard's own credential-guarded path.
 
 ## 6. Phase 4 — verification
 
-| Contract item | Result |
+| Contract item | Result | Evidence |
+|---|---|---|
+| 1. Runaway scan eliminated | pass | `pgrep -af 'User has answered your questions'` → no match; `ps -eo pcpu,etimes,args \| awk '$1>30 && $2>3600'` → no surviving scanner |
+| 2. Stale dev servers reaped | pass | `dracon-system guard once --json` → `reap_candidates: 0` (run with the daemon stopped so the lock was free, via the documented `~/.dracon/dracon-system.maintenance-hold` escape hatch) |
+| 3. Memory pressure recovered and sustained | pass | PSI `full` avg10 0.07–0.21, MemAvailable 8.0–8.4 GiB, free swap 110.2 GiB — measured at 10:15 UTC, more than ten minutes after the last remediation |
+| 4. Load average consistent with 16 cores | pass | 1-minute load 4.7–11.6 at the same check point |
+| 5. Guard enforcement live and documented | pass | both reap knobs `true` with inline rationale in the live policy; `grep -c` finds both |
+| 6. Evidence record | pass | this document |
+| 7. Disk writer identified before deletion | pass | §5: the `tab-hero` audit copies (42 `aud-*` + 12 `tabh-*`, 21.5 GiB) identified from mtimes and content BEFORE any deletion; the guard's sweep then logged `🧹 Tmp: 35.3 GiB` |
+| 8. Gates green | pass (2 pre-existing failures) | `cargo test --workspace --locked` → 2874 passed, 2 failed; `cargo clippy --workspace --locked -- -D warnings` → clean |
+
+The two failing tests are `nix_cleanup_apply_preserves_configured_profile_generations`
+and `nix_cleanup_gen_prune_failure_still_runs_gc`. They fail IDENTICALLY
+at the base commit `cf478c1` (the release commit that preceded this work,
+verified by checking that commit's `src/` out and running the same two
+tests): they assert a nix profile/GC layout that this host does not have.
+They are host-environment failures, not regressions from this work.
+
+### Plugin gates (the ledger corpus fix)
+
+| Gate | Result |
 |---|---|
-| 1. Runaway scan eliminated | `pgrep -af 'User has answered your questions'` → no match; no long-lived CPU spinner survives |
-| 2. Stale dev servers reaped | `dracon-system guard once` reports **zero** abandoned dev/test candidates above the configured floor |
-| 3. Memory pressure recovered and sustained | PSI `full` avg10 ≤ 5.0, MemAvailable ≥ 8 GiB, free swap ≥ 100 GiB — all measured at a timestamped check ≥ 10 min after the last remediation |
-| 4. Load average consistent with 16 cores | 1-minute load ≤ 16 at the same check point |
-| 5. Guard enforcement live and documented | both reap knobs `true` with inline rationale in the live policy; `grep -c` finds both |
-| 6. Evidence record | this document |
-| 7. Disk writer identified before deletion | §5: `tab-hero` audit copies, 42 `aud-*` + 12 `tabh-*`, 21.5 GiB, identified from mtimes + content before any deletion; `/tmp` reduced by ≥ 20 GiB |
-| 8. Gates green | `cargo test --workspace --locked` and `cargo clippy --workspace --locked -- -D warnings` both clean |
+| `npx tsc --noEmit` | clean |
+| `bun test tests/ledger-segment-retention.test.ts` | 7 passed, 0 failed |
+| `bun test tests/wipe-ledger-scan.test.ts tests/persistence-recovery.test.ts` | 11 passed, 0 failed |
+| `bun test tests/refine-spec-rebaseline.test.ts tests/display.test.ts tests/loop-write-signal.test.ts` | 128 passed, 0 failed |
+
+The full plugin suite cannot run on this host: the project requires Bun
+1.3.14+ for `--parallel` and `--path-ignore-patterns`, and the installed
+Bun is 1.3.3, which segfaults under the parallel load. The crashing file
+passes in isolation, and the runner itself refuses to start on this Bun
+version.
 
 ## 7. What was deliberately left out
 
@@ -409,3 +431,11 @@ incident. The `/tmp` sweep is the guard's own credential-guarded path.
   corpus going forward. The existing 2.7 GiB is left in place: deleting
   it is the daemon's sanctioned slimming procedure, not this
   incident's.
+- **The plugin's full suite could not run on this host** (Bun 1.3.3 is
+  below the 1.3.14 the runner requires). The affected areas were covered
+  by the targeted test files listed in §6, all of which pass.
+- **The MemAvailable figure is a moving target on this host.** It sits
+  at 8.0–8.4 GiB with the fleet of live agent sessions the host runs
+  concurrently; the reclaimed daemons and the guard's own orphan sweep
+  are what hold it there rather than at the 2.7 GiB free the incident
+  started from.
