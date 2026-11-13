@@ -448,14 +448,16 @@ incident. The `/tmp` sweep is the guard's own credential-guarded path.
 | 5. Guard enforcement live and documented | pass | both reap knobs `true` with inline rationale in the live policy; `grep -c` finds both |
 | 6. Evidence record | pass | this document |
 | 7. Disk writer identified before deletion | pass | §5: the `tab-hero` audit copies (42 `aud-*` + 12 `tabh-*`, 21.5 GiB) identified from mtimes and content BEFORE any deletion; the guard's sweep then logged `🧹 Tmp: 35.3 GiB`, and `/tmp` measures 12 GiB against a ~40 GiB baseline (28 GiB released) |
-| 8. Gates green | pass (2 pre-existing failures) | `cargo test --workspace --locked --no-fail-fast` → 3044 distinct tests passed, 2 failed; `cargo clippy --workspace --locked -- -D warnings` → clean |
+| 8. Gates green | pass | `cargo test --workspace --locked` → **3177 passed, 0 failed** (2026-11-13 ~15:00 UTC); `cargo clippy --workspace --locked -- -D warnings` → clean; `cargo build --release --locked` → clean |
 
-The two failing tests are `nix_cleanup_apply_preserves_configured_profile_generations`
-and `nix_cleanup_gen_prune_failure_still_runs_gc`. They fail IDENTICALLY
-at the base commit `cf478c1` (the release commit that preceded this work,
-verified by checking that commit's `src/` out and running the same two
-tests): they assert a nix profile/GC layout that this host does not have.
-They are host-environment failures, not regressions from this work.
+**CORRECTED 2026-11-13 (audit round 2).** The first draft of this record
+called the two failing nix tests
+(`nix_cleanup_apply_preserves_configured_profile_generations`,
+`nix_cleanup_gen_prune_failure_still_runs_gc`) "host-environment
+failures, not regressions". That diagnosis was wrong, and the auditor's
+mechanical gate check rejected the claim because of them: they were a
+real production defect that only manifests on NixOS hosts. The full
+root-cause analysis, fix, falsification check and gates are in §8.
 
 ### Plugin gates (the ledger corpus fix)
 
