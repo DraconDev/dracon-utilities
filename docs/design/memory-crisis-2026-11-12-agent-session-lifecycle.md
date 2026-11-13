@@ -498,3 +498,79 @@ version.
   concurrently; the reclaimed daemons and the guard's own orphan sweep
   are what hold it there rather than at the 2.7 GiB free the incident
   started from.
+
+## 8. Audit round 2 (2026-11-13): the skipped-GC defect behind the "host-environment" failures
+
+### The objection
+
+The detached auditor's mechanical contract check ran
+`cargo test --workspace --locked` and failed (exit 101, on both
+attempts). Contract item 8 requires that gate to pass; "2 pre-existing
+failures" is not a passing gate, and the previous round's diagnosis did
+not survive scrutiny.
+
+### The root cause — a production bug, not a host-layout mismatch
+
+`clean_nix_garbage_with_bins` (`dracon-system/src/main.rs`) builds a
+closure-safe spread plan for the root-owned NixOS system profile from
+`/nix/var/nix/profiles/system-<n>-link`. When a plan existed, the code
+attempted the system prune and then **returned early — skipping
+`nix-collect-garbage` entirely**. Its own warning text promised "user GC
+still runs"; on any NixOS host above the retention it never did. This
+host carries generations 312–318, so the guard's nix cleanup had never
+reclaimed store garbage here — a disk-reclaim defect directly in the
+path of this incident's Phase 3.
+
+The two fake-bin tests passed on dev hosts because those hosts have no
+system links: the plan was `None`, the early return was unreachable, and
+GC ran. On this NixOS host the branch was live and both tests failed —
+the apply test's last logged call was the system prune instead of
+`nix-gc:`, and the prune-failure test collected 0 GC results instead
+of 1. The earlier "fails identically at the base commit" observation was
+correct but misread: the base commit carries the same host-conditional
+bug, so reproducing it on the SAME host is expected, and is not evidence
+of a host-environment mismatch.
+
+### The fix (dracon-system commit `42177ef`)
+
+1. **Removed the early return.** Store GC now always runs after the
+   system-profile prune attempt, whether that prune succeeded or failed
+   — the documented contract, and what the prune-failure test protects.
+2. **Made the NixOS branch injectable.** `system_profile_spread_plan`
+   now takes the profile directory and run root as parameters (its old
+   `nix_env` parameter was unused); `clean_nix_garbage_with_bins` is a
+   thin wrapper over `clean_nix_garbage_impl` with the real paths.
+3. **New hermetic regression test**,
+   `nix_store_gc_runs_after_system_profile_prune_on_nixos_layout`: a
+   fixture profile with seven generation links, a fixture
+   `current-system` naming the booted one, a fake `nix-env` whose
+   system-profile prune (the `-p` call) fails like the real root-blocked
+   one, and a fake `nix-gc`. It asserts the system branch was actually
+   exercised, that GC ran AFTER it, and that GC results survived the
+   prune failure. It forces the branch on ANY host — closing the exact
+   coverage gap that let the defect ship green from dev hosts.
+
+**Falsification check** (run under `dracon-sync maintenance --` so the
+daemon could not commit the mutated state): re-introducing the early
+return makes the new test fail (exit 101, panic at the GC-survival
+assertion); reverting makes it pass. The two original tests pass on both
+host layouts with their protected requirements unchanged.
+
+### Gates (2026-11-13, this host, after the fix)
+
+| Gate | Result |
+|---|---|
+| `cargo test --workspace --locked` | **3177 passed, 0 failed** (44 target results ok, exit 0) |
+| `cargo clippy --workspace --locked -- -D warnings` | clean (exit 0) |
+| `cargo build --release --locked` | clean (exit 0) |
+
+### Deployment
+
+The fixed release binary was installed to `~/.local/bin/dracon-system`
+and the guard restarted at **15:04 UTC** through the documented
+maintenance-hold procedure (hold marker → stop → `guard once` evidence →
+start → marker removed; service `active`, watchdog backstop intact).
+`guard once --json` on the new binary: `reap_candidates: []`,
+`reaped: []`, `pressure_reaped: []`, and `session_fleet` reporting the
+32-session pi fleet with the fleet rule over bound (first-pass
+`unknown` is the honest CPU-baseline reset after a restart).
