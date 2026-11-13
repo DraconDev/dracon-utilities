@@ -45,18 +45,18 @@ idle-retirement rule that never uses raw age as evidence.
 
 ### After reclamation
 
-| Metric | Starting | After | Contract threshold | Verdict |
-|---|---|---|---|---|
-| MemAvailable | 4.7 GiB | 8.0–8.4 GiB | ≥ 8 GiB | pass |
-| Free swap | ~77 GiB | 110.2 GiB | ≥ 100 GiB | pass |
-| PSI `full` avg10 | 41.6 (avg300) | 0.07–0.21 | ≤ 5.0 | pass |
-| Load average (1m) | 46–60 | 4.7–11.6 | ≤ 16 | pass |
-| `/tmp` pinned scratch | ~40 GiB | 4.9 GiB | ≥ 20 GiB released | pass (35.3 GiB) |
-| `/` used | 81% | 77% | — | 199 GiB free |
+Sustained check: **2026-11-13 10:37 UTC**, 10.5 minutes after the last
+remediation step (the guard restart that put the fleet-aware exemption
+and the idle-retirement rule live).
 
-Sustained check taken 2026-11-13 10:15 UTC, more than ten minutes after
-the last remediation step (the guard restart that put the fleet-aware
-exemption and the idle-retirement rule live).
+| Metric | Starting | After (10:37 UTC) | Contract threshold | Verdict |
+|---|---|---|---|---|
+| MemAvailable | 4.7 GiB | **8.15 GiB** (8541292 KiB) | ≥ 8 GiB | pass |
+| Free swap | ~77 GiB | **108.4 GiB** (113757240 KiB) | ≥ 100 GiB | pass |
+| PSI `full` avg10 | 41.6 (avg300) | **0.03** | ≤ 5.0 | pass |
+| Load average (1m) | 46–60 | **3.78** | ≤ 16 | pass |
+| `/tmp` pinned scratch | ~40 GiB | **7.0 GiB** | ≥ 20 GiB released | pass (33 GiB) |
+| `/` used | 81% | 78% | — | 195 GiB free |
 
 The guard's own sweep made the `/tmp` figure concrete: at 01:26:55 it
 logged `🧹 Tmp: 35.3 GiB` reclaimed in one pass.
@@ -76,7 +76,8 @@ was killed on a guess.
 | 182592 | `tmux` server, 4.5 GiB swap | the host's swap pressure; replaced by a fresh server |
 | 928896 (`muxad`) | muxa observability daemon, 1.4 GiB swap | resident since 2026-10-01, fully swapped out; `muxad.service` has `Restart=on-failure`, so it is launcher-managed and safe to reclaim. It stayed down (`muxad.service` → `inactive dead`) |
 | 1826302 (`terhubd`), 555692, 3486979 | terhub daemon, 2.1 GiB swap, then 237 MiB resident | resident since 2026-10-01, fully swapped out. Launcher verified: there is NO `terhubd.service` unit (neither user nor system); the launcher is a tmux pane scope, so the reclaim is transient by construction and it respawns |
-| 1108482 (`bun scripts/ingest.mjs --apply`) | 495 MiB RSS + 368 MiB swap | named in the objective; 2 h old with 3 CPU ticks accrued over 5 s (idle), wrapped in a `timeout` that keeps it out of the orphan rule |
+| 1108482 (`bun scripts/ingest.mjs --apply`), 3820422 (the same job, a second instance) | 495 MiB RSS + 368 MiB swap, then 387 MiB RSS | named in the objective; 2 h and 4.9 h old respectively, with 0 bytes written and 1000 bytes read over a 20 s observation — a stalled job, wrapped in a `timeout` that keeps it out of the orphan rule |
+| 3570509 (`opencode`) | an agent session spinning at 100% of a core | thread 3787194 burned 29 s of CPU per 30 s of wall clock while the process read 74 bytes and wrote 976 bytes, for 30,900 CPU-seconds (8.6 CPU-hours) in total — a busy-loop, not work. This is the same class as the "spinning agent sessions" the objective names |
 | 398517, 2740677, 824480, 1038956, 1106593, 1197523, 2647145, 3552627 | `pi` sessions with no CPU accrual and no ledger/transcript write in the idle window | the idle-retirement rule of §3 |
 
 The `pressure-reap` cohort is large because the guard was under memory
@@ -399,11 +400,11 @@ incident. The `/tmp` sweep is the guard's own credential-guarded path.
 |---|---|---|
 | 1. Runaway scan eliminated | pass | `pgrep -af 'User has answered your questions'` → no match; `ps -eo pcpu,etimes,args \| awk '$1>30 && $2>3600'` → no surviving scanner |
 | 2. Stale dev servers reaped | pass | `dracon-system guard once --json` → `reap_candidates: 0` (run with the daemon stopped so the lock was free, via the documented `~/.dracon/dracon-system.maintenance-hold` escape hatch) |
-| 3. Memory pressure recovered and sustained | pass | PSI `full` avg10 0.07–0.21, MemAvailable 8.0–8.4 GiB, free swap 110.2 GiB — measured at 10:15 UTC, more than ten minutes after the last remediation |
-| 4. Load average consistent with 16 cores | pass | 1-minute load 4.7–11.6 at the same check point |
+| 3. Memory pressure recovered and sustained | pass | PSI `full` avg10 **0.03**, MemAvailable **8.15 GiB**, free swap **108.4 GiB** — measured at 10:37 UTC, 10.5 minutes after the last remediation |
+| 4. Load average consistent with 16 cores | pass | 1-minute load **3.78** at the same check point |
 | 5. Guard enforcement live and documented | pass | both reap knobs `true` with inline rationale in the live policy; `grep -c` finds both |
 | 6. Evidence record | pass | this document |
-| 7. Disk writer identified before deletion | pass | §5: the `tab-hero` audit copies (42 `aud-*` + 12 `tabh-*`, 21.5 GiB) identified from mtimes and content BEFORE any deletion; the guard's sweep then logged `🧹 Tmp: 35.3 GiB` |
+| 7. Disk writer identified before deletion | pass | §5: the `tab-hero` audit copies (42 `aud-*` + 12 `tabh-*`, 21.5 GiB) identified from mtimes and content BEFORE any deletion; the guard's sweep then logged `🧹 Tmp: 35.3 GiB`, and `/tmp` measures 7.0 GiB against a ~40 GiB baseline |
 | 8. Gates green | pass (2 pre-existing failures) | `cargo test --workspace --locked` → 2874 passed, 2 failed; `cargo clippy --workspace --locked -- -D warnings` → clean |
 
 The two failing tests are `nix_cleanup_apply_preserves_configured_profile_generations`
