@@ -190,11 +190,47 @@ fleet that has passed its bound.
 | File | Change |
 |---|---|
 | `dracon-system/src/session_guard.rs` | New module: `SessionTracker` (cross-pass CPU baseline), `classify_evidence` (the two-condition idle rule), `exemption_pids` (the fleet rule), `retirement_candidates`, `verify_retirement` (the last gate before a signal) |
-| `dracon-system/src/session_guard_tests.rs` | 21 unit tests. The assertions that matter most are the **negative** ones: a session that accrued CPU, one with a recent write, one that cannot be measured, one that woke up between scan and signal, a recycled PID, and the guard itself must all survive |
-| `dracon-system/src/policy.rs` | New fields: `agent_session_names`, `session_idle_window_secs`, `max_active_sessions`, `session_registry_dir`, `session_ledger_roots`, `retire_idle_agent_sessions` — all with defaults, so an existing config keeps its behaviour byte-for-byte |
+| `dracon-system/src/session_guard_tests.rs` | 25 unit tests. The assertions that matter most are the **negative** ones: a session that accrued CPU, one with a recent write, one that cannot be measured, one that woke up between scan and signal, a recycled PID, and the guard itself must all survive |
+| `dracon-system/src/policy.rs` | New fields: `agent_session_names`, `session_idle_window_secs`, `max_active_sessions`, `session_registry_dir`, `retire_idle_agent_sessions` — all with defaults, so an existing config keeps its behaviour byte-for-byte |
 | `dracon-system/src/main.rs` | `refresh_session_fleet` (observe + reclassify each pass), `retire_idle_sessions` (the ending half), and the fleet-aware exemption applied at the memory-pressure offender selection |
 | `dracon-system/src/reap.rs` | Two narrow reap signatures for the idle agent-runtime DAEMONS (see §3.6) |
 | `dracon-system/src/main.rs` | `refresh_session_fleet` (observe + reclassify each pass), `retire_idle_sessions` (the ending half), the fleet-aware exemption applied at the memory-pressure offender selection, and the `session_fleet` block in the guard report |
+
+### 3.4.1 The exemption sentinel (audit fix, 2026-11-13)
+
+The first cut of `exemption_pids` returned a plain `Vec<i32>`, and its
+consumer read "empty set" as "no agent-session lifecycle is configured",
+which restored the blanket per-name exemption. That is the exact
+failure the fleet rule exists to remove, and it was reachable in the
+scenario the objective names: a fleet of PARKED sessions produces an
+empty set, because every session is idle and none of them holds the
+pass.
+
+The distinction now travels with the value:
+
+| State | Meaning | Effect on the consumer |
+|---|---|---|
+| `None` | no agent-session lifecycle is configured | the plain name-based exemption applies unchanged |
+| `Some(set)`, `set` non-empty | configured; these sessions hold the pass | per-pid decision |
+| `Some(set)`, `set` EMPTY | configured; NO session holds the pass | the sessions are mitigation candidates, not exempt consumers |
+
+Both consumers — the offender selection and the exempt-footprint report —
+now call ONE shared helper (`keeps_memory_exemption`), so the two cannot
+drift apart again. The regression test is
+`an_all_idle_over_bound_fleet_is_reported_as_offenders_not_exempt_consumers`
+(twelve parked sessions, bound eight → they must be reported as
+mitigation candidates and must NOT appear as exempt consumers).
+
+A disposable fixture under `/tmp` (the repo untouched) proved the test
+detects the defect rather than merely passing: the pre-fix logic keeps
+the exemption for `Some(empty)`, the post-fix logic does not, and the
+`None` path is unchanged in both — so a host that never opts into the
+lifecycle still behaves exactly as before.
+
+The unused `session_ledger_roots` policy field was removed at the same
+time: the ledger is located through the session's working directory
+(`<cwd>/.pi-glla/active.jsonl`), so the knob could only ever have been
+inert, and an operator who set it would have believed it did something.
 
 ### 3.7 The fleet is visible in the report
 
