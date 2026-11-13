@@ -45,18 +45,25 @@ idle-retirement rule that never uses raw age as evidence.
 
 ### After reclamation
 
-Sustained check: **2026-11-13 10:37 UTC**, 10.5 minutes after the last
-remediation step (the guard restart that put the fleet-aware exemption
-and the idle-retirement rule live).
+Sustained check: **2026-11-13 11:59 UTC**, 11 minutes after the last
+remediation step (the guard restart that put the fleet-aware exemption,
+the idle-retirement rule, and the exemption-sentinel fix live).
 
-| Metric | Starting | After (10:37 UTC) | Contract threshold | Verdict |
+| Metric | Starting | After (11:59 UTC) | Contract threshold | Verdict |
 |---|---|---|---|---|
-| MemAvailable | 4.7 GiB | **8.15 GiB** (8541292 KiB) | ≥ 8 GiB | pass |
-| Free swap | ~77 GiB | **108.4 GiB** (113757240 KiB) | ≥ 100 GiB | pass |
-| PSI `full` avg10 | 41.6 (avg300) | **0.03** | ≤ 5.0 | pass |
-| Load average (1m) | 46–60 | **3.78** | ≤ 16 | pass |
-| `/tmp` pinned scratch | ~40 GiB | **7.0 GiB** | ≥ 20 GiB released | pass (33 GiB) |
-| `/` used | 81% | 78% | — | 195 GiB free |
+| MemAvailable | 4.7 GiB | **8.52 GiB** (8935500 KiB) | ≥ 8 GiB | pass |
+| Free swap | ~77 GiB | **113.0 GiB** (118539908 KiB) | ≥ 100 GiB | pass |
+| PSI `full` avg10 | 41.6 (avg300) | **0.18** | ≤ 5.0 | pass |
+| Load average (1m) | 46–60 | **12.22** (16 cores) | ≤ 16 | pass |
+| `/tmp` pinned scratch | ~40 GiB | **12 GiB** | ≥ 20 GiB released | pass (28 GiB) |
+| `/` used | 81% | 78% | — | 192 GiB free |
+
+An earlier sustained check at 10:37 UTC read 8.15 GiB / 108.4 GiB free
+swap / PSI 0.03 / load 3.78; the figures above are the post-fix
+checkpoint. MemAvailable oscillates with the host's concurrent agent and
+browser workload (samples between 6.3 and 8.9 GiB across the
+observation window) — the threshold is met at the checkpoint, but the
+margin is thin while ~29 agent sessions and the operator's browser run.
 
 The guard's own sweep made the `/tmp` figure concrete: at 01:26:55 it
 logged `🧹 Tmp: 35.3 GiB` reclaimed in one pass.
@@ -436,12 +443,12 @@ incident. The `/tmp` sweep is the guard's own credential-guarded path.
 |---|---|---|
 | 1. Runaway scan eliminated | pass | `pgrep -af 'User has answered your questions'` → no match; `ps -eo pcpu,etimes,args \| awk '$1>30 && $2>3600'` → no surviving scanner |
 | 2. Stale dev servers reaped | pass | `dracon-system guard once --json` → `reap_candidates: 0` (run with the daemon stopped so the lock was free, via the documented `~/.dracon/dracon-system.maintenance-hold` escape hatch) |
-| 3. Memory pressure recovered and sustained | pass | PSI `full` avg10 **0.03**, MemAvailable **8.15 GiB**, free swap **108.4 GiB** — measured at 10:37 UTC, 10.5 minutes after the last remediation |
-| 4. Load average consistent with 16 cores | pass | 1-minute load **3.78** at the same check point |
+| 3. Memory pressure recovered and sustained | pass | PSI `full` avg10 **0.18**, MemAvailable **8.52 GiB**, free swap **113.0 GiB** — measured at 11:59 UTC, 11 minutes after the last remediation |
+| 4. Load average consistent with 16 cores | pass | 1-minute load **12.22** at the same check point (16 cores) |
 | 5. Guard enforcement live and documented | pass | both reap knobs `true` with inline rationale in the live policy; `grep -c` finds both |
 | 6. Evidence record | pass | this document |
-| 7. Disk writer identified before deletion | pass | §5: the `tab-hero` audit copies (42 `aud-*` + 12 `tabh-*`, 21.5 GiB) identified from mtimes and content BEFORE any deletion; the guard's sweep then logged `🧹 Tmp: 35.3 GiB`, and `/tmp` measures 7.0 GiB against a ~40 GiB baseline |
-| 8. Gates green | pass (2 pre-existing failures) | `cargo test --workspace --locked` → 2874 passed, 2 failed; `cargo clippy --workspace --locked -- -D warnings` → clean |
+| 7. Disk writer identified before deletion | pass | §5: the `tab-hero` audit copies (42 `aud-*` + 12 `tabh-*`, 21.5 GiB) identified from mtimes and content BEFORE any deletion; the guard's sweep then logged `🧹 Tmp: 35.3 GiB`, and `/tmp` measures 12 GiB against a ~40 GiB baseline (28 GiB released) |
+| 8. Gates green | pass (2 pre-existing failures) | `cargo test --workspace --locked --no-fail-fast` → 3044 distinct tests passed, 2 failed; `cargo clippy --workspace --locked -- -D warnings` → clean |
 
 The two failing tests are `nix_cleanup_apply_preserves_configured_profile_generations`
 and `nix_cleanup_gen_prune_failure_still_runs_gc`. They fail IDENTICALLY
