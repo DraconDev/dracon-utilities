@@ -47,15 +47,19 @@ idle-retirement rule that never uses raw age as evidence.
 
 | Metric | Starting | After | Contract threshold | Verdict |
 |---|---|---|---|---|
-| MemAvailable | 4.7 GiB | 8.39 GiB | ≥ 8 GiB | pass |
+| MemAvailable | 4.7 GiB | 8.0–8.4 GiB | ≥ 8 GiB | pass |
 | Free swap | ~77 GiB | 110.2 GiB | ≥ 100 GiB | pass |
-| PSI `full` avg10 | 41.6 (avg300) | 0.00–0.07 | ≤ 5.0 | pass |
-| Load average (1m) | 46–60 | 6.5–11.6 | ≤ 16 | pass |
+| PSI `full` avg10 | 41.6 (avg300) | 0.07–0.21 | ≤ 5.0 | pass |
+| Load average (1m) | 46–60 | 4.7–11.6 | ≤ 16 | pass |
 | `/tmp` pinned scratch | ~40 GiB | 4.9 GiB | ≥ 20 GiB released | pass (35.3 GiB) |
 | `/` used | 81% | 77% | — | 199 GiB free |
 
-Sustained check taken 2026-11-13 05:25 UTC, more than ten minutes after
-the last remediation step.
+Sustained check taken 2026-11-13 10:15 UTC, more than ten minutes after
+the last remediation step (the guard restart that put the fleet-aware
+exemption and the idle-retirement rule live).
+
+The guard's own sweep made the `/tmp` figure concrete: at 01:26:55 it
+logged `🧹 Tmp: 35.3 GiB` reclaimed in one pass.
 
 ### The terminated processes, with the evidence for each
 
@@ -176,6 +180,30 @@ session that has been demonstrably idle for the whole window.
 | `dracon-system/src/policy.rs` | New fields: `agent_session_names`, `session_idle_window_secs`, `max_active_sessions`, `session_registry_dir`, `session_ledger_roots`, `retire_idle_agent_sessions` — all with defaults, so an existing config keeps its behaviour byte-for-byte |
 | `dracon-system/src/main.rs` | `refresh_session_fleet` (observe + reclassify each pass), `retire_idle_sessions` (the ending half), and the fleet-aware exemption applied at the memory-pressure offender selection |
 | `dracon-system/src/reap.rs` | Two narrow reap signatures for the idle agent-runtime DAEMONS (see §3.6) |
+| `dracon-system/src/main.rs` | `refresh_session_fleet` (observe + reclassify each pass), `retire_idle_sessions` (the ending half), the fleet-aware exemption applied at the memory-pressure offender selection, and the `session_fleet` block in the guard report |
+
+### 3.7 The fleet is visible in the report
+
+A policy nobody can see is a policy nobody can audit. The guard report
+now carries the fleet explicitly:
+
+```json
+"session_fleet": {
+  "names": ["pi"], "total": 31, "active": 0, "idle": 0, "unknown": 31,
+  "max_active_sessions": 8, "over_bound": true, "exempt": 31
+}
+```
+
+`unknown` is the honest first reading: on the first pass the guard has no
+CPU baseline for any session yet, so it cannot claim they are active —
+only that it does not yet know. As the passes accumulate, a session that
+accrues CPU becomes `active` and a session that neither accrues CPU nor
+writes to its transcript or ledger across the whole window becomes `idle`
+(and retirable).
+
+`over_bound: true` is the fleet rule reporting that the fleet has passed
+its bound, so the exemption narrows from "every session of this name" to
+"the demonstrably active ones".
 
 ### 3.6 The idle agent-runtime daemons
 
