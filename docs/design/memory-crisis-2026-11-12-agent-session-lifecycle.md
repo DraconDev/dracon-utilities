@@ -605,3 +605,31 @@ checks clean), `guard once --json` on the fixed binary reports
 `reap_candidates: []`, both reap knobs remain `true` with inline
 rationale in `~/.dracon/utilities/system/dracon-system.toml`, and
 `/tmp` measures 12–13 GiB against the ~40 GiB pre-incident baseline.
+
+### Live behavioral receipt of the fix (not just install evidence)
+
+The running guard's executable is the fixed build:
+`sha256(/proc/<guard pid>/exe)` =
+`sha256(~/.local/bin/dracon-system)` =
+`sha256(target/release/dracon-system)` =
+`8e7c94303f99a6d00d3870fd0bc68c18fced24483fa676d826cfdf8e208ef98a`.
+
+The fixed path was then exercised through the installed binary itself:
+`dracon-system guard clean --nix --apply` (three runs, 15:3x UTC).
+Each run reached the NixOS system-spread branch — stderr carries the
+expected root-blocked prune warning (`opening lock file
+'/nix/var/nix/profiles/default.lock': Permission denied … user GC still
+runs`) — and, on the third run, the GC child was observed directly:
+
+```
+OBSERVED: dracon-system pid=4172181 spawned nix-collect-garbage pid=4172360
+4172360 4172181  0  /run/current-system/sw/bin/nix-collect-garbage
+```
+
+Before the fix this spawn could not happen on this host: the early
+return fired right after the system-prune warning. The runs completed
+with `apply: true, failures: []`; reclaimed bytes were 0 because the
+store had no unrooted garbage at that moment (a GC run over a clean
+store reports nothing), and one run's 12.2 s wall at ~0.1 s CPU is the
+store-liveness traversal itself. The positive receipt is the observed
+parent→child spawn, not the byte count.
