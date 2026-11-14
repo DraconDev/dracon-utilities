@@ -410,6 +410,12 @@ The no-rewrite policy below is now enforced, not just documented:
    high-water measurements; repeated runs require new loose-byte
    growth and are rate-limited. This self-heals both interrupted-push
    tmp_pack_* bloat and repeated large-file loose-object churn.
+   CHANGED 2026-11-14 (dracon-sync 0.113.99): the loose-object trigger
+   runs an incremental `git repack -d -l`, not a full `gc` (a full gc of
+   browser-extensions-shared's 7.6 GiB of packs never finished inside its
+   600s timeout and looped all night); gc/repack run in
+   `dracon-sync-push.slice`, not the daemon's cgroup; and consecutive
+   failures double the retry wait, capped at one day.
 
 Details: `docs/design/incident-amend-race-and-trust-2026-07-25.md`
 ("Whack-a-mole audit" section).
