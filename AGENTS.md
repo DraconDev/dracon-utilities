@@ -539,6 +539,9 @@ watching. Three things changed:
    `CAP_SYS_NICE`, because an unprivileged user service can lower priority
    but cannot restore it; otherwise it emits one diagnostic and leaves
    processes untouched. Whitelist via `process_exempt_names`.
+   (CHANGED 2026-11-14: the "one diagnostic" is now literal — it was
+   per-pid, ~1,000 lines/week. A user service cannot hold CAP_SYS_NICE, so
+   on this host `auto_renice_on_memory = false`; OOM bias + CPU cap remain.)
 3. **OOM-killer bias** (`bias_oom_on_pressure`, default true): during
    critical pressure offenders get `oom_score_adj` 250 so the kernel's
    last-resort kill picks them, not an innocent process. Never
@@ -577,6 +580,30 @@ behavior when both knobs below are off). Two DESTRUCTIVE opt-ins
    gates (orphanhood is the proof). `guard once` renders both outcomes in
    the table (`Reaped (stale servers)` / `Reaped (pressure orphans)`)
    since 2026-10-08, F118.
+
+**CHANGED 2026-11-14 — orphanhood is NOT abandonment.** Parent = systemd
+was the only proof, and the pressure pass killed live work 5,227 times in
+48h: a healthy `*.service` main process (systemd IS its owner — killed
+~3,000× in a restart loop) and agents' background jobs whose `bash -c`
+wrapper had exited while the agent in the same tmux pane still used them.
+Every reap path now also requires the process NOT be in a `*.service`
+cgroup, and the pressure path additionally requires the launching
+session to be gone (no member of its cgroup has a live, non-init parent
+outside it). Both re-checked at kill time; unreadable cgroup fails closed.
+Operator rule: **kill only what is provably abandoned, never active
+work.** Before trusting a kill path, run the read-only
+`dracon-system guard reap-preview` (shows what every pass WOULD signal
+now; `guard once` really kills).
+
+Related, same day: the session-fleet exemption had narrowed EVERY exempt
+name, so the user systemd manager / plasmashell / chrome were OOM-biased
+to 250 — it now narrows only `agent_session_names`. Idle-session
+retirement (`retire_idle_agent_sessions`) is report-only by default
+(`retire_idle_agent_sessions_dry_run = true`). Deploy locally with
+`dracon-system/scripts/deploy-local.sh` (always restarts and proves the
+running exe is the installed one); `doctor` fails on a guard running a
+replaced `(deleted)` binary. Task list:
+`dracon-system/docs/design/audit-tasklist-2026-11-14.md`.
 
 Design doc: `docs/design/guard-auto-reap-2026-10-04.md`.
 

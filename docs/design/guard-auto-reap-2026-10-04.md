@@ -59,3 +59,31 @@ that contract under an explicit opt-in**.
   harness wrapper can orphan a grandchild sleeper (observed in the smoke
   test, cleaned by hand). Process-group kill is deliberately NOT used --
   the guard must never signal a PID it did not verify.
+
+## Addendum 2026-11-14 — orphanhood is not abandonment
+
+The pressure path's proof ("parent is init/systemd + no tty + signature")
+was wrong in two ways, measured live (5,227 pressure-reaps in 48h):
+
+1. **Supervised services.** A systemd service's main process has systemd
+   as its parent by design. `wave11-micro1-sync.service`
+   (`bun scripts/….mjs`, matched by `.mjs`) was killed every ~30 s for days
+   — ~3,000 kills, matched one-for-one by its `NRestarts`.
+2. **Live sessions.** An agent's `bash -c 'timeout 2400 bun run test &'`
+   wrapper exits at once; the job is reparented to systemd while the agent
+   in the same tmux pane is still waiting on it.
+
+Fix (`reap.rs`): `owner_provably_dead` = parent is systemd AND the process
+is not in a `*.service` cgroup (all reap paths, incl. stale and forgotten
+trees). `session_still_anchored` (pressure path): the process's cgroup
+still contains a member whose live, non-init parent is OUTSIDE that cgroup
+(pane shell under the tmux server, agent under its launcher) ⇒ not
+reaped. A closed pane leaves only parent-dead roots in its scope ⇒ still
+reaped. Both checks repeat at kill time; an unreadable cgroup fails closed.
+
+A heavy runaway inside a live session is no longer killed by the guard;
+OOM-score bias still steers the kernel's last-resort kill at it.
+
+Verification: `dracon-system guard reap-preview` (read-only) against live
+`/proc` — before the fix the pressure pass would have killed the service
+and an in-flight 40-minute test run; after, nothing.
