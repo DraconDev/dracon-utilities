@@ -135,9 +135,12 @@ web/games/wip/football-forever/docs/audit/
 # scan-bloat (v0.112.15) flagged them because their target/ build dirs are huge.
 # We exclude them from the parent so the parent stays meta-only. See
 # docs/design/scan-bloat-review-2026-07-15.md.
-dracon-sync/
-dracon-system/
-dracon-warden/
+# CHANGED 2026-11-14: anchored. Unanchored, these also matched
+# docs/archive/release-notes/<utility>/, so newly archived notes were
+# silently ignored (only pre-existing ones were tracked).
+/dracon-sync/
+/dracon-system/
+/dracon-warden/
 # --- OPERATOR DECISION 2026-11-02 ---
 # Session HTML export exceeds warden's 64 MiB clean limit, so every sync
 # round fails trying to stage it. Ignored (stays on disk); the audit it
