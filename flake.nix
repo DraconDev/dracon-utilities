@@ -562,6 +562,9 @@
                 Description = "Dracon System Guard - Proactive disk space monitoring and cleanup";
                 Documentation = "https://github.com/DraconDev/dracon-utilities";
                 After = [ "network.target" ];
+                # ADDED 2026-11-14: starting the guard re-arms its watchdog timer
+                # (match dracon-system/dracon-system-guard.service).
+                Wants = [ "dracon-system-guard-watchdog.timer" ];
               };
               Service = {
                 Type = "simple";
