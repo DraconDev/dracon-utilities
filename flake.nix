@@ -582,7 +582,9 @@
                 RestartSec = "10";
                 # 78 = EX_CONFIG for malformed/unreadable startup policy; 2 = usage.
                 RestartPreventExitStatus = "2 78";
-                MemoryMax = "250M";
+                # CHANGED 2026-11-14: match dracon-system/dracon-system-guard.service.
+                MemoryHigh = "256M";
+                MemoryMax = "1G";
                 CPUQuota = "20%";
                 TasksMax = "64";
                 NoNewPrivileges = true;
