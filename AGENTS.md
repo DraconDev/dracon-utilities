@@ -33,11 +33,22 @@ there are no gitlinks).
 
 The 3 utilities live in directories under this
 directory, each with its own `.git/`, its own remotes
-(codeberg/github/gitlab), its own history, tags, and CHANGELOG:
+(github + gitlab), its own history, tags, and CHANGELOG:
 
-- `dracon-sync/` → `codeberg:dracondev/dracon-sync-background-auto-commit-multi-remote`
-- `dracon-system/` → `codeberg:dracondev/dracon-system-disk-process-guard-doctor`
-- `dracon-warden/` → `codeberg:dracondev/dracon-warden-secret-encrypt-age-git-filter`
+- `dracon-sync/` → `github:DraconDev/dracon-sync-background-auto-commit-multi-remote` (+ gitlab mirror)
+- `dracon-system/` → `github:DraconDev/dracon-system-disk-process-guard-doctor` (+ gitlab mirror)
+- `dracon-warden/` → `github:DraconDev/dracon-warden-secret-encrypt-age-git-filter` (+ gitlab mirror)
+
+> **CODEBERG IS ABANDONED (operator decision; disabled for the daemon
+> 2026-08-13, re-confirmed 2026-11-15).** The account-wide 85 GiB quota is
+> exhausted — pushes and repo creation fail with `Forgejo: Quota exceeded`
+> / HTTP 413 — and the fleet no longer mirrors there. The live daemon config
+> (`~/.dracon/utilities/sync/dracon-sync.toml`) defines only the `github`
+> and `gitlab` mirror remotes. Codeberg copies are frozen at their
+> 2026-08 state (dracon-system: `dfd2664`, 2026-08-11) and are NOT a
+> release target. Do NOT add `codeberg` remotes, push to Codeberg, or treat
+> a missing Codeberg tag as an incomplete release. References to Codeberg
+> elsewhere in this file and in `docs/design/` are historical.
 
 Utility releases are tagged in the NESTED repos
 (`dracon-sync-vX.Y.Z`, …); the monorepo-era unprefixed `vX.Y.Z` tags
