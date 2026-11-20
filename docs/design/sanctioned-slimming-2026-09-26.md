@@ -444,3 +444,47 @@ unless the operator explicitly reclassifies them.
       passes**, so the nested budget is genuinely the only binding
       constraint. Measured after the rewrite:
       `projectedBytes 919,639,181`, `atOrAboveLimit: false`.
+- **2026-11-20 — browser-extensions-shared (audit/screenshot imagery). Fourth
+  execution; first driven by GitLab's 10 GiB per-project cap rather than the
+  2 GiB bucket guard.**
+  - why: 12.7 GiB of packs. GitLab locked the project at 10,161,969,648 B
+    (`storage quota exceeded` on every push); GitHub has no total cap, so only
+    the mirror failed. Retries also re-ran the repo's per-commit pre-push secret
+    scan over ~3,900 commits (>10 min each) under host memory pressure.
+  - excised (operator-approved class): `png|jpg|jpeg|webp` under any
+    `audit-shots/ screenshots/ *-screenshots/ tmp/ test-results/
+    .playwright-artifacts*/ design-audit-*/ design-pass-*/ .audit-ui/
+    measurements/ audit/` directory — 6,475 paths / 19,421 blobs / 9.0 GiB.
+    Shipped art (`assets/ public/ store-assets/ build-assets/ docs/design/`)
+    untouched. 5,390 of the paths were tracked at HEAD: untracked first (files
+    kept on disk) with an equivalent `.gitignore` block, verified exact with
+    `check-ignore --no-index` (6,475/6,475 cut paths ignored, 0 other images).
+  - result: reachable blobs 12.67 GiB → 3.68 GiB; new GitLab project 4.02 GB.
+  - preservation: all 188,471 non-cut (blob, path) pairs present after the
+    rewrite (`comm -23` → 0); tip tree identical (`654dade6…`).
+  - backup: hardlinked mirror `~/dracon/backups/browser-extensions-shared-pre-slim-20261120.git`
+    (`fsck --connectivity-only` clean; refreshed to the exact cutover old tip
+    inside the window). A 13 GiB `git bundle` could not complete under memory
+    pressure; the hardlinked mirror costs ~0 RAM/disk.
+  - cutover: scratch `filter-repo` in `~/dracon/conv-work/bes-slim`; the 163
+    linear daemon commits made meanwhile were replayed with identical
+    trees/metadata (`hash-object -t commit` with rewritten parent); all 21 refs
+    swapped in one `update-ref --stdin` CAS transaction; GitHub
+    force-with-lease; GitLab project deleted (`DELETE` then `DELETE
+    ?permanently_remove=true&full_path=<…-deletion_scheduled-ID>`), recreated
+    private, `main` auto-protected (force-push off). Final tip `510adad4`
+    identical on local, GitHub and GitLab.
+  - findings:
+    - **a rewritten history must be pushed in chunks.** It shares no commits
+      with the remote, so pack-objects sends nearly every object: the first
+      attempt hit GitHub's `pack exceeds maximum allowed size (2.00 GiB)`.
+      Pushed four first-parent chunks of ≤1.2 GiB (measured with
+      `rev-list --objects <tip> ^<prev>`), first with force-with-lease, then
+      fast-forwards. Same chunks to GitLab.
+    - **keep working files out of /tmp** — a host cleanup removed the work dir
+      mid-procedure. Use `~/dracon/conv-work/`.
+    - **the daemon dropped a duplicate remote (`github` == `origin` URL)
+      mid-window, leaving `refs/remotes/github/main` stale**; the backstop then
+      counted 26,326 "unpushed" commits against it. Delete orphaned tracking
+      refs after cutover (also the old project's `gitlab/master`).
+    - in zsh, `$var:refs/...` applies the `:r` modifier; write `${var}:refs/...`.
