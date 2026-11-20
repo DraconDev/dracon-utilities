@@ -488,3 +488,33 @@ unless the operator explicitly reclassifies them.
       counted 26,326 "unpushed" commits against it. Delete orphaned tracking
       refs after cutover (also the old project's `gitlab/master`).
     - in zsh, `$var:refs/...` applies the `:r` modifier; write `${var}:refs/...`.
+- **2026-11-20 — ai-auto-writer (superseded media, history-only). Fifth
+  execution; pre-emptive (GitLab 7.85 GB of its 10 GiB cap).**
+  - excised: by blob id (`filter-repo --strip-blobs-with-ids`), every blob
+    absent from the tip tree whose path is `png/jpg/jpeg/webp/gif/epub/pdf/
+    mobi/azw3/bak/pack/idx` or under `.git.corrupt-bak/` — 3,475 blobs /
+    2.10 GiB (superseded covers, author photos, epubs). No current file
+    touched, so no gitignore change was needed.
+  - result: packed 8.00 GiB → 5.89 GiB. The tip alone is 5.28 GiB of shipped
+    books and grows per book — this buys headroom only; the durable fix is
+    bucket storage for generated covers/epubs.
+  - preservation: 310,288 non-stripped (blob, path) pairs before and after;
+    8 differ only in which path `rev-list` names an identical blob
+    (`*.epub.bak-prerename` == `*.epub`); tip tree identical (`5d6a04fb…`).
+  - backup: `~/dracon/backups/ai-auto-writer-pre-slim-20261120.git`
+    (hardlinked mirror, fsck clean, main = cutover old tip `67d6e717`).
+  - cutover: old tip 67d6e717 → cfc7a16e; 0 delta commits; 188 refs CAS-swapped;
+    GitHub in 5 first-parent chunks ≤1.2 GiB + 187 tag/branch leases; GitLab
+    force-push via `PATCH protected_branches/main?allow_force_push=true` and back
+    to false (no unprotect, so no `unprotect_access_levels` drift).
+  - findings:
+    - **force-pushing a rewrite to a GitLab project near its cap fails mid-way**:
+      chunk 1 arrives as a new pack while the old objects still count (8.43 →
+      9.68 GB) and chunk 2 is refused as "would exceed the allocated storage".
+      `POST /projects/:id/housekeeping?task=prune` reclaimed the unreferenced old
+      objects (→ 8.10 GB) and the remaining chunks went through. For a locked
+      project (over cap), delete + recreate instead, as for
+      browser-extensions-shared.
+    - toggling `allow_force_push` on the existing rule is the reversible way to
+      open the window; the unprotect/re-create path cannot restore
+      `unprotect_access_levels`.
